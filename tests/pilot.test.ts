@@ -180,3 +180,43 @@ it("flattens people search clusters before computing pagination", async () => {
   });
   expect(result.next.start).toBe(1);
 });
+
+it("keeps already collected extraction results when cancelled", async () => {
+  const { Extractions } = await import("../src/core/extractions.js");
+  const { store } = storage();
+  let resume: () => void = () => {};
+  const blocked = new Promise<void>((r) => (resume = r));
+  let calls = 0;
+  const jobs = new Extractions(
+    store,
+    async () => {
+      calls++;
+      if (calls === 2) await blocked;
+      return {
+        items: [{ id: String(calls) }],
+        next_cursor: "next",
+        partial: true,
+      };
+    },
+    async () => account,
+    () => "11111111-1111-4111-8111-111111111111",
+  );
+  const job = await jobs.handle("extraction_start", {
+    account_urn: account,
+    kind: "comments",
+    post_urn: "urn:li:activity:1",
+    max_items: 100,
+  });
+  await vi.waitFor(() => expect(calls).toBe(2));
+  await jobs.handle("extraction_cancel", {
+    account_urn: account,
+    operation_id: job.operation_id,
+  });
+  resume();
+  const result = await jobs.handle("extraction_get", {
+    account_urn: account,
+    operation_id: job.operation_id,
+  });
+  expect(result.status).toBe("cancelled");
+  expect(result.items).toEqual([{ id: "1" }]);
+});

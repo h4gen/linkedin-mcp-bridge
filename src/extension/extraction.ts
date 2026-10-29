@@ -226,21 +226,241 @@ export async function extractionOperation(
     });
     return [...profiles.values()];
   };
+  const isUsableControl = (element: HTMLElement): boolean => {
+    if (
+      element.closest('[hidden], [inert], [aria-hidden="true"]') ||
+      element.matches(':disabled, [aria-disabled="true"], [aria-busy="true"]')
+    )
+      return false;
+    const style = getComputedStyle(element);
+    return (
+      style.display !== "none" &&
+      style.visibility !== "hidden" &&
+      element.getClientRects().length > 0
+    );
+  };
+
+  function findReactionTrigger(post: HTMLElement): HTMLElement | null {
+    const controls = Array.from(
+      post.querySelectorAll<HTMLElement>('button, a, [role="button"]'),
+    );
+    return (
+      controls.find((control) => {
+        if (
+          !isUsableControl(control) ||
+          control.closest(
+            '[componentkey^="replaceableComment_"], .comments-comment-entity',
+          )
+        )
+          return false;
+        const ownPost = control.closest(
+          '[data-urn], [data-id^="urn:"], [role="listitem"]',
+        );
+        if (ownPost && ownPost !== post && !ownPost.contains(post))
+          return false;
+        const labelledElement = control.hasAttribute("aria-labelledby")
+          ? control
+          : control.querySelector("[aria-labelledby]");
+        const labelledText = (
+          labelledElement?.getAttribute("aria-labelledby") || ""
+        )
+          .split(/\s+/)
+          .map((id) => document.getElementById(id)?.textContent || "")
+          .join(" ")
+          .trim();
+        const label =
+          control.getAttribute("aria-label") ||
+          labelledText ||
+          elementText(control);
+        return (
+          /^(?:view all reactions|[\d,.\sKMB]+ reactions?)$/i.test(
+            label.trim(),
+          ) ||
+          control.matches(
+            ".social-details-social-counts__reactions-count, .social-details-social-counts__count-value",
+          ) ||
+          !!control.querySelector(
+            ".social-details-social-counts__reactions-count",
+          )
+        );
+      }) || null
+    );
+  }
+
+  const findCommentsRoot = (post: HTMLElement): HTMLElement =>
+    // SDUI permalink comments are siblings of the post, inside its own paged container.
+    post.closest<HTMLElement>('[componentkey*="pagedCommentsContainer"]') ||
+    post;
+
+  function activateReactionTrigger(trigger: HTMLElement) {
+    // SDUI's press control needs the press/release sequence, not only HTMLElement.click().
+    // Keep this strictly scoped to the already-validated reaction-count control.
+    const control =
+      trigger.querySelector<HTMLElement>("[aria-labelledby]") || trigger;
+    control.scrollIntoView?.({
+      block: "nearest",
+      inline: "nearest",
+      behavior: "instant",
+    });
+    const rect = control.getBoundingClientRect();
+    const clientX = rect.left + rect.width / 2;
+    const clientY = rect.top + rect.height / 2;
+    // Dispatch on the actual hit-tested descendant, as a browser click does.
+    // A click on the wrapper skips handlers attached to the icon/list below it.
+    const hit = document.elementFromPoint?.(clientX, clientY);
+    const target = hit && control.contains(hit) ? hit : control;
+    // Let LinkedIn's press handler consume the event and cancel its own link.
+    // Do not pre-cancel a delegated handler at document capture.
+    if (control !== trigger && typeof PointerEvent !== "undefined") {
+      const init = {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        clientX,
+        clientY,
+        button: 0,
+      };
+      const pointer = {
+        ...init,
+        pointerId: 1,
+        pointerType: "mouse",
+        isPrimary: true,
+        width: 1,
+        height: 1,
+      };
+      for (const event of [
+        new PointerEvent("pointerdown", { ...pointer, buttons: 1 }),
+        new MouseEvent("mousedown", { ...init, buttons: 1 }),
+        new PointerEvent("pointerup", { ...pointer, buttons: 0 }),
+        new MouseEvent("mouseup", { ...init, buttons: 0 }),
+        new PointerEvent("click", { ...pointer, detail: 1, buttons: 0 }),
+      ]) {
+        target.dispatchEvent(event);
+      }
+    } else control.click();
+  }
+
+  function findReactionDialog(): HTMLElement | null {
+    const dialogs = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        'dialog[open], [role="dialog"], .artdeco-modal',
+      ),
+    );
+    return (
+      dialogs.find((dialog) => {
+        if (!isUsableControl(dialog)) return false;
+        if (dialog.querySelector(".social-details-reactors-modal__content"))
+          return true;
+        const labelled = (dialog.getAttribute("aria-labelledby") || "")
+          .split(/\s+/)
+          .map((id) => elementText(document.getElementById(id)))
+          .join(" ")
+          .trim();
+        const heading =
+          labelled ||
+          elementText(dialog.querySelector('h1, h2, h3, [role="heading"]'));
+        return /^reactions$/i.test(heading);
+      }) || null
+    );
+  }
+
+  const scrollExtractionList = (root: HTMLElement) => {
+    const candidates = [
+      root,
+      ...Array.from(root.querySelectorAll<HTMLElement>("*")),
+    ];
+    const target = candidates.find(
+      (element) =>
+        element.scrollHeight > element.clientHeight + 20 &&
+        /auto|scroll/.test(getComputedStyle(element).overflowY),
+    );
+    if (target) target.scrollTo({ top: target.scrollHeight, behavior: "auto" });
+    else
+      root.lastElementChild?.scrollIntoView({ block: "end", behavior: "auto" });
+  };
+
   if (
     location.origin !== "https://www.linkedin.com" ||
     /checkpoint|challenge|login/.test(location.pathname)
   )
     throw Error("session_unavailable");
   const expectedPath = "/feed/update/" + a.post_urn;
-  if (decodeURIComponent(location.pathname).replace(/\/$/, "") !== expectedPath)
-    throw Error("open_exact_post_before_extraction");
-  const root = document.querySelector<HTMLElement>('main, [role="main"]');
-  if (!root) throw Error("post_container_missing");
+  const targets = Array.from(
+    document.querySelectorAll<HTMLElement>(
+      "[data-mcp-post-urn],[data-urn],[data-id]",
+    ),
+  ).filter((e) =>
+    ["data-mcp-post-urn", "data-urn", "data-id"].some(
+      (k) => e.getAttribute(k) === a.post_urn,
+    ),
+  );
+  const direct = targets.filter(
+    (e) => !targets.some((other) => other !== e && other.contains(e)),
+  );
+  const onPermalink =
+    decodeURIComponent(location.pathname).replace(/\/$/, "") === expectedPath;
+  const root =
+    direct.length === 1
+      ? direct[0]
+      : onPermalink
+        ? document.querySelector<HTMLElement>('main, [role="main"]')
+        : null;
+  if (!root) throw Error("post_target_not_unique");
   const seen = new Set<string>(state.seen ?? []);
   const items: Profile[] = [];
   const usable = (e: HTMLElement) =>
     !!e.offsetParent &&
     !e.matches(':disabled,[aria-disabled="true"],[aria-busy="true"]');
+  if (op === "reactions_list") {
+    const prior = findReactionDialog();
+    const trigger = findReactionTrigger(root);
+    let dialog = prior;
+    if (
+      prior &&
+      !(
+        onPermalink ||
+        (prior.id && trigger?.getAttribute("aria-controls") === prior.id)
+      )
+    )
+      throw Error("unrelated_dialog_open");
+    if (!dialog) {
+      if (document.querySelector('dialog[open],[role="dialog"]'))
+        throw Error("unrelated_dialog_open");
+      if (!trigger) throw Error("reaction_control_missing");
+      activateReactionTrigger(trigger);
+      for (let attempt = 0; attempt < 12 && !dialog; attempt++) {
+        await new Promise((r) => setTimeout(r, 200));
+        dialog = findReactionDialog();
+      }
+    }
+    if (!dialog) throw Error("reaction_dialog_missing");
+    try {
+      for (let step = 0; step < 5 && items.length < a.limit; step++) {
+        for (const p of extractReactors(dialog)) {
+          const key = p.profile_url?.split(/[?#]/)[0];
+          if (!key || seen.has(key) || items.length >= a.limit) continue;
+          seen.add(key);
+          items.push({ ...p, id: key, headline: p.description });
+        }
+        if (items.length >= a.limit) break;
+        scrollExtractionList(dialog);
+        await new Promise((r) => setTimeout(r, 700));
+      }
+      return {
+        items,
+        partial: true,
+        completeness: "bounded_visible_results",
+        next: items.length ? { seen: [...seen].slice(-5000) } : undefined,
+      };
+    } finally {
+      if (!prior)
+        dialog
+          .querySelector<HTMLElement>(
+            'button[aria-label="Dismiss"],button[aria-label="Close"],button[aria-label="Schließen"],.artdeco-modal__dismiss',
+          )
+          ?.click();
+    }
+  }
   let advances = 0;
   for (let step = 0; step < 5 && items.length < a.limit; step++) {
     for (const p of extractCommenters(root)) {

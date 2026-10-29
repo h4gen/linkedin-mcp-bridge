@@ -295,7 +295,6 @@ export class Engine {
       "profile_get",
       "people_search",
       "people_search_filters",
-      "reactions_list",
       "invitations_list",
     ].includes(op);
     const result = api

@@ -63,10 +63,25 @@ const engine = new Engine({
   fetch: fetchRequest,
   dom: async (op, a, state) => {
     const id = await tabId();
-    if (["comments_list", "post_get"].includes(op)) {
+    if (["comments_list", "reactions_list", "post_get"].includes(op)) {
       const url = "https://www.linkedin.com/feed/update/" + a.post_urn + "/";
       const tab = await chrome.tabs.get(id);
-      if (tab.url !== url) {
+      const target = await chrome.scripting.executeScript({
+        target: { tabId: id },
+        world: "ISOLATED",
+        func: (urn: string) =>
+          Array.from(
+            document.querySelectorAll(
+              "[data-mcp-post-urn],[data-urn],[data-id]",
+            ),
+          ).some((e) =>
+            ["data-mcp-post-urn", "data-urn", "data-id"].some(
+              (k) => e.getAttribute(k) === urn,
+            ),
+          ),
+        args: [a.post_urn],
+      });
+      if (!target[0]?.result && tab.url !== url) {
         await chrome.tabs.update(id, { url });
         for (let attempt = 0; attempt < 40; attempt++) {
           await new Promise((r) => setTimeout(r, 250));
@@ -79,7 +94,9 @@ const engine = new Engine({
     const result = await chrome.scripting.executeScript({
       target: { tabId: await tabId() },
       world: "ISOLATED",
-      func: op === "comments_list" ? extractionOperation : domOperation,
+      func: ["comments_list", "reactions_list"].includes(op)
+        ? extractionOperation
+        : domOperation,
       args: [op, a, state],
     });
     if (!result[0]?.result) throw new Fault("ui_operation_failed");

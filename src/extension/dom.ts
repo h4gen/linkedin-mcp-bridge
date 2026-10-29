@@ -46,6 +46,7 @@ export async function domOperation(
       ),
     ]) {
       for (const attr of [
+        "data-mcp-post-urn",
         "data-urn",
         "data-id",
         "data-entity-urn",
@@ -237,12 +238,16 @@ export async function domOperation(
               urn &&
               post.isConnected &&
               postData(post).scan_key === initial.scan_key
-            )
+            ) {
+              post.setAttribute("data-mcp-post-urn", urn);
               return {
                 ...initial,
                 entityUrn: urn,
-                url: "https://www.linkedin.com/feed/update/" + urn,
+                url: urn.startsWith("urn:li:activity:")
+                  ? "https://www.linkedin.com/feed/update/" + urn
+                  : null,
               };
+            }
           }
         }
       }

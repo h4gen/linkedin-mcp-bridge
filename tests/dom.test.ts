@@ -62,3 +62,27 @@ it("scrolls the nearest actual overflow container to discover another page", asy
   expect(scroll).toHaveBeenCalledTimes(1);
   expect(result.items.map((x: any) => x.text)).toEqual(["First", "Second"]);
 });
+
+it("reads only the resolved post's comments and excludes controls from comment text", async () => {
+  const { extractionOperation } = await import(
+    "../src/extension/extraction.js"
+  );
+  page(
+    '<main><div data-mcp-post-urn="urn:li:share:1"><div componentkey="replaceableComment_one"><a href="/in/author"><p>Author</p><p>Founder</p></a><button aria-label="View more options for Author’s comment."></button><div data-testid="expandable-text-box">Useful comment<button>more</button></div></div></div><div componentkey="replaceableComment_other"><a href="/in/unrelated"><p>Unrelated</p></a><p>Do not extract me</p></div></main>',
+  );
+  const result = await extractionOperation(
+    "comments_list",
+    { post_urn: "urn:li:share:1", limit: 3 },
+    {},
+  );
+  expect(result.items).toHaveLength(1);
+  expect(result.items[0].text).toBe("Useful comment");
+  expect(result.items[0].truncated).toBe(true);
+  const next = await extractionOperation(
+    "comments_list",
+    { post_urn: "urn:li:share:1", limit: 3 },
+    result.next,
+  );
+  expect(next.items).toEqual([]);
+  expect(next.partial).toBe(true);
+});
