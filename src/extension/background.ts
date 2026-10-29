@@ -100,6 +100,8 @@ const engine = new Engine({
       args: [op, a, state],
     });
     if (!result[0]?.result) throw new Fault("ui_operation_failed");
+    if (result[0].result.bridge_error)
+      throw new Fault(result[0].result.bridge_error);
     return result[0].result;
   },
   account: async () => {
