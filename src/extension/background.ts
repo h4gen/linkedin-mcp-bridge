@@ -161,6 +161,17 @@ const engine = new Engine({
       (await chrome.tabs.get(id)).status !== "complete";
       attempt++
     ) {
+      // Background resources may keep Chrome's tab status loading after the
+      // document is interactive. Never accept the old document of a pending navigation.
+      const loadingTab = await chrome.tabs.get(id);
+      if (!loadingTab.pendingUrl) {
+        const ready = await chrome.scripting.executeScript({
+          target: { tabId: id },
+          world: "ISOLATED",
+          func: () => document.readyState !== "loading" && !!document.body,
+        });
+        if (ready[0]?.result === true) break;
+      }
       if (attempt >= 40)
         throw new Fault(
           "work_tab_navigation_timeout",
