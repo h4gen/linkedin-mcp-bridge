@@ -1,8 +1,4 @@
-import {
-  acceptedWrites,
-  capabilities,
-  capabilityStatus,
-} from "./capabilities.js";
+import { capabilities, capabilityStatus } from "./capabilities.js";
 import { VERSION, PROTOCOL } from "../version.js";
 import { Args, Fault, Operation, parse, writes } from "./contracts.js";
 import {
@@ -29,14 +25,6 @@ export interface Deps {
   now: () => number;
   uuid: () => string;
   hash: (text: string) => Promise<string>;
-  authorize?: (
-    op: Operation,
-    args: Args,
-    fingerprint: string,
-    key: string,
-    preview?: Args[],
-  ) => Promise<Args | undefined>;
-  allowedWrites?: ReadonlySet<Operation>;
   cursorContext?: (op: Operation, state: Args) => Promise<void>;
   checkpoint?: () => Promise<void>;
   generation?: () => number;
@@ -119,10 +107,7 @@ export class Engine {
       return {
         version: VERSION,
         protocol: PROTOCOL,
-        accepted_writes: [...acceptedWrites].filter((op) =>
-          d.allowedWrites?.has(op),
-        ),
-        enabled_writes: d.allowedWrites ? [...d.allowedWrites] : [],
+        enabled_writes: [...writes],
         connected: usable,
         error,
         account_urn: expected ?? null,
@@ -150,15 +135,7 @@ export class Engine {
     const key = await d.hash(`${expected}:${a.idempotency_key ?? ""}`);
     if (op === "operation_get") {
       const row = journal[key];
-      if (!row) {
-        const approval = await d.store.get("approval:" + key);
-        return approval
-          ? {
-              status: approval.expires < d.now() ? "expired" : approval.status,
-              operation_id: approval.id,
-            }
-          : { status: "not_found", retention_days: 7 };
-      }
+      if (!row) return { status: "not_found", retention_days: 7 };
       if (
         row.operation === "message_send" &&
         ["pending", "unknown_outcome"].includes(row.status)
@@ -194,8 +171,6 @@ export class Engine {
           replayed: true,
         };
       }
-      if (d.allowedWrites && !d.allowedWrites.has(op))
-        throw new Fault("capability_not_accepted");
       if (op === "message_send") {
         const wanted = [...a.expected_participant_urns].sort();
         if (a.recipient_urn) {
@@ -249,23 +224,16 @@ export class Engine {
         !actor?.name
       )
         throw new Fault("actor_identity_unavailable");
-      const preview: Args[] = target?.profile ? [target.profile] : [];
       if (d.identity && op === "invitation_send") {
         const identity = await d.identity(a.profile_urn);
         if (!identity?.name) throw new Fault("recipient_identity_unavailable");
-        preview.push(identity);
       }
       if (d.identity && op === "message_send") {
         for (const urn of a.expected_participant_urns) {
           const identity = await d.identity(urn);
           if (!identity?.name)
             throw new Fault("recipient_identity_unavailable");
-          preview.push(identity);
         }
-      }
-      if (d.authorize) {
-        const pending = await d.authorize(op, a, scope, key, preview);
-        if (pending) return pending;
       }
       check();
       const origin = d.uuid();
@@ -287,7 +255,6 @@ export class Engine {
       journal[key] = row;
       await d.checkpoint?.();
       await d.store.set("journal", journal); // durable before dispatch
-      await d.store.remove("approval:" + key);
       let dispatched = false;
       try {
         check();

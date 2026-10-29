@@ -1,7 +1,5 @@
 import { cursorEvictions } from "../core/cursor-budget.js";
 import { retryAt } from "../core/errors.js";
-import { Approvals } from "../core/approvals.js";
-import { enabledWrites } from "../core/capabilities.js";
 import { Engine, Store } from "../core/engine.js";
 import { Fault } from "../core/contracts.js";
 import { self, normalize } from "../core/normalize.js";
@@ -15,7 +13,6 @@ const area = (k: string) =>
   k.startsWith("identity:") ||
   k.startsWith("post-url:") ||
   k.startsWith("cursor:") ||
-  k.startsWith("approval:") ||
   k.startsWith("extraction:")
     ? chrome.storage.session
     : chrome.storage.local;
@@ -120,13 +117,10 @@ async function validateDomCursor(_op: string, state: Record<string, any>) {
   if (check[0]?.result !== state.dom_session)
     throw new Fault("cursor_invalidated");
 }
-const approvals = new Approvals(store);
 const engine = new Engine({
   generation: () => generation,
   identity: (urn) => store.get("identity:" + urn),
   cursorContext: validateDomCursor,
-  allowedWrites: enabledWrites,
-  authorize: (...args) => approvals.request(...args),
   store,
   fetch: fetchRequest,
   dom: async (op, a, state) => {
@@ -365,35 +359,11 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   // Popup only. No content-script bridge or externally_connectable surface.
   if (
     sender.id !== chrome.runtime.id ||
-    !["popup.html", "review.html"].some(
-      (page) => sender.url === chrome.runtime.getURL(page),
-    )
+    sender.url !== chrome.runtime.getURL("popup.html")
   )
     return;
   (async () => {
     await initialized;
-    if (msg.action === "approvals") {
-      const all = await chrome.storage.session.get(null);
-      return {
-        items: Object.entries(all)
-          .filter(
-            ([k, v]) =>
-              k.startsWith("approval:") &&
-              (v as any).expires > Date.now() &&
-              (v as any).status === "approval_required",
-          )
-          .map(([, v]) => v),
-      };
-    }
-    if (msg.action === "decide") {
-      const row = await approvals.decide(msg.key, msg.id, msg.approve === true);
-      if (msg.approve === true) return engine.run(row.operation, row.args);
-      return { status: "rejected" };
-    }
-    if (msg.action === "inbox-permission") {
-      await store.set("allowInboxChanges", msg.enabled === true);
-      return { enabled: msg.enabled === true };
-    }
     if (msg.action === "clear") {
       generation++;
       await invalidateDocument();
@@ -414,7 +384,6 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
         native: !!port,
         extensionId: chrome.runtime.id,
         version: chrome.runtime.getManifest().version,
-        allowInboxChanges: (await store.get("allowInboxChanges")) === true,
         blockedUntil: await store.get("blockedUntil"),
       };
     if (msg.action === "connect") {
@@ -481,9 +450,7 @@ chrome.alarms.onAlarm.addListener(async () => {
   const cursors = await chrome.storage.session.get(null);
   for (const [k, v] of Object.entries(cursors))
     if (
-      (k.startsWith("cursor:") ||
-        k.startsWith("approval:") ||
-        k.startsWith("extraction:")) &&
+      (k.startsWith("cursor:") || k.startsWith("extraction:")) &&
       (v as { expires: number }).expires < Date.now()
     )
       await chrome.storage.session.remove(k);
@@ -494,6 +461,7 @@ const initialized = (async () => {
   if ((await store.get("schemaVersion")) !== VERSION) {
     generation++;
     await chrome.storage.session.clear();
+    await chrome.storage.local.remove("allowInboxChanges");
     const connection = await store.get("connection");
     if (connection)
       await store.set("connection", { ...connection, paused: true });

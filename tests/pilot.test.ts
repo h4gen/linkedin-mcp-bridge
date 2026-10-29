@@ -1,5 +1,4 @@
 import { describe, it, expect, vi } from "vitest";
-import { Approvals, ACCEPTED_WRITES } from "../src/core/approvals.js";
 import { Engine, Store } from "../src/core/engine.js";
 import { readApi } from "../src/core/api.js";
 import { parse } from "../src/core/contracts.js";
@@ -22,16 +21,11 @@ const send = {
   recipient_urn: "urn:li:fsd_profile:friend",
   expected_participant_urns: ["urn:li:fsd_profile:friend"],
   text: "Grüße 👋",
-  idempotency_key: "approval-test",
+  idempotency_key: "direct-write-test",
 };
-describe("extension-owned approvals", () => {
-  it("does not send before approval; binds content; rejects external decisions", async () => {
-    const { store } = storage();
-    const approvals = new Approvals(
-      store,
-      () => 1,
-      () => "review-id",
-    );
+describe("direct writes", () => {
+  it("dispatches immediately once and preserves content-bound idempotency", async () => {
+    const { store, data } = storage();
     const fetch = vi.fn(async (r: any) =>
       r.path === "/me"
         ? { data: { miniProfile: { entityUrn: account } } }
@@ -45,46 +39,17 @@ describe("extension-owned approvals", () => {
       now: () => 1,
       uuid: () => "00112233-4455-4677-8899-aabbccddeeff",
       hash: async (s) => s,
-      authorize: (...args) => approvals.request(...args),
-      allowedWrites: ACCEPTED_WRITES,
     });
-    const pending = await engine.run("message_send", send);
-    expect(pending.status).toBe("approval_required");
-    expect(fetch.mock.calls.some(([r]) => r.method)).toBe(false);
+    expect((await engine.run("message_send", send)).status).toBe("confirmed");
     await expect(
       engine.run("message_send", { ...send, text: "changed" }),
     ).rejects.toThrow("idempotency_conflict");
-    expect(() => parse("approval_decide", {})).toThrow();
-    await expect(
-      approvals.decide(account + ":" + send.idempotency_key, "wrong", true),
-    ).rejects.toThrow();
-    await approvals.decide(
-      account + ":" + send.idempotency_key,
-      pending.operation_id,
-      true,
-    );
-    expect((await engine.run("message_send", send)).status).toBe("confirmed");
     expect((await engine.run("message_send", send)).replayed).toBe(true);
     expect(fetch.mock.calls.filter(([r]) => r.method)).toHaveLength(1);
-  });
-  it("expires drafts and deletes rejected content", async () => {
-    const { store, data } = storage();
-    let now = 1;
-    const approvals = new Approvals(
-      store,
-      () => now,
-      () => "id",
+    expect(Object.keys(data).some((k) => k.startsWith("approval:"))).toBe(
+      false,
     );
-    await approvals.request("message_send", send, "hash", "key");
-    await approvals.decide("key", "id", false);
-    expect(data["approval:key"].args).toBeUndefined();
-    await expect(
-      approvals.request("message_send", send, "hash", "key"),
-    ).rejects.toThrow("approval_rejected");
-    now += 1800001;
-    await expect(
-      approvals.request("message_send", send, "hash", "key"),
-    ).rejects.toThrow("approval_expired");
+    expect(() => parse("approval_decide", {})).toThrow();
   });
 });
 describe("GTM and inbox pages", () => {

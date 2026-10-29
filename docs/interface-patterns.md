@@ -1,4 +1,4 @@
-# Interface contract — 0.3
+# Interface contract — 0.4
 
 ## Source-shaped reads
 
@@ -22,7 +22,7 @@ Comments expose identity quality (`source` or `session`), text truncation and pa
 
 ## Writes and recovery
 
-Writes use exact targets, idempotency keys and extension-owned payload confirmation. A preview is not a send. Message previews use resolved recipient names and verified profile URLs. Existing-thread sends validate all participants. Only message send and read/archive changes are enabled pending further acceptance.
+Writes execute directly with exact targets and idempotency keys. Existing-thread sends validate all participants. All implemented writes are enabled; no approval states or review queue exist. `operation_get` returns an execution receipt or `not_found`.
 
 Operation receipts survive updates for seven days. A pending/interrupted send is unknown, never automatically resent. `operation_get` can read known receipts without a live network session and attempts bounded reconciliation for unknown sends. Reconciliation uses the origin token and exact conversation, traversing older history or locating a new-recipient conversation. Missing evidence never proves failure.
 
@@ -32,4 +32,4 @@ Read timeouts permit read retry; ambiguous writes require receipt inspection. Cu
 
 0.3 removes the three extraction job tools and introduces `conversations_get` and output schemas for every operation. Profile and invitation results are compact typed views. Temporary 0.2 cursors/drafts are cleared on migration; content-free send receipts are retained. Original write inputs and fingerprints remain compatible.
 
-The capability registry is shared by dispatch, tool listing and release checking. The development build exposes 17 of 24 operations. All original capabilities are mandatory for the full pilot; seven unaccepted writes are blockers, not silently dropped scope. Current-build live acceptance must be documented separately from historical evidence and passing unit tests.
+The capability registry is shared by dispatch, tool listing and release checking. All 24 operations are exposed. Current-build live acceptance remains separate from availability and passing unit tests. Updating to 0.4 clears temporary session state and the obsolete inbox permission, pauses the connection for reconnection, and retains seven-day mutation receipts. Old drafts are never dispatched automatically.

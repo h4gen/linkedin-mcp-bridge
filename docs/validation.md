@@ -93,3 +93,9 @@ The user authorized a deletion test for Parth Patel, selection of a new invitati
 A local development build can explicitly expose these four capabilities for acceptance with `BRIDGE_TEST_WRITES=conversation_delete,invitation_send,invitation_respond,invitation_withdraw npm run build`. Each is marked `acceptance_test_only` in health and still requires the normal extension-owned approval and postcondition checks. A normal build disables them; pilot builds reject the flag, and packaged companions ignore it. This does not change accepted capability evidence. Test-build policy and the existing regression suite pass 65 tests.
 
 The extension review page is inaccessible to the browser automation surface due to its security policy. No alternate surface or approval-storage bypass is used. Live mutations require the user to review the prepared requests in the extension; until that happens, they remain pending and must not be reported as accepted.
+
+## 0.4 direct execution (2026-10-29)
+
+All 24 operations are exposed without extension approvals or acceptance-based execution gates. The review page, approval store/handlers and test-write build flag were removed. Migration preserves mutation receipts, clears temporary state and the obsolete inbox permission, and pauses the connection without dispatching old drafts. The earlier approval requirements in this record are historical.
+
+Typecheck and 65 automated tests pass, including immediate single dispatch with idempotent replay, actual MCP discovery of all 24 tools, and actual MV3 migration with retained receipts and no draft execution. Live results for the five previously prepared actions are recorded separately against the tested canonical commit under `artifacts/qa/`. No additional public-write or message acceptance is inferred.

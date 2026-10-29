@@ -9,6 +9,13 @@ async function action(action: string) {
         "Please acknowledge the data flow before connecting.";
       return;
     }
+    if (
+      action === "clear" &&
+      !confirm(
+        "Disconnect and delete all local bridge data? Previous send receipts will no longer prevent duplicates.",
+      )
+    )
+      return;
     const r = await chrome.runtime.sendMessage({ action });
     if (r.error) {
       status.textContent = r.error;
@@ -27,9 +34,4 @@ for (const b of document.querySelectorAll<HTMLButtonElement>(
   "button[data-action]",
 ))
   b.addEventListener("click", () => void action(b.dataset.action!));
-document
-  .querySelector("#review")
-  ?.addEventListener("click", () =>
-    chrome.tabs.create({ url: chrome.runtime.getURL("review.html") }),
-  );
 void action("status");

@@ -58,3 +58,7 @@ Reaction/comment readers use scoped visible DOM adapters adapted from the user's
 Jobs and dormant alternative reaction/comment adapters have been removed. The active DOM reader retains owned dialogs and binds cursors to a dedicated work tab/document session. Server cursors, timestamp boundaries, offset pages and local scans remain distinct adapter mechanisms. `conversations_get` shares identity-bound lookup with recipient checks and state verification; mailbox-only lookup is used for deletion postconditions. Source arrays are no longer silently truncated, ambiguous/wrong collections fail, and invitation shared secrets are excluded from results.
 
 An already-connected profile inspected on 2026-10-29 exposed its exact profile URN in its Message compose link and visible `· 1st` text near the profile heading. The connection postcondition reader requires both observed identity and visible degree in that profile scope. An invitation card disappearing alone is not sufficient acceptance evidence.
+
+## 0.4 execution policy
+
+The earlier enabled-write restrictions above are historical. All implemented operations now execute directly without extension approval. Endpoint acceptance remains evidence-based and separate from availability.

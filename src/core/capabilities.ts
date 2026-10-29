@@ -58,10 +58,6 @@ const list = (item: z.ZodType) =>
   });
 const mutation = row({
   status: z.enum([
-    "approval_required",
-    "approved",
-    "rejected",
-    "expired",
     "pending",
     "unknown_outcome",
     "failed_before_dispatch",
@@ -171,18 +167,6 @@ const definitions = {
     output: z.ZodObject<any>;
   }
 >;
-export const acceptedWrites: ReadonlySet<Operation> = new Set([
-  "message_send",
-  "conversation_update",
-]);
-const testWrites: Operation[] =
-  process.env.BRIDGE_CHANNEL === "development"
-    ? JSON.parse(process.env.BRIDGE_TEST_WRITES ?? "[]")
-    : [];
-export const enabledWrites: ReadonlySet<Operation> = new Set([
-  ...acceptedWrites,
-  ...testWrites,
-]);
 export const capabilities = Object.fromEntries(
   Object.keys(schemas).map((name) => {
     const op = name as Operation;
@@ -190,7 +174,7 @@ export const capabilities = Object.fromEntries(
       op,
       {
         ...definitions[op],
-        enabled: !writes.has(op) || enabledWrites.has(op),
+        enabled: true,
         required: true,
       },
     ];
@@ -213,7 +197,6 @@ export function capabilityStatus(connected: boolean) {
   return Object.entries(capabilities).map(([name, c]) => ({
     name,
     implemented: true,
-    acceptance_test_only: testWrites.includes(name as Operation),
     accepted: buildAcceptance.passed?.includes(name) ?? false,
     acceptance: buildAcceptance.passed?.includes(name)
       ? "current_build_live_acceptance"

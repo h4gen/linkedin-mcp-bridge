@@ -2,7 +2,7 @@
 
 A separate macOS-first MCP server and Chrome MV3 extension. The local Node process communicates with the extension through Chrome Native Messaging and a private Unix socket. LinkedIn session credentials stay in the browser. No hosted relay, remote scripts, background inbox indexing or telemetry.
 
-**Development candidate 0.3.0 — not submitted to the Chrome Web Store.** Outgoing messages now require content-bound extension review. Public writes, invitation mutations and deletion are disabled pending acceptance. Inbox/history, filtered people search, feed identity resolution and paginated reaction/comment reads have live checks; see [validation](docs/validation.md). The pilot includes a separate bundled macOS companion and a release gate that fails until publishing prerequisites and acceptance are complete.
+**Development candidate 0.4.0 — not submitted to the Chrome Web Store.** All 24 operations are available. Writes execute directly after account, target and idempotency checks, without extension confirmation. Inbox/history, filtered people search, feed identity resolution and paginated reaction/comment reads have live checks; see [validation](docs/validation.md). The pilot includes a separate bundled macOS companion and a release gate that fails until publishing prerequisites and acceptance are complete.
 
 ## Install locally
 
@@ -79,7 +79,7 @@ Every write requires `idempotency_key`. Use the same key for a retry of the same
 
 `message_send` requires either `conversation_urn` or `recipient_urn`, plus exact `expected_participant_urns` excluding yourself. Existing-conversation validation first checks an exact conversation entity in the history response, then traverses Inbox, Archive and Spam within the operation deadline. It fails closed if participants cannot be verified. There is no fixed 260-thread limit. New recipient sends require one exact profile URN. Group replies use the exact participant set; group creation is excluded.
 
-Each enabled write initially returns `approval_required`. Open **Review actions & settings** and inspect account, recipients and content. Confirming executes the stored request once; rejecting removes the draft body. MCP cannot approve itself. Reversible inbox changes may be enabled separately in that UI. `operation_get` reads the result, and the same key replays the persisted receipt. Unaccepted writes return `capability_not_accepted`.
+Writes execute immediately through the connected account. There is no extension review queue or per-operation approval. `operation_get` reads persisted execution receipts, and the same key replays the receipt without dispatching again. Live acceptance is reported separately from availability.
 
 Statuses:
 
@@ -103,7 +103,7 @@ Feed pagination is a bounded live scroll. `post_resolve` resolves a rendered car
 
 Collection jobs were removed in 0.3. Use direct cursor pages. DOM reads use a dedicated LinkedIn work tab and bring it forward to avoid background timer throttling. Navigating or clicking controls in that tab invalidates its traversal cursor; API reads do not. A consumed cursor replays its cached page. Session cursors expire after 30 minutes and share a 5 MiB storage budget. See [interface contract](docs/interface-patterns.md).
 
-The registry defines 24 operations; 17 are currently exposed. The seven unaccepted write operations remain disabled. `health` reports implementation, current-build acceptance, enablement and availability separately. `release:check` requires every original basic capability to be enabled and backed by current-commit acceptance evidence; disabled operations are release blockers.
+The registry exposes all 24 operations in development and pilot builds. `health` reports current-build acceptance separately from availability. `release:check` still requires current-commit evidence for every capability and the publishing prerequisites; acceptance does not gate individual calls.
 
 ## Development and packaging
 

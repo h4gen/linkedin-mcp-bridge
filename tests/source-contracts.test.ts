@@ -136,7 +136,7 @@ it("every tool has a single registered output contract and jobs are absent", () 
     false,
   );
   for (const c of Object.values(capabilities)) expect(c.output).toBeDefined();
-  expect(capabilities.conversation_delete.enabled).toBe(false);
+  for (const c of Object.values(capabilities)) expect(c.enabled).toBe(true);
 });
 
 it("strips invitation shared secrets and returns only the typed invitation view", async () => {

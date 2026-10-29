@@ -27,7 +27,7 @@ Pending receipt persistence happens before a write. An interrupted/pending recei
 
 No cloud dependencies or runtime coupling to the existing Google Ads bridge or LinkedIn extractor. No canonical remote exists yet; this new repository's local `main` is its current integration branch. Store publication/deployment is not part of the local test build.
 
-## Pilot 0.2 additions
+## Historical pilot 0.2 additions
 
 Extension-owned session approvals bind the exact account/operation/payload hash/key and expire after 30 minutes. Only packaged popup/review page senders can decide them; no approval tool exists in MCP. Enabled mutations are message_send and conversation_update. The original unaccepted handlers remain present but cannot execute through the extension.
 
@@ -42,3 +42,7 @@ API adapters own server cursor, timestamp and offset semantics. DOM adapters own
 Conversation lookup is shared by public reads, exact recipient validation and mutation postconditions. State verification requests the necessary source fields instead of accepting a partial conversation entity. Delete verification scans mailbox membership, not still-readable historical messages. Message reconciliation follows older pages and can locate new-recipient conversations without dispatching again.
 
 A connection-generation change invalidates queued operations and guards journal writes. In-flight external actions may still have taken effect; no retry is implied. Old pending receipts stay unknown. Updating to 0.3 clears temporary cursors/drafts, pauses the connection for reconnection to the work tab, and retains the seven-day mutation journal.
+
+## 0.4 direct writes
+
+All 24 operations are exposed in every build. The approval module, review UI, inbox permission and test-write build flag have been removed. Writes retain account/target checks, serialization, durable receipts and postconditions. Acceptance metadata informs release readiness only. Migration clears session drafts and the old inbox preference without replaying actions or deleting the mutation journal; it pauses the bound connection for reconnection. Local data clearing is available in the popup.

@@ -1,5 +1,4 @@
 import { acceptanceDefine } from "./build-acceptance.mjs";
-import { testWrites } from "./test-writes.mjs";
 import { build } from "esbuild";
 import { mkdir, writeFile, chmod, rm, cp } from "node:fs/promises";
 const channel =
@@ -7,9 +6,6 @@ const channel =
 const define = {
   "process.env.BRIDGE_CHANNEL": JSON.stringify(channel),
   "process.env.BRIDGE_ACCEPTANCE": await acceptanceDefine(),
-  "process.env.BRIDGE_TEST_WRITES": JSON.stringify(
-    JSON.stringify(testWrites(channel, process.env.BRIDGE_TEST_WRITES)),
-  ),
 };
 await rm("dist", { recursive: true, force: true });
 await mkdir("dist/extension", { recursive: true });
@@ -25,11 +21,7 @@ await build({
 });
 await build({
   define,
-  entryPoints: [
-    "src/extension/background.ts",
-    "src/extension/popup.ts",
-    "src/extension/review.ts",
-  ],
+  entryPoints: ["src/extension/background.ts", "src/extension/popup.ts"],
   outdir: "dist/extension",
   bundle: true,
   platform: "browser",
@@ -43,7 +35,7 @@ await writeFile(
     {
       manifest_version: 3,
       name: "LinkedIn MCP Bridge" + (channel === "pilot" ? " BETA" : " Dev"),
-      version: "0.3.0",
+      version: "0.4.0",
       description:
         "Local MCP access to your connected LinkedIn tab. Messaging, profiles and feed.",
       minimum_chrome_version: "120",
@@ -62,7 +54,6 @@ await writeFile(
 );
 for (const file of [
   "popup.html",
-  "review.html",
   "ui.css",
   "icon16.png",
   "icon48.png",

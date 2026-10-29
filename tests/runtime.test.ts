@@ -59,7 +59,7 @@ it("serves all typed tools through actual MCP stdio", async () => {
   try {
     await client.connect(transport);
     const result = await client.listTools();
-    expect(result.tools).toHaveLength(17);
+    expect(result.tools).toHaveLength(24);
     expect(result.tools.every((x) => x.outputSchema)).toBe(true);
     expect(
       result.tools.some((x) => x.name.startsWith("linkedin_extraction_")),
@@ -172,7 +172,7 @@ it("validates real MCP responses after tool discovery without losing output pass
           result: {
             connected: false,
             capabilities: [],
-            version: "0.3.0",
+            version: "0.4.0",
             protocol: 1,
             account_urn: null,
             transport: "local_native_messaging",
@@ -207,7 +207,7 @@ it("validates real MCP responses after tool discovery without losing output pass
     });
     expect(result.isError).not.toBe(true);
     expect(result.structuredContent).toMatchObject({
-      version: "0.3.0",
+      version: "0.4.0",
       connected: false,
     });
     rateLimited = true;
@@ -225,4 +225,102 @@ it("validates real MCP responses after tool discovery without losing output pass
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await fs.rm(home, { recursive: true, force: true });
   }
+});
+
+it("migrates old drafts without dispatch and retains mutation receipts", async () => {
+  const receipt = {
+    status: "pending",
+    created_at: Date.now(),
+    target: "urn:li:msg_conversation:old",
+  };
+  const local: Record<string, any> = {
+    schemaVersion: "0.3.0",
+    allowInboxChanges: true,
+    journal: { old: receipt },
+    connection: { account: "urn:li:fsd_profile:me", tabId: 7, paused: false },
+  };
+  const session: Record<string, any> = {
+    "approval:old": {
+      status: "approval_required",
+      args: { text: "Never auto-send" },
+    },
+  };
+  const area = (data: Record<string, any>) => ({
+    get: async (key: string | null) =>
+      key === null ? { ...data } : { [key!]: data[key!] },
+    set: async (values: Record<string, any>) => {
+      Object.assign(data, values);
+    },
+    remove: async (key: string) => {
+      delete data[key];
+    },
+    clear: async () => {
+      for (const key of Object.keys(data)) delete data[key];
+    },
+  });
+  let listener: any;
+  let dispatched = 0;
+  const chrome = {
+    storage: { local: area(local), session: area(session) },
+    runtime: {
+      id: "extension",
+      getURL: (page: string) => "chrome-extension://extension/" + page,
+      getManifest: () => ({ version: "0.4.0" }),
+      onMessage: {
+        addListener: (fn: any) => {
+          listener = fn;
+        },
+      },
+      connectNative: () => ({
+        onMessage: { addListener() {} },
+        onDisconnect: { addListener() {} },
+      }),
+    },
+    scripting: {
+      executeScript: () => {
+        dispatched++;
+        throw Error("Unexpected browser action");
+      },
+    },
+    alarms: { create() {}, onAlarm: { addListener() {} } },
+  };
+  vm.runInNewContext(
+    await fs.readFile("dist/extension/background.js", "utf8"),
+    {
+      chrome,
+      console,
+      crypto: globalThis.crypto,
+      setTimeout,
+      clearTimeout,
+      TextEncoder,
+      URLSearchParams,
+    },
+  );
+  const sender = { id: "extension", url: chrome.runtime.getURL("popup.html") };
+  const status: any = await new Promise((resolve) =>
+    listener({ action: "status" }, sender, resolve),
+  );
+  expect(status.version).toBe("0.4.0");
+  expect(local.journal.old).toEqual(receipt);
+  expect(local.connection.paused).toBe(true);
+  expect(local.allowInboxChanges).toBeUndefined();
+  expect(session).toEqual({});
+  expect(dispatched).toBe(0);
+  const removed: any = await new Promise((resolve) =>
+    listener({ action: "decide" }, sender, resolve),
+  );
+  expect(removed.error).toBe("unknown_popup_action");
+  expect(
+    listener(
+      { action: "clear" },
+      { ...sender, url: chrome.runtime.getURL("review.html") },
+      () => {},
+    ),
+  ).toBeUndefined();
+  const popup = await fs.readFile("dist/extension/popup.html", "utf8");
+  expect(popup).not.toContain('id="review"');
+  expect(popup).toContain('data-action="clear"');
+  expect(
+    await fs.stat("dist/extension/review.html").catch(() => null),
+  ).toBeNull();
 });
