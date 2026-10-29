@@ -173,7 +173,11 @@ export async function extractionOperation(
           ? elementText(
               item.querySelector(".comments-comment-meta__description-title"),
             )
-          : nameMatch?.[1]?.trim() || elementText(metaLink.querySelector("p"));
+          : nameMatch?.[1]?.trim() ||
+            elementText(metaLink.querySelector("p"))
+              .split("\n")[0]
+              .replace(/\s+(?:Verified|Premium)\s+Profile.*$/, "")
+              .replace(/\s+•\s*\d.*$/, "");
         if (!name) return;
         const metadata = Array.from(metaLink.querySelectorAll("p")).map(
           elementText,
@@ -227,6 +231,16 @@ export async function extractionOperation(
               : metaLink,
           ).match(/•\s*([123])(?:st|nd|rd)?\+?/i)?.[1],
           comment_id,
+          parent_comment_id: (() => {
+            const parent = item.parentElement?.closest(COMMENT_SELECTOR);
+            return parent
+              ? parent.getAttribute("componentkey") ||
+                  parent.getAttribute("data-id") ||
+                  parent.getAttribute("data-urn") ||
+                  parent.id ||
+                  null
+              : null;
+          })(),
           comment_text: comment_text || undefined,
           comment_text_truncated: content.some((part) => part.truncated),
         });
@@ -511,7 +525,7 @@ export async function extractionOperation(
           },
           text: p.comment_text,
           truncated: p.comment_text_truncated,
-          parent_id: null,
+          parent_id: p.parent_comment_id ?? null,
         });
       }
       if (items.length >= a.limit) break;

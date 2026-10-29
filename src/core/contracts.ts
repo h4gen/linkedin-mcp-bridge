@@ -79,7 +79,11 @@ export const schemas = {
     .object({ ...page, query: z.string().trim().min(1).max(200), filters })
     .strict(),
   people_search_filters: z
-    .object({ ...account, query: z.string().trim().min(1).max(200) })
+    .object({
+      ...account,
+      query: z.string().trim().min(1).max(200),
+      kind: z.enum(["location", "company"]).default("location"),
+    })
     .strict(),
   extraction_start: z
     .object({

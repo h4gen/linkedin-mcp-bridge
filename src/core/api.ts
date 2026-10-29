@@ -1,6 +1,7 @@
 import { Args, Fault, Operation } from "./contracts.js";
 import { collection, normalize, restli } from "./normalize.js";
 export type Request = {
+  surface?: "guest_typeahead";
   path: string;
   method?: "POST" | "DELETE";
   body?: unknown;
@@ -87,48 +88,31 @@ export async function readApi(
     };
   }
   if (op === "people_search_filters") {
-    const raw = await fetch(
-      graph("people", {
-        start: 0,
-        count: 1,
-        origin: "GLOBAL_SEARCH_HEADER",
-        query: {
-          keywords: a.query,
-          flagshipSearchIntent: "SEARCH_SRP",
-          queryParameters: [{ key: "resultType", value: ["PEOPLE"] }],
-          includeFiltersInResponse: true,
-        },
-      }),
-    );
-    const n = normalize(raw);
-    const options: Args[] = [];
-    const walk = (x: any, depth = 0) => {
-      if (!x || typeof x !== "object" || depth > 15) return;
-      if (
-        typeof x.value === "string" &&
-        /^\d+$/.test(x.value) &&
-        (x.displayValue || x.label || x.text)
+    const kind = a.kind === "company" ? "COMPANY" : "GEO";
+    const results = await fetch({
+      surface: "guest_typeahead",
+      path:
+        "/jobs-guest/api/typeaheadHits?" +
+        new URLSearchParams({ typeaheadType: kind, query: a.query }),
+    });
+    if (
+      !Array.isArray(results) ||
+      results.some(
+        (x) =>
+          typeof x?.id !== "string" ||
+          !/^\d+$/.test(x.id) ||
+          typeof x.displayName !== "string",
       )
-        options.push({
-          id: x.value,
-          label: x.displayValue ?? x.label ?? x.text,
-        });
-      for (const v of Object.values(x)) walk(v, depth + 1);
-    };
-    walk(n);
-    if (!options.length)
-      throw new Fault(
-        "filter_lookup_unavailable",
-        "LinkedIn did not expose location/company filter values. Supply verified numeric filter IDs; do not guess them.",
-      );
+    )
+      throw new Fault("filter_lookup_shape_changed");
     return {
-      options,
-      connection_degrees: ["1", "2", "3"],
-      partial: true,
-      reason: "only_filters_exposed_by_linkedin_response",
+      options: results
+        .slice(0, 10)
+        .map((x) => ({ id: x.id, label: x.displayName, kind: a.kind })),
+      partial: results.length >= 10,
+      source: "linkedin_public_typeahead",
     };
   }
-
   if (op === "profile_get")
     return normalize(
       await fetch({

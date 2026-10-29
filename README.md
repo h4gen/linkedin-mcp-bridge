@@ -2,7 +2,7 @@
 
 A separate macOS-first MCP server and Chrome MV3 extension. The local Node process communicates with the extension through Chrome Native Messaging and a private Unix socket. LinkedIn session credentials stay in the browser. No hosted relay, remote scripts, background inbox indexing or telemetry.
 
-**Development build 0.1.0.** Local installation, Inbox/history pagination, message delivery and duplicate protection, read/archive management, profile/people/invitation reads and modern feed reads have passed live acceptance. Public posting, invitation mutations and conversation deletion remain unverified. See [live results](docs/validation.md) and [capability status](docs/protocol.md).
+**Pilot candidate 0.2.0 — not submitted to the Chrome Web Store.** Outgoing messages now require content-bound extension review. Public writes, invitation mutations and deletion are disabled pending acceptance. Inbox/history, filtered people search, feed identity resolution and paginated reaction/comment reads have live checks; see [validation](docs/validation.md). The pilot includes a separate bundled macOS companion and a release gate that fails until publishing prerequisites and acceptance are complete.
 
 ## Install locally
 
@@ -66,6 +66,7 @@ All names have a `linkedin_` prefix. First call `health`, then supply its `accou
 | Inbox       | `conversations_list`, `conversations_search`, `messages_list`, `message_send`, `conversation_update`, `conversation_delete` |
 | People      | `profile_get`, `people_search`, `invitations_list`, `invitation_send`, `invitation_respond`, `invitation_withdraw`          |
 | Feed        | `feed_list`, `post_get`, `post_create`, `post_like`, `post_comment`, `comments_list`                                        |
+| GTM         | `people_search_filters`, `reactions_list`, `post_resolve`, `extraction_start`, `extraction_get`, `extraction_cancel`        |
 | Diagnostics | `health`, `operation_get`                                                                                                   |
 
 Lists default to 20, max 50. LinkedIn Inbox requests are capped at 20 per backend page because live requests for 50 return an unusable response; use the cursor to continue. Pass the returned opaque `next_cursor` as `cursor` with the **same arguments**. Cursors expire after 30 minutes, are bound to account, filters and operation, and reset with the browser session. Lists are live, not immutable snapshots. Deduplicate by entity URN when traversing a changing inbox. `conversations_search` searches participant/title/preview content in each fetched page; follow its cursor to search older pages. It is not full historical message search.
@@ -76,7 +77,9 @@ Inbox/history reads use HTTP only and never intentionally open a conversation or
 
 Every write requires `idempotency_key`. Use the same key for a retry of the same operation; changing its payload produces `idempotency_conflict`. Receipts survive service-worker/native-host restarts for seven days. After seven days a key is no longer protected: check LinkedIn before replaying an old action.
 
-`message_send` requires either `conversation_urn` or `recipient_urn`, plus exact `expected_participant_urns` excluding yourself. Existing-conversation validation currently searches the first 260 Inbox threads. Archived/older threads fail closed rather than guessing recipients. New recipient sends require one exact profile URN. Group replies use the exact participant set; group creation is excluded.
+`message_send` requires either `conversation_urn` or `recipient_urn`, plus exact `expected_participant_urns` excluding yourself. Existing-conversation validation first checks an exact conversation entity in the history response, then traverses Inbox, Archive and Spam within the operation deadline. It fails closed if participants cannot be verified. There is no fixed 260-thread limit. New recipient sends require one exact profile URN. Group replies use the exact participant set; group creation is excluded.
+
+Each enabled write initially returns `approval_required`. Open **Review actions & settings** and inspect account, recipients and content. Confirming executes the stored request once; rejecting removes the draft body. MCP cannot approve itself. Reversible inbox changes may be enabled separately in that UI. `operation_get` reads the result, and the same key replays the persisted receipt. Unaccepted writes return `capability_not_accepted`.
 
 Statuses:
 
@@ -92,7 +95,13 @@ Calls serialize across MCP clients in the extension. HTTP requests have at least
 
 The DOM adapter uses only packaged operations, exact target URNs, unique visible controls and English/German labels. It never accepts caller-supplied selectors, scripts or URLs. A missing/ambiguous target fails rather than clicking an unrelated control.
 
-Feed and post tools act on the connected tab: open the feed or the exact post first. Feed pagination is a bounded live scroll, marked `partial`. When a rendered card does not expose its URN, it returns a local `scan_key` and a null permalink; that key is only for read deduplication, never a guessed write target. Comments return currently rendered comments, also marked `partial`. Invitation respond/withdraw require the matching invitation URN in the rendered invitation card. Conversation deletion requires the exact thread already open; it deletes from your own inbox, not recipients' inboxes. These DOM contracts need live acceptance and selector updates for LinkedIn UI changes.
+Feed pagination is a bounded live scroll. `post_resolve` resolves a rendered card's `scan_key` through its scoped control menu and binds its exact identity to that card. A share ID is not advertised as a verified public permalink. Read reactions/comments on the resolved card; if no matching card exists, post reads may navigate the connected tab to the exact requested post. No arbitrary navigation URL is accepted.
+
+`comments_list` expands comments/replies and returns bounded, deduplicated pages with author profiles and truncation indicators. `reactions_list` opens only the selected post's visible reaction dialog and closes the dialog it opened. Both remain partial because LinkedIn may rank or omit entries. Reply parent IDs are supplied only when the DOM establishes the relationship.
+
+`people_search` supports `filters.connection_degrees` (`1`, `2`, `3`), `location_ids` and `company_ids`. `people_search_filters` takes `kind: location|company` and a name query to resolve numeric values through LinkedIn's public typeahead. No Sales Navigator requests are made.
+
+`extraction_start` starts a bounded job (maximum 500 records / 25 pages). `extraction_get` reads progress and paginated results, `extraction_cancel` stops between pages. Restarted workers label interrupted jobs instead of silently restarting them. Temporary results expire after 30 minutes. The review page also displays progress and a Stop control.
 
 ## Development and packaging
 
@@ -104,6 +113,23 @@ npm run package          # dist/linkedin-extension.zip
 
 Tests cover strict tool boundaries, native framing/fragmentation, actual MCP stdio registration, actual MV3 bundle startup, installer isolation, native/socket roundtrip, account and recipient mismatches, opaque cursor binding, mutation persistence and ambiguous outcomes. No live writes occur during tests.
 
-`dist/linkedin-extension.zip` is a local upload artifact. Chrome Web Store listing, store-assigned extension ID, privacy-policy URL, screenshots and publication are separate release work. The installer accepts that future exact store ID; it does not include a wildcard origin.
+`dist/linkedin-extension.zip` is a local upload artifact. Draft store listing, privacy notice and reviewer instructions are in `store/`. Actual store ID, hosted operator/support URLs, screenshots and notarized artifacts remain release prerequisites checked by `npm run release:check`. The installer accepts that future exact store ID; it does not include a wildcard origin.
 
 Remove the local host using `node dist/cli.js uninstall`. Remove the Chrome extension separately to erase its local data. Receipts contain payload hashes, target/account IDs, operation IDs, timestamps and statuses, not message bodies. Reads are transient MCP responses, not an inbox database. As with other local MCP tools, clients on the same OS account are trusted; other OS users cannot access the private socket directory.
+
+## Build the macOS pilot companion
+
+```sh
+npm run package:companion -- /path/to/official/node STORE_EXTENSION_ID arm64
+npm run package:companion -- /path/to/official/x64/node STORE_EXTENSION_ID x64
+BRIDGE_CHANNEL=pilot npm run package
+npm run release:check
+```
+
+Companion builds include runtime, bundled dependencies, licenses, Setup/Uninstall commands, ZIP and PKG installers with SHA-256 files. Supply `BRIDGE_NODE_LICENSE` pointing to the matching official Node LICENSE when the cached 22.22.0 license is unavailable. No build command installs the companion automatically.
+
+The pilot uses native host `com.hagen.linkedin_mcp_bridge.pilot` and a separate `LinkedIn MCP Bridge Pilot` data directory. A pilot ZIP must be paired with a pilot companion configured with its exact Chrome extension ID. Development builds retain the original host. Extension and companion versions/protocol must match.
+
+Signing requires `BRIDGE_SIGN_IDENTITY` (Developer ID Application) and `BRIDGE_INSTALLER_IDENTITY` (Developer ID Installer); notarization additionally requires `BRIDGE_NOTARY_PROFILE`. The package command rejects the wrong identity type or a non-Accepted notarization response. Unsigned artifacts are explicitly development candidates, not distributable notarized releases.
+
+The PKG places the companion under `/Applications/LinkedIn MCP Bridge Pilot`. Run its Setup.command as the signed-in user to register that user's native host. For a ZIP installation, move the whole directory to a durable location first. Configure the local MCP client with its bundled node and cli.js paths. Updates replace the companion while Chrome is closed, then rerun Setup.command. The unpacked development setup remains available above.

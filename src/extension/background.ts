@@ -123,8 +123,7 @@ const extractions = new Extractions(
   store,
   (op, a) => engine.run(op, a),
   async () => {
-    const health = await engine.run("health", {});
-    return health.connected ? health.account_urn : undefined;
+    return (await store.get("connection"))?.account;
   },
 );
 const cancelled = new Set<string>();
@@ -200,7 +199,9 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
         items: Object.entries(all)
           .filter(
             ([k, v]) =>
-              k.startsWith("approval:") && (v as any).expires > Date.now(),
+              k.startsWith("approval:") &&
+              (v as any).expires > Date.now() &&
+              (v as any).status === "approval_required",
           )
           .map(([, v]) => v),
       };
@@ -222,6 +223,11 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       await chrome.storage.local.clear();
       return { cleared: true };
     }
+    if (msg.action === "cancel-extraction")
+      return extractions.handle("extraction_cancel", {
+        account_urn: (await store.get("connection"))?.account,
+        operation_id: msg.id,
+      });
     if (msg.action === "status")
       return {
         connection: await store.get("connection"),
@@ -230,6 +236,17 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
         version: chrome.runtime.getManifest().version,
         allowInboxChanges: (await store.get("allowInboxChanges")) === true,
         blockedUntil: await store.get("blockedUntil"),
+        extractions: Object.entries(await chrome.storage.session.get(null))
+          .filter(
+            ([k, v]) =>
+              k.startsWith("extraction:") && (v as any).expires > Date.now(),
+          )
+          .map(([, v]) => ({
+            id: (v as any).id,
+            kind: (v as any).kind,
+            status: (v as any).status,
+            count: (v as any).items.length,
+          })),
       };
     if (msg.action === "connect") {
       const [tab] = await chrome.tabs.query({

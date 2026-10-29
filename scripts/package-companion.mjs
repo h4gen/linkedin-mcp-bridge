@@ -1,6 +1,13 @@
 // Produces a relocatable macOS companion. Never modifies the installed host.
 import { build } from "esbuild";
-import { mkdir, cp, readFile, writeFile, chmod } from "node:fs/promises";
+import {
+  mkdir,
+  cp,
+  readFile,
+  writeFile,
+  chmod,
+  readdir,
+} from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { resolve, join } from "node:path";
 import { createHash } from "node:crypto";
@@ -45,6 +52,27 @@ await writeFile(
   join(app, "README.txt"),
   `LinkedIn MCP Bridge ${version} — macOS ${arch}\nMove this entire folder to ~/Applications, then open Setup.command. Keep the folder in place.\nMCP command: /absolute/path/to/LinkedIn MCP Bridge/node\nMCP arguments: ["/absolute/path/to/LinkedIn MCP Bridge/cli.js", "mcp"]\nCheck: node cli.js doctor (use the bundled node).\nUpdates: quit Chrome, replace this folder, rerun Setup.command, reopen Chrome.\nUninstall: run Uninstall.command, remove the extension, then remove this folder.\nUnsigned development artifact unless accompanied by a notarized release receipt.\n`,
 );
+const licenses = join(app, "licenses");
+await mkdir(licenses, { recursive: true });
+const lock = JSON.parse(await readFile("package-lock.json", "utf8"));
+for (const [folder, meta] of Object.entries(lock.packages)) {
+  if (!folder || meta.dev) continue;
+  const names = await readdir(folder).catch(() => []);
+  for (const name of names.filter((x) =>
+    /^(license|licence|copying|notice)(\.|$)/i.test(x),
+  )) {
+    await cp(
+      join(folder, name),
+      join(licenses, folder.replaceAll("/", "_") + "_" + name),
+      { recursive: true },
+    );
+  }
+}
+const nodeLicense = resolve(
+  process.env.BRIDGE_NODE_LICENSE ??
+    "artifacts/runtime-cache/node-v22.22.0-darwin-x64/LICENSE",
+);
+await cp(nodeLicense, join(licenses, "NODE-LICENSE"));
 const identity = process.env.BRIDGE_SIGN_IDENTITY;
 if (identity) {
   if (!identity.startsWith("Developer ID Application:"))
@@ -56,6 +84,7 @@ if (identity) {
       "--options",
       "runtime",
       "--timestamp",
+      "--preserve-metadata=entitlements",
       "--sign",
       identity,
       join(app, "node"),
@@ -77,36 +106,76 @@ await writeFile(
     archive.split("/").pop() +
     "\n",
 );
+const pkg = resolve(`artifacts/companion-${version}-${arch}.pkg`);
+const pkgArgs = [
+  "--root",
+  app,
+  "--identifier",
+  "com.hagen.linkedin-mcp-bridge.pilot",
+  "--version",
+  version,
+  "--install-location",
+  "/Applications/LinkedIn MCP Bridge Pilot",
+  pkg,
+];
+if (process.env.BRIDGE_INSTALLER_IDENTITY) {
+  if (
+    !identity ||
+    !process.env.BRIDGE_INSTALLER_IDENTITY.startsWith("Developer ID Installer:")
+  )
+    throw Error("Both Developer ID signing identities are required");
+  pkgArgs.splice(
+    pkgArgs.length - 1,
+    0,
+    "--sign",
+    process.env.BRIDGE_INSTALLER_IDENTITY,
+  );
+}
+execFileSync("pkgbuild", pkgArgs, { stdio: "inherit" });
+await writeFile(
+  pkg + ".sha256",
+  createHash("sha256")
+    .update(await readFile(pkg))
+    .digest("hex") +
+    "  " +
+    pkg.split("/").pop() +
+    "\n",
+);
 if (process.env.BRIDGE_NOTARY_PROFILE) {
-  if (!identity) throw Error("Notarization requires signed runtime");
-  execFileSync(
+  if (!process.env.BRIDGE_INSTALLER_IDENTITY)
+    throw Error("Notarization requires a signed installer");
+  const output = execFileSync(
     "xcrun",
     [
       "notarytool",
       "submit",
-      archive,
+      pkg,
       "--keychain-profile",
       process.env.BRIDGE_NOTARY_PROFILE,
       "--wait",
       "--output-format",
       "json",
     ],
-    {
-      stdio: [
-        "ignore",
-        await (await import("node:fs/promises"))
-          .open(archive + ".notary.json", "w")
-          .then((f) => f.fd),
-        "inherit",
-      ],
-    },
+    { encoding: "utf8" },
   );
-  const result = JSON.parse(await readFile(archive + ".notary.json", "utf8"));
-  if (result.status !== "Accepted") throw Error("Notarization did not succeed");
+  await writeFile(pkg + ".notary.json", output);
+  if (JSON.parse(output).status !== "Accepted")
+    throw Error("Notarization did not succeed");
+  execFileSync("xcrun", ["stapler", "staple", pkg], { stdio: "inherit" });
+  await writeFile(
+    pkg + ".sha256",
+    createHash("sha256")
+      .update(await readFile(pkg))
+      .digest("hex") +
+      "  " +
+      pkg.split("/").pop() +
+      "\n",
+  );
 }
 console.log(
   JSON.stringify({
     archive,
+    installer: pkg,
     version,
     arch,
     signed: !!identity,

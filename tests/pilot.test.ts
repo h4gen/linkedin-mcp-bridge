@@ -261,3 +261,27 @@ it("verifies recipients from an exact conversation entity without scanning the i
     fetch.mock.calls.some(([r]) => r.path.includes("messengerConversations.")),
   ).toBe(false);
 });
+
+it("resolves typed company/location IDs from the public lookup and rejects shape drift", async () => {
+  const fetch = vi.fn(async (_r: any) => [
+    { id: "123", displayName: "Berlin, Germany", type: "GEO" },
+  ]);
+  const result = await readApi(
+    "people_search_filters",
+    { kind: "location", query: "Berlin" },
+    {},
+    fetch,
+  );
+  expect(result.options).toEqual([
+    { id: "123", label: "Berlin, Germany", kind: "location" },
+  ]);
+  expect(fetch.mock.calls[0][0]).toMatchObject({ surface: "guest_typeahead" });
+  await expect(
+    readApi(
+      "people_search_filters",
+      { kind: "company", query: "Acme" },
+      {},
+      async () => ({ unexpected: [] }),
+    ),
+  ).rejects.toThrow("filter_lookup_shape_changed");
+});
