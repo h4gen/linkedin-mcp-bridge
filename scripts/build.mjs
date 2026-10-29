@@ -1,8 +1,12 @@
+import { acceptanceDefine } from "./build-acceptance.mjs";
 import { build } from "esbuild";
 import { mkdir, writeFile, chmod, rm, cp } from "node:fs/promises";
 const channel =
   process.env.BRIDGE_CHANNEL === "pilot" ? "pilot" : "development";
-const define = { "process.env.BRIDGE_CHANNEL": JSON.stringify(channel) };
+const define = {
+  "process.env.BRIDGE_CHANNEL": JSON.stringify(channel),
+  "process.env.BRIDGE_ACCEPTANCE": await acceptanceDefine(),
+};
 await rm("dist", { recursive: true, force: true });
 await mkdir("dist/extension", { recursive: true });
 await build({

@@ -1,4 +1,5 @@
 // Produces a relocatable macOS companion. Never modifies the installed host.
+import { acceptanceDefine } from "./build-acceptance.mjs";
 import { build } from "esbuild";
 import {
   mkdir,
@@ -36,7 +37,10 @@ await build({
   platform: "node",
   format: "esm",
   target: "node22",
-  define: { "process.env.BRIDGE_CHANNEL": '"pilot"' },
+  define: {
+    "process.env.BRIDGE_CHANNEL": '"pilot"',
+    "process.env.BRIDGE_ACCEPTANCE": await acceptanceDefine(),
+  },
   banner: {
     js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);',
   },

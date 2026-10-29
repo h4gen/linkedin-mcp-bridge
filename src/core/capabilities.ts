@@ -198,12 +198,18 @@ export const capabilities = Object.fromEntries(
     required: boolean;
   }
 >;
+const buildAcceptance: { revision?: string; passed?: string[] } = JSON.parse(
+  process.env.BRIDGE_ACCEPTANCE ?? "{}",
+);
 export function capabilityStatus(connected: boolean) {
   return Object.entries(capabilities).map(([name, c]) => ({
     name,
     implemented: true,
-    accepted: false,
-    acceptance: "current_build_live_acceptance_pending",
+    accepted: buildAcceptance.passed?.includes(name) ?? false,
+    acceptance: buildAcceptance.passed?.includes(name)
+      ? "current_build_live_acceptance"
+      : "current_build_live_acceptance_pending",
+    acceptance_revision: buildAcceptance.revision ?? null,
     enabled: c.enabled,
     available: c.enabled && (connected || c.adapter === "local"),
     source: c.source ?? c.adapter,
