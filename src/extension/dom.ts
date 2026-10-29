@@ -27,12 +27,55 @@ export async function domOperation(
     if (matches.length !== 1) return fail("ui_control_ambiguous_or_missing");
     return matches[0] as HTMLElement;
   };
-  const card = () => {
-    const all = [...document.querySelectorAll("[data-urn],[data-id]")].filter(
-      (e) =>
-        e.getAttribute("data-urn") === a.post_urn ||
-        e.getAttribute("data-id") === a.post_urn,
+  // Modern SDUI and legacy post structure, adapted from the user's LinkedIn extractor.
+  const roots = () => {
+    const nodes = [
+      ...document.querySelectorAll(
+        '[data-urn^="urn:li:activity:"],[data-id^="urn:li:activity:"],.feed-shared-update-v2,[role="listitem"]:has(button[aria-label^="Open control menu for post by "]),[role="listitem"]:has(button[aria-label="Comment"]):has(button[aria-label="Repost"])',
+      ),
+    ];
+    return nodes.filter(
+      (e) => !nodes.some((other) => other !== e && other.contains(e)),
     );
+  };
+  const identity = (e: Element): string | null => {
+    for (const node of [
+      e,
+      ...e.querySelectorAll(
+        '[data-urn],[data-id],[data-entity-urn],[data-reaction-urn],[id*="ContentUrn"],[componentkey*="ContentUrn"],[componentkey*="userGeneratedContentId="],[componentkey*="ugcPostId="],[componentkey*="shareId="],a[href*="/feed/update/"],a[href*="/posts/"]',
+      ),
+    ]) {
+      for (const attr of [
+        "data-urn",
+        "data-id",
+        "data-entity-urn",
+        "data-reaction-urn",
+        "id",
+        "componentkey",
+        "href",
+      ]) {
+        let value = node.getAttribute(attr) ?? "";
+        try {
+          value = decodeURIComponent(value);
+        } catch {}
+        const direct = value.match(
+          /urn:li:(?:activity|share|ugcPost):\d+/,
+        )?.[0];
+        if (direct) return direct;
+        const activity = value.match(/activity[-:](\d+)/)?.[1];
+        if (activity) return "urn:li:activity:" + activity;
+        const ugc = value.match(
+          /(?:userGeneratedContent(?:Post)?Id|ugcPostId)=(\d+)/,
+        )?.[1];
+        if (ugc) return "urn:li:ugcPost:" + ugc;
+        const share = value.match(/shareId=(\d+)/)?.[1];
+        if (share) return "urn:li:share:" + share;
+      }
+    }
+    return null;
+  };
+  const card = () => {
+    const all = roots().filter((e) => identity(e) === a.post_urn);
     if (all.length !== 1) return fail("post_target_not_unique");
     return all[0];
   };
@@ -54,24 +97,39 @@ export async function domOperation(
       }),
     );
   };
-  const postData = (e: Element) => ({
-    entityUrn: e.getAttribute("data-urn") ?? e.getAttribute("data-id"),
-    text:
+  const postData = (e: Element) => {
+    const entityUrn = identity(e);
+    const text =
       e
         .querySelector(
-          ".update-components-text,.feed-shared-update-v2__description",
+          '.feed-shared-update-v2__commentary,.feed-shared-inline-show-more-text__text-view,.feed-shared-update-v2__description,.update-components-text,[data-test-id="main-feed-post-content"],[data-testid="expandable-text-box"]',
         )
-        ?.textContent?.trim() ?? "",
-    author:
+        ?.textContent?.trim() ?? "";
+    const menuLabel =
+      e
+        .querySelector('button[aria-label^="Open control menu for post by "]')
+        ?.getAttribute("aria-label") ?? "";
+    const author =
+      menuLabel.replace(/^Open control menu for post by /, "") ||
       e
         .querySelector(
-          ".update-components-actor__title,.feed-shared-actor__name",
+          ".update-components-actor__name,.update-components-actor__title,.feed-shared-actor__name",
         )
-        ?.textContent?.trim() ?? "",
-    url:
-      e.querySelector<HTMLAnchorElement>('a[href*="/feed/update/"]')?.href ??
-      null,
-  });
+        ?.textContent?.trim() ||
+      "";
+    let hash = 2166136261;
+    for (const ch of author + "|" + text)
+      hash = Math.imul(hash ^ ch.charCodeAt(0), 16777619);
+    return {
+      entityUrn,
+      scan_key: entityUrn ?? "local:" + String(hash >>> 0),
+      text,
+      author,
+      url: entityUrn
+        ? "https://www.linkedin.com/feed/update/" + entityUrn
+        : null,
+    };
+  };
   if (op === "feed_list") {
     if (!location.pathname.startsWith("/feed"))
       fail("open_feed_in_connected_tab");
@@ -79,19 +137,27 @@ export async function domOperation(
     let items: Record<string, any>[] = [];
     let stagnant = 0;
     for (let i = 0; i < 5 && items.length < a.limit; i++) {
-      const all = [
-        ...document.querySelectorAll(
-          '[data-urn^="urn:li:activity:"],[data-id^="urn:li:activity:"]',
-        ),
-      ].map(postData);
+      const all = roots().map(postData);
       for (const p of all)
-        if (p.entityUrn && !seen.has(p.entityUrn) && items.length < a.limit) {
+        if (
+          (p.text || p.author) &&
+          !seen.has(p.scan_key) &&
+          items.length < a.limit
+        ) {
           items.push(p);
-          seen.add(p.entityUrn);
+          seen.add(p.scan_key);
         }
       if (items.length >= a.limit) break;
       stagnant++;
-      window.scrollBy(0, Math.max(innerHeight, 700));
+      const scrolling =
+        [
+          ...document.querySelectorAll<HTMLElement>(
+            'main,[role="main"],[data-testid="mainFeed"]',
+          ),
+        ].find((e) => e.scrollHeight > e.clientHeight + 100) ??
+        document.scrollingElement;
+      if (scrolling) scrolling.scrollBy(0, Math.max(innerHeight, 700));
+      else window.scrollBy(0, Math.max(innerHeight, 700));
       await wait();
     }
     return {
