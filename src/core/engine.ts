@@ -297,10 +297,13 @@ export class Engine {
       return row;
     }
     let state: Args = {};
+    let cursorRecord: Args | undefined;
     if (a.cursor) {
       const saved = await d.store.get("cursor:" + a.cursor);
       if (!saved || saved.scope !== scope || saved.expires < d.now())
         throw new Fault("invalid_cursor");
+      if (saved.response) return saved.response;
+      cursorRecord = saved;
       state = saved.state;
     }
     check();
@@ -328,6 +331,31 @@ export class Engine {
       result.next_cursor = token;
       delete result.next;
     }
+    if (Array.isArray(result.items) && "limit" in a) {
+      result.next_cursor ??= null;
+      result.page_info = {
+        returned_count: result.items.length,
+        requested_limit: a.limit,
+        continuation: result.next_cursor ? "available" : "unavailable",
+        coverage:
+          result.partial || result.next_cursor
+            ? "partial"
+            : result.partial === false
+              ? "complete_for_query"
+              : "unknown",
+        consistency: "live_traversal",
+        reason: result.reason ?? result.completeness ?? null,
+        cursor_expires_at: result.next_cursor
+          ? new Date(d.now() + 1800000).toISOString()
+          : null,
+      };
+    }
+    // Cache a consumed cursor's page: retries must not advance the live DOM twice.
+    if (cursorRecord)
+      await d.store.set("cursor:" + a.cursor, {
+        ...cursorRecord,
+        response: result,
+      });
     return result;
   }
 }

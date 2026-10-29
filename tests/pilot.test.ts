@@ -285,3 +285,70 @@ it("resolves typed company/location IDs from the public lookup and rejects shape
     ),
   ).rejects.toThrow("filter_lookup_shape_changed");
 });
+
+it("replays cursor pages without traversing the DOM again and separates continuation from coverage", async () => {
+  const { store } = storage();
+  let clock = 1000;
+  let id = 0;
+  const dom = vi.fn(async () => ({
+    items: [{ id: String(id) }],
+    partial: true,
+    reason: "linkedin_may_rank_or_hide_comments",
+    next: { seen: [String(id)] },
+  }));
+  const engine = new Engine({
+    store,
+    dom,
+    fetch: async () => ({ data: { miniProfile: { entityUrn: account } } }),
+    account: async () => account,
+    now: () => clock,
+    uuid: () => `cursor-${++id}`,
+    hash: async (s) => s,
+  });
+  const args = { account_urn: account, post_urn: "urn:li:share:123", limit: 3 };
+  const first = await engine.run("comments_list", args);
+  const nextArgs = { ...args, cursor: first.next_cursor };
+  const second = await engine.run("comments_list", nextArgs);
+  expect(await engine.run("comments_list", nextArgs)).toEqual(second);
+  expect(dom).toHaveBeenCalledTimes(2);
+  expect(second.page_info).toMatchObject({
+    coverage: "partial",
+    continuation: "available",
+    returned_count: 1,
+  });
+  await expect(
+    engine.run("comments_list", { ...nextArgs, post_urn: "urn:li:share:456" }),
+  ).rejects.toThrow("invalid_cursor");
+  clock += 1800001;
+  await expect(engine.run("comments_list", nextArgs)).rejects.toThrow(
+    "invalid_cursor",
+  );
+});
+
+it("does not equate a missing cursor with complete comment coverage", async () => {
+  const { store } = storage();
+  const engine = new Engine({
+    store,
+    dom: async () => ({
+      items: [],
+      partial: true,
+      reason: "bounded_visible_results",
+    }),
+    fetch: async () => ({ data: { miniProfile: { entityUrn: account } } }),
+    account: async () => account,
+    now: () => 1000,
+    uuid: () => "cursor",
+    hash: async (s) => s,
+  });
+  const result = await engine.run("comments_list", {
+    account_urn: account,
+    post_urn: "urn:li:share:123",
+    limit: 3,
+  });
+  expect(result.next_cursor).toBeNull();
+  expect(result.page_info).toMatchObject({
+    coverage: "partial",
+    continuation: "unavailable",
+    cursor_expires_at: null,
+  });
+});

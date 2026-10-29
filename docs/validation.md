@@ -51,3 +51,13 @@ No invitation was sent because the named contact was already connected. No invit
 Some SDUI feed posts omit a discoverable URN. They return readable content with a local scan key and no invented permalink. Feed/comments are bounded partial reads, not complete snapshots. Posting and comment selectors remain operation-specific live acceptance work.
 
 The repository has no remote, so no remote fetch, push or hosted/store deployment is claimed. No extra worktree was created. The local Chrome development deployment contains cumulative local `main`; all source changes made during acceptance are committed there.
+
+## 0.2 pilot implementation and interface follow-up
+
+The 0.1 live acceptance above remains historical evidence. The 0.2 work adds extension-owned confirmation, disabled unaccepted writes, consent/pause/clear controls, typed people filters, post identity resolution, reaction/comment readers, optional collection jobs, and relocatable macOS companion packaging.
+
+This turn's live reads verified two distinct people-search pages, two history pages without overlap, a resolved post, and paginated reaction/comment reads. A new draft was shown in the extension and rejected; no additional message was sent. A subsequent collection job returned zero partial results despite earlier positive direct reads; this remains an unresolved acceptance issue. Public company/location lookup was implemented and fixture-tested, but its final live output was not retained and is not claimed as accepted.
+
+The cursor contract follow-up passes typecheck and 43 automated tests, including identical-page replay, cross-target cursor rejection, expiry and partial coverage without continuation. These new cursor changes have not yet been reloaded and live-accepted. Source changes are on local main; earlier generated companion ZIP/PKG files predate this interface follow-up and are not final release artifacts.
+
+Store submission remains blocked: public operator/support/privacy details, reserved Store extension ID, store screenshots, Developer ID signing/notarization, fresh macOS installation acceptance on both architectures, and the remaining live adapter checks. Unsigned arm64/x64 PKG and ZIP artifacts exist for development; their existence is not signing or fresh-machine acceptance. No store publication has occurred.

@@ -39,7 +39,7 @@ async function main() {
         annotations: {
           readOnlyHint: !writes.has(op),
           destructiveHint: writes.has(op),
-          idempotentHint: !writes.has(op),
+          idempotentHint: !writes.has(op) && op !== "extraction_start",
           openWorldHint: true,
         },
       },

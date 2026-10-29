@@ -46,3 +46,9 @@ Query IDs are intentionally tied to their captured variable shape. Do not blindl
 - No public post/comment/like acceptance test without a specified target/content.
 
 Automated tests use fictional fixtures. They validate implementation behavior, not LinkedIn endpoint availability.
+
+## 0.2 changes
+
+The table above records the earlier acceptance. Inbox search now scans a bounded number of pages with a cursor (participant/title/preview matching, not full-text message search). History pagination buffers overflow and suppresses overlap; unresolved timestamp boundaries remain explicitly partial. People search flattens nested result clusters and accepts typed connection/location/company filters. The public LinkedIn guest typeahead lookup is a separate fixed GET-only adapter without cookies; protocol facts were inspected at https://github.com/alexey-pelykh/lhremote/blob/main/packages/core/src/operations/resolve-linkedin-entity.ts and independently implemented, with no third-party source copied.
+
+Reaction/comment readers use scoped visible DOM adapters adapted from the user's local extractor. They expose primary cursor interfaces; optional jobs collect those same pages. See [interface patterns](interface-patterns.md) and the 0.2 section of [validation](validation.md) for current acceptance limits. Only message send and inbox state changes are enabled writes in the pilot.

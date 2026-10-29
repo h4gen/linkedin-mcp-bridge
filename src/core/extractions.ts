@@ -58,7 +58,7 @@ export class Extractions {
           {
             account_urn: a.account_urn,
             post_urn: a.post_urn,
-            limit: 20,
+            limit: Math.min(20, a.max_items),
             ...(cursor ? { cursor } : {}),
           },
         );
