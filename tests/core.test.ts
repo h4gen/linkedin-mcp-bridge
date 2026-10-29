@@ -327,3 +327,15 @@ it("caps live inbox backend pages to 20 while retaining the remote cursor", asyn
   expect(fetch.mock.calls[0][0].path).toContain("count:20");
   expect(page.next).toEqual({ nextCursor: "next" });
 });
+
+it("encodes LinkedIn message trackingId as sixteen bytes, not the UUID spelling", () => {
+  const r = mutation(
+    "message_send",
+    send,
+    "00112233-4455-4677-8899-aabbccddeeff",
+  );
+  expect((r?.body as any).trackingId.length).toBe(16);
+  expect((r?.body as any).message.originToken).toBe(
+    "00112233-4455-4677-8899-aabbccddeeff",
+  );
+});

@@ -146,7 +146,11 @@ export function mutation(
             : {}),
         },
         mailboxUrn: a.account_urn,
-        trackingId: originToken,
+        trackingId: String.fromCharCode(
+          ...(originToken.replaceAll("-", "").match(/.{2}/g) ?? []).map(
+            (byte) => parseInt(byte, 16),
+          ),
+        ),
         dedupeByClientGeneratedToken: false,
         ...(a.recipient_urn ? { hostRecipientUrns: [a.recipient_urn] } : {}),
       },
