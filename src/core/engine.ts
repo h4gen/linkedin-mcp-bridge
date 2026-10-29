@@ -159,17 +159,26 @@ export class Engine {
       };
     }
     if (writes.has(op)) {
-      if (journal[key]) {
-        if (journal[key].fingerprint !== scope)
+      const previous = journal[key];
+      const legacyCandidate =
+        previous?.status === "unknown_outcome" &&
+        !previous.dispatch_state &&
+        ((op === "conversation_delete" &&
+          previous.error === "conversation_pane_missing") ||
+          (["invitation_respond", "invitation_withdraw"].includes(op) &&
+            previous.error === "ui_control_ambiguous_or_missing"));
+      if (previous) {
+        if (previous.fingerprint !== scope)
           throw new Fault("idempotency_conflict");
-        return {
-          ...journal[key],
-          status:
-            journal[key].status === "pending"
-              ? "unknown_outcome"
-              : journal[key].status,
-          replayed: true,
-        };
+        if (previous.status !== "failed_before_dispatch" && !legacyCandidate)
+          return {
+            ...previous,
+            status:
+              previous.status === "pending"
+                ? "unknown_outcome"
+                : previous.status,
+            replayed: true,
+          };
       }
       if (op === "message_send") {
         const wanted = [...a.expected_participant_urns].sort();
@@ -214,6 +223,31 @@ export class Engine {
         target = await getConversation(a, d.fetch, check, {
           fields: ["conversationUrl"],
         });
+      if (legacyCandidate) {
+        // An exact source entity must still exist and its original failed control
+        // path must be proven non-dispatching. Never infer this from absence.
+        const proof = await d.dom(
+          op,
+          {
+            ...a,
+            verified_target: target,
+            preflight: true,
+            execution_deadline: deadline,
+          },
+          {},
+        );
+        check();
+        if (
+          !proof.preflight ||
+          proof.dispatch_state !== "not_dispatched" ||
+          !proof.legacy_no_dispatch_proof
+        )
+          return {
+            ...previous,
+            replayed: true,
+            reconciliation: "legacy_dispatch_not_disproven",
+          };
+      }
       const actor =
         ["post_create", "post_comment"].includes(op) && d.identity
           ? await d.identity(expected)
@@ -236,13 +270,33 @@ export class Engine {
         }
       }
       check();
-      const origin = d.uuid();
+      const origin = previous?.origin_token ?? d.uuid();
       const row: Args = {
         operation: op,
+        version: VERSION,
+        attempt_count: (previous?.attempt_count ?? (previous ? 1 : 0)) + 1,
+        dispatch_state: "unknown",
+        ...(previous
+          ? {
+              previous_attempts: [
+                ...(previous.previous_attempts ?? []),
+                {
+                  status: previous.status,
+                  error: previous.error,
+                  dispatch_state: previous.dispatch_state ?? "unknown",
+                  created_at: previous.created_at,
+                  recovery: legacyCandidate
+                    ? "verified_legacy_pre_dispatch_failure_and_current_target"
+                    : "failed_before_dispatch",
+                },
+              ].slice(-10),
+            }
+          : {}),
         ...(op === "conversation_update" ? { action: a.action } : {}),
         fingerprint: scope,
         account_urn: expected,
-        created_at: d.now(),
+        created_at: previous?.created_at ?? d.now(),
+        last_attempt_at: d.now(),
         status: "pending",
         origin_token: origin,
         target:
@@ -270,9 +324,15 @@ export class Engine {
           ? await d.fetch(request)
           : await d.dom(
               op,
-              { ...a, verified_target: target, verified_actor: actor },
+              {
+                ...a,
+                verified_target: target,
+                verified_actor: actor,
+                execution_deadline: deadline,
+              },
               {},
             );
+        row.dispatch_state = "dispatched";
         let verified = result?.verified === true;
         if (op === "conversation_update") {
           check();
@@ -295,28 +355,42 @@ export class Engine {
         }
 
         if (
-          op === "invitation_withdraw" ||
-          (op === "invitation_respond" && a.action === "ignore")
+          [
+            "invitation_withdraw",
+            "invitation_respond",
+            "conversation_delete",
+          ].includes(op)
         ) {
-          verified = !(await findInvitation(
-            a,
-            op === "invitation_withdraw" ? "sent" : "received",
-            d.fetch,
-            check,
-          ));
-        }
-        if (op === "invitation_respond" && a.action === "accept") {
-          verified =
-            verified && !(await findInvitation(a, "received", d.fetch, check));
-        }
-        if (op === "conversation_delete") {
-          try {
-            await getConversation(a, d.fetch, check, { mailboxOnly: true });
-            verified = false;
-          } catch (e) {
-            if (e instanceof Fault && e.code === "conversation_not_verified")
-              verified = true;
-            else throw e;
+          const uiVerified = verified;
+          for (let attempt = 0; attempt < 4; attempt++) {
+            check();
+            if (op === "conversation_delete") {
+              try {
+                await getConversation(a, d.fetch, check, { mailboxOnly: true });
+                verified = false;
+              } catch (e) {
+                if (
+                  e instanceof Fault &&
+                  e.code === "conversation_not_verified"
+                )
+                  verified = true;
+                else throw e;
+              }
+            } else {
+              const absent = !(await findInvitation(
+                a,
+                op === "invitation_withdraw" ? "sent" : "received",
+                d.fetch,
+                check,
+              ));
+              verified =
+                absent &&
+                (op !== "invitation_respond" ||
+                  a.action !== "accept" ||
+                  uiVerified);
+            }
+            if (verified) break;
+            if (attempt < 3) await new Promise((r) => setTimeout(r, 500));
           }
         }
         const id =
@@ -335,7 +409,22 @@ export class Engine {
             null;
         }
       } catch (e) {
+        if (
+          e instanceof Fault &&
+          e.details.dispatch_state === "not_dispatched" &&
+          [
+            "invitation_respond",
+            "invitation_withdraw",
+            "conversation_delete",
+          ].includes(op)
+        )
+          dispatched = false;
         row.status = dispatched ? "unknown_outcome" : "failed_before_dispatch";
+        row.dispatch_state = dispatched
+          ? e instanceof Fault && e.details.dispatch_state === "dispatched"
+            ? "dispatched"
+            : "unknown"
+          : "not_dispatched";
         row.error = e instanceof Fault ? e.code : "transport_error";
       }
       try {

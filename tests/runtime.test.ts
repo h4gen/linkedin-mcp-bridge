@@ -172,7 +172,7 @@ it("validates real MCP responses after tool discovery without losing output pass
           result: {
             connected: false,
             capabilities: [],
-            version: "0.4.0",
+            version: "0.4.1",
             protocol: 1,
             account_urn: null,
             transport: "local_native_messaging",
@@ -207,7 +207,7 @@ it("validates real MCP responses after tool discovery without losing output pass
     });
     expect(result.isError).not.toBe(true);
     expect(result.structuredContent).toMatchObject({
-      version: "0.4.0",
+      version: "0.4.1",
       connected: false,
     });
     rateLimited = true;
@@ -265,7 +265,7 @@ it("migrates old drafts without dispatch and retains mutation receipts", async (
     runtime: {
       id: "extension",
       getURL: (page: string) => "chrome-extension://extension/" + page,
-      getManifest: () => ({ version: "0.4.0" }),
+      getManifest: () => ({ version: "0.4.1" }),
       onMessage: {
         addListener: (fn: any) => {
           listener = fn;
@@ -300,7 +300,7 @@ it("migrates old drafts without dispatch and retains mutation receipts", async (
   const status: any = await new Promise((resolve) =>
     listener({ action: "status" }, sender, resolve),
   );
-  expect(status.version).toBe("0.4.0");
+  expect(status.version).toBe("0.4.1");
   expect(local.journal.old).toEqual(receipt);
   expect(local.connection.paused).toBe(true);
   expect(local.allowInboxChanges).toBeUndefined();

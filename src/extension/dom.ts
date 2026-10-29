@@ -5,6 +5,12 @@ export async function domOperation(
   a: Record<string, any>,
   state: Record<string, any>,
 ): Promise<Record<string, any>> {
+  const tracksDispatch = [
+    "invitation_respond",
+    "invitation_withdraw",
+    "conversation_delete",
+  ].includes(op);
+  let mutationStarted = false;
   try {
     const fail = (code: string): never => {
       throw new Error(code);
@@ -23,13 +29,16 @@ export async function domOperation(
       )
         fail("cancelled");
       const matches = [
-        ...root.querySelectorAll('button,[role="button"]'),
+        ...root.querySelectorAll(
+          'button,[role="button"],a[href],[role="menuitem"]',
+        ),
       ].filter(
         (e) =>
           visible(e) &&
-          pattern.test(
-            (e.getAttribute("aria-label") ?? e.textContent ?? "").trim(),
+          [e.getAttribute("aria-label"), e.textContent].some((label) =>
+            pattern.test(label?.trim() ?? ""),
           ) &&
+          e.getAttribute("aria-disabled") !== "true" &&
           !(e as HTMLButtonElement).disabled,
       );
       if (matches.length !== 1) return fail("ui_control_ambiguous_or_missing");
@@ -396,52 +405,142 @@ export async function domOperation(
         ? { verified: true, receipt_id: own.entityUrn }
         : { verified: false };
     }
+    const readyUntil = Math.min(
+      Date.now() + 10000,
+      a.execution_deadline ?? Infinity,
+    );
+    const pagePath = location.pathname;
+    const guard = () => {
+      if (
+        location.pathname !== pagePath ||
+        (a.execution_session &&
+          (window as any).__liBridgeSession !== a.execution_session)
+      )
+        fail("cancelled");
+      if (Date.now() > (a.execution_deadline ?? Infinity))
+        fail("deadline_exceeded");
+    };
+    const ready = async <T>(
+      read: () => T | undefined,
+      error: string,
+    ): Promise<T> => {
+      for (;;) {
+        guard();
+        const value = read();
+        if (value !== undefined) return value;
+        if (Date.now() >= readyUntil) return fail(error);
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    };
+    const mutate = (control: HTMLElement) => {
+      guard();
+      mutationStarted = true; // Immediately before the potentially mutating click.
+      control.click();
+    };
+    const dialogs = () =>
+      [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].filter(
+        visible,
+      );
     if (op === "invitation_respond" || op === "invitation_withdraw") {
       const verified = a.verified_target;
       if (!verified || verified.entityUrn !== a.invitation_urn)
         fail("invitation_not_verified");
-      const url = verified.profile.profile_url;
-      const cards = Array.from(
-        document.querySelectorAll<HTMLElement>(
-          ".invitation-card,li,[role='listitem']",
-        ),
-      ).filter((card) =>
-        Array.from(
-          card.querySelectorAll<HTMLAnchorElement>('a[href*="/in/"]'),
-        ).some(
-          (link) =>
-            link.href.split(/[?#]/)[0].replace(/\/$/, "") ===
-            url.replace(/\/$/, ""),
-        ),
-      );
-      const targets = cards.filter(
-        (card) =>
-          !cards.some((other) => other !== card && card.contains(other)),
-      );
-      if (targets.length !== 1) fail("invitation_target_not_unique");
-      const target = targets[0];
-      button(
-        target,
+      const canonical = (url: string) =>
+        new URL(url, location.href).href.split(/[?#]/)[0].replace(/\/$/, "");
+      const url = canonical(verified.profile.profile_url);
+      const pattern =
         op === "invitation_withdraw"
-          ? /^(Withdraw|Zurückziehen)$/i
+          ? /^(Withdraw|Zurückziehen)(\s|$)/i
           : a.action === "accept"
-            ? /^(Accept|Annehmen)$/i
-            : /^(Ignore|Ignorieren)$/i,
-      ).click();
+            ? /^(Accept|Annehmen)(\s|$)/i
+            : /^(Ignore|Ignorieren)(\s|$)/i;
+      const target = await ready(() => {
+        const candidates = new Set<HTMLElement>();
+        for (const link of document.querySelectorAll<HTMLAnchorElement>(
+          'a[href*="/in/"]',
+        )) {
+          if (!visible(link) || canonical(link.href) !== url) continue;
+          for (
+            let node = link.parentElement;
+            node && !node.matches('body,main,[role="main"]');
+            node = node.parentElement
+          ) {
+            const urls = new Set(
+              [
+                ...node.querySelectorAll<HTMLAnchorElement>('a[href*="/in/"]'),
+              ].map((l) => canonical(l.href)),
+            );
+            if (urls.size !== 1 || !urls.has(url)) break;
+            const controls = [
+              ...node.querySelectorAll<HTMLElement>(
+                'button,[role="button"],a[href]',
+              ),
+            ].filter(
+              (e) =>
+                visible(e) &&
+                [e.getAttribute("aria-label"), e.textContent].some((t) =>
+                  pattern.test(t?.trim() ?? ""),
+                ),
+            );
+            if (controls.length) {
+              candidates.add(node);
+              break;
+            }
+          }
+        }
+        const minimal = [...candidates].filter(
+          (n) =>
+            ![...candidates].some((other) => other !== n && n.contains(other)),
+        );
+        if (minimal.length > 1) fail("invitation_target_not_unique");
+        return minimal[0];
+      }, "invitation_target_not_unique");
+      const control = button(target, pattern);
+      if (
+        control.tagName === "A" &&
+        new URL((control as HTMLAnchorElement).href).origin !== location.origin
+      )
+        fail("invitation_control_location_mismatch");
+      if (a.preflight) {
+        // The previous adapter excluded links and matched only the whole aria-label.
+        const oldPattern =
+          op === "invitation_withdraw"
+            ? /^(Withdraw|Zurückziehen)$/i
+            : a.action === "accept"
+              ? /^(Accept|Annehmen)$/i
+              : /^(Ignore|Ignorieren)$/i;
+        return {
+          preflight: true,
+          dispatch_state: "not_dispatched",
+          legacy_no_dispatch_proof:
+            control.tagName === "A" ||
+            !oldPattern.test(
+              (
+                control.getAttribute("aria-label") ??
+                control.textContent ??
+                ""
+              ).trim(),
+            ),
+        };
+      }
+      const before = new Set(dialogs());
+      mutate(control); // Also conservative for variants that withdraw without a dialog.
       await wait();
       if (op === "invitation_withdraw") {
-        const dialogs = [
-          ...document.querySelectorAll('[role="dialog"]'),
-        ].filter(visible);
-        if (dialogs.length === 1) {
-          button(dialogs[0], /^(Withdraw|Zurückziehen)$/i).click();
+        const appeared = dialogs().filter((d) => !before.has(d));
+        if (appeared.length > 1) fail("withdraw_dialog_not_unique");
+        if (appeared.length === 1) {
+          mutate(button(appeared[0], /^(Withdraw|Zurückziehen)$/i));
           await wait();
         }
       }
-      return { verified: false, ui_target_disappeared: !target.isConnected };
+      return {
+        verified: false,
+        dispatch_state: "dispatched",
+        ui_target_disappeared: !target.isConnected,
+      };
     }
     if (op === "conversation_delete") {
-      // Require the exact thread to already be open; never navigate a guessed ID.
       const thread = a.conversation_urn.match(/,([^,)]+)\)$/)?.[1];
       if (
         !thread ||
@@ -450,28 +549,66 @@ export async function domOperation(
           "/messaging/thread/" + thread
       )
         fail("open_exact_conversation_before_delete");
-      const pane = document.querySelector(".msg-thread");
-      if (!pane) return fail("conversation_pane_missing");
-      button(
-        pane,
-        /^(More|More options|Weitere|Weitere Optionen)(\s|$)/i,
-      ).click();
-      await wait();
-      button(document, /^(Delete conversation|Unterhaltung löschen)$/i).click();
-      await wait();
-      const dialogs = [...document.querySelectorAll('[role="dialog"]')].filter(
-        visible,
+      const pane = await ready(() => {
+        const panes = [
+          ...document.querySelectorAll<HTMLElement>(".msg-thread"),
+        ].filter(visible);
+        if (panes.length > 1) fail("conversation_pane_not_unique");
+        return panes[0];
+      }, "conversation_pane_missing");
+      const header = await ready(
+        () =>
+          pane.querySelector<HTMLElement>(
+            "#thread-detail-jump-target,.msg-title-bar",
+          ) ?? undefined,
+        "conversation_header_missing",
       );
-      if (dialogs.length !== 1) fail("delete_dialog_not_unique");
-      button(dialogs[0], /^(Delete|Löschen)$/i).click();
+      const trigger = button(
+        header,
+        /^(Open the options list in your conversation|More|More options|Weitere|Weitere Optionen)(\s|$)/i,
+      );
+      if (a.preflight)
+        return {
+          preflight: true,
+          dispatch_state: "not_dispatched",
+          legacy_no_dispatch_proof: true,
+        };
+      const beforeDialogs = new Set(dialogs());
+      guard();
+      trigger.click();
+      const menu = await ready(() => {
+        const id = trigger.getAttribute("aria-controls");
+        const owned = id
+          ? document.getElementById(id)
+          : trigger
+              .closest(".artdeco-dropdown")
+              ?.querySelector<HTMLElement>(
+                '[role="menu"],.artdeco-dropdown__content',
+              );
+        return owned && visible(owned) ? owned : undefined;
+      }, "conversation_menu_missing");
+      guard();
+      button(
+        menu,
+        /^(Delete conversation|Delete|Unterhaltung löschen|Löschen)$/i,
+      ).click();
+      const dialog = await ready(() => {
+        const fresh = dialogs().filter((d) => !beforeDialogs.has(d));
+        if (fresh.length > 1) fail("delete_dialog_not_unique");
+        return fresh[0];
+      }, "delete_dialog_not_unique");
+      mutate(button(dialog, /^(Delete|Löschen)$/i));
       await wait();
-      return { verified: false };
+      return { verified: false, dispatch_state: "dispatched" };
     }
     return fail("unsupported_dom_operation");
   } catch (error) {
     return {
       bridge_error:
         error instanceof Error ? error.message : "dom_operation_failed",
+      ...(tracksDispatch
+        ? { dispatch_state: mutationStarted ? "dispatched" : "not_dispatched" }
+        : {}),
     };
   }
 }

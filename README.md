@@ -2,7 +2,7 @@
 
 A separate macOS-first MCP server and Chrome MV3 extension. The local Node process communicates with the extension through Chrome Native Messaging and a private Unix socket. LinkedIn session credentials stay in the browser. No hosted relay, remote scripts, background inbox indexing or telemetry.
 
-**Development candidate 0.4.0 — not submitted to the Chrome Web Store.** All 24 operations are available. Writes execute directly after account, target and idempotency checks, without extension confirmation. Inbox/history, filtered people search, feed identity resolution and paginated reaction/comment reads have live checks; see [validation](docs/validation.md). The pilot includes a separate bundled macOS companion and a release gate that fails until publishing prerequisites and acceptance are complete.
+**Development candidate 0.4.1 — not submitted to the Chrome Web Store.** All 24 operations are available. Writes execute directly after account, target and idempotency checks, without extension confirmation. Inbox/history, filtered people search, feed identity resolution and paginated reaction/comment reads have live checks; see [validation](docs/validation.md). The pilot includes a separate bundled macOS companion and a release gate that fails until publishing prerequisites and acceptance are complete.
 
 ## Install locally
 
@@ -89,7 +89,7 @@ Statuses:
 
 `operation_get` can reconcile an uncertain existing-thread message if its origin token appears in bounded older-history traversal. No matching token is **not** proof of non-delivery. Read/unread and archive/unarchive changes also get a bounded list-based state check after dispatch. Other uncertain operations remain uncertain until checked in LinkedIn. HTTP success without an identifiable receipt/state is deliberately not reported as verified success.
 
-Calls serialize across MCP clients in the extension. HTTP requests have at least one second spacing and a 15-second fetch timeout. Queued calls expire after 60 seconds. Cancellation prevents queued work and checks before dispatch; an in-flight browser operation may finish and its receipt remains available. No automatic write retries or HTTP-to-DOM mutation fallbacks.
+Calls serialize across MCP clients in the extension. HTTP requests have at least one second spacing and a 15-second fetch timeout. Queued calls expire after 60 seconds. Cancellation prevents queued work and checks before dispatch; an in-flight browser operation may finish and its receipt remains available. No automatic write retries or HTTP-to-DOM mutation fallbacks. An explicit same-key call may retry a recorded `failed_before_dispatch` after fresh target checks. Receipts include `dispatch_state`, `attempt_count`, and up to ten prior attempt summaries. Legacy DOM failures are recoverable only when the original pre-click failure and the still-present exact target can be verified; other unknown outcomes remain non-retryable.
 
 ### DOM operation boundaries
 

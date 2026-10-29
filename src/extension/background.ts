@@ -250,9 +250,13 @@ const engine = new Engine({
     });
     if (!result[0]?.result) throw new Fault("ui_operation_failed");
     if (result[0].result.bridge_error)
-      throw new Fault(result[0].result.bridge_error);
+      throw new Fault(
+        result[0].result.bridge_error,
+        result[0].result.bridge_error,
+        { dispatch_state: result[0].result.dispatch_state },
+      );
     const value = result[0].result;
-    if (op === "invitation_respond" && a.action === "accept") {
+    if (op === "invitation_respond" && a.action === "accept" && !a.preflight) {
       const profile = a.verified_target.profile;
       await chrome.tabs.update(id, { url: profile.profile_url });
       for (let attempt = 0; attempt < 40; attempt++) {
@@ -264,13 +268,20 @@ const engine = new Engine({
           break;
         await new Promise((r) => setTimeout(r, 250));
       }
-      const proof = await chrome.scripting.executeScript({
-        target: { tabId: id },
-        world: "ISOLATED",
-        func: firstDegreeConnection,
-        args: [profile.profile_url, profile.entityUrn],
-      });
-      value.verified = proof[0]?.result === true;
+      value.verified = false;
+      for (let attempt = 0; attempt < 12; attempt++) {
+        const proof = await chrome.scripting.executeScript({
+          target: { tabId: id },
+          world: "ISOLATED",
+          func: firstDegreeConnection,
+          args: [profile.profile_url, profile.entityUrn],
+        });
+        if (proof[0]?.result === true) {
+          value.verified = true;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 500));
+      }
       value.verification = value.verified
         ? "profile_first_degree"
         : "connection_state_unverified";

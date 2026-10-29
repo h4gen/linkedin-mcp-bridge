@@ -99,3 +99,7 @@ The extension review page is inaccessible to the browser automation surface due 
 All 24 operations are exposed without extension approvals or acceptance-based execution gates. The review page, approval store/handlers and test-write build flag were removed. Migration preserves mutation receipts, clears temporary state and the obsolete inbox permission, and pauses the connection without dispatching old drafts. The earlier approval requirements in this record are historical.
 
 Typecheck and 65 automated tests pass, including immediate single dispatch with idempotent replay, actual MCP discovery of all 24 tools, and actual MV3 migration with retained receipts and no draft execution. Live results for the five previously prepared actions are recorded separately against the tested canonical commit under `artifacts/qa/`. No additional public-write or message acceptance is inferred.
+
+## 0.4.1 DOM recovery
+
+Regression coverage reproduces extended invitation labels, link controls, delayed thread rendering, owned menus/dialogs, hidden/duplicate/disabled targets, session cancellation and pre/post-click failures. Engine integration tests cover same-key recovery, legacy proof requirements, restart, serialization and payload conflicts. Live recovery evidence for the four original pending actions is stored under `artifacts/qa/write-recovery-0.4.1.json`, tied to the canonical revision. Earlier 0.4.0 failed attempts remain in their original evidence and receipt histories.
