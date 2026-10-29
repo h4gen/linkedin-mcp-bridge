@@ -456,23 +456,28 @@ export function receipt(raw: any, operation?: Operation): string | undefined {
 
 // Deliberately select user-visible fields, never arbitrary serialized identifiers.
 export function conversationSearchText(item: Args): string {
+  const visibleText = (value: unknown): string =>
+    typeof value === "string"
+      ? value
+      : value &&
+          typeof value === "object" &&
+          "text" in value &&
+          typeof value.text === "string"
+        ? value.text
+        : "";
   const participants = item.conversationParticipants ?? item.participants ?? [];
   const names = (
     Array.isArray(participants) ? participants : (participants.elements ?? [])
   ).map((p: Args) => {
     const m = p.participantType?.member ?? p.member ?? p;
-    return [m.firstName, m.lastName, m.name]
-      .filter((x) => typeof x === "string")
-      .join(" ");
+    return [m.firstName, m.lastName, m.name].map(visibleText).join(" ");
   });
   const previews = [
     item.preview,
     item.lastMessage?.body?.text,
     ...(item.messages?.elements ?? []).map((m: Args) => m.body?.text),
   ];
-  return [item.title, ...names, ...previews]
-    .filter((x) => typeof x === "string")
-    .join("\n");
+  return [item.title, ...names, ...previews].map(visibleText).join("\n");
 }
 
 export async function getConversation(
