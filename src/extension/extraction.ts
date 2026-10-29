@@ -435,7 +435,13 @@ export async function extractionOperation(
       )
         throw Error("unrelated_dialog_open");
       if (!dialog) {
-        if (document.querySelector('dialog[open],[role="dialog"]'))
+        if (
+          Array.from(
+            document.querySelectorAll<HTMLElement>(
+              'dialog[open],[role="dialog"]',
+            ),
+          ).some(isUsableControl)
+        )
           throw Error("unrelated_dialog_open");
         if (!trigger) throw Error("reaction_control_missing");
         activateReactionTrigger(trigger);
@@ -480,7 +486,12 @@ export async function extractionOperation(
       );
       if (comments.length === 1) {
         comments[0].click();
-        await new Promise((r) => setTimeout(r, 800));
+        for (
+          let attempt = 0;
+          attempt < 15 && !root.querySelector(COMMENT_SELECTOR);
+          attempt++
+        )
+          await new Promise((r) => setTimeout(r, 200));
       }
     }
     let advances = 0;

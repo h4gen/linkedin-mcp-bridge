@@ -220,3 +220,44 @@ it("keeps already collected extraction results when cancelled", async () => {
   expect(result.status).toBe("cancelled");
   expect(result.items).toEqual([{ id: "1" }]);
 });
+
+it("verifies recipients from an exact conversation entity without scanning the inbox", async () => {
+  const { store } = storage();
+  const thread = "urn:li:msg_conversation:archived";
+  const fetch = vi.fn(async (r: any) =>
+    r.path === "/me"
+      ? { data: { miniProfile: { entityUrn: account } } }
+      : r.method
+        ? { data: { entityUrn: "urn:li:msg_message:sent" } }
+        : {
+            data: { elements: [] },
+            included: [
+              {
+                entityUrn: thread,
+                conversationParticipants: [
+                  { hostIdentityUrn: send.recipient_urn },
+                  { hostIdentityUrn: account },
+                ],
+              },
+            ],
+          },
+  );
+  const engine = new Engine({
+    store,
+    fetch,
+    dom: vi.fn(),
+    account: async () => account,
+    now: () => 1000,
+    uuid: () => "00112233-4455-4677-8899-aabbccddeeff",
+    hash: async (s) => s,
+  });
+  const result = await engine.run("message_send", {
+    ...send,
+    recipient_urn: undefined,
+    conversation_urn: thread,
+  });
+  expect(result.status).toBe("confirmed");
+  expect(
+    fetch.mock.calls.some(([r]) => r.path.includes("messengerConversations.")),
+  ).toBe(false);
+});

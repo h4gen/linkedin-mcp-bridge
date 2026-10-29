@@ -116,6 +116,11 @@ export async function readApi(
       for (const v of Object.values(x)) walk(v, depth + 1);
     };
     walk(n);
+    if (!options.length)
+      throw new Fault(
+        "filter_lookup_unavailable",
+        "LinkedIn did not expose location/company filter values. Supply verified numeric filter IDs; do not guess them.",
+      );
     return {
       options,
       connection_degrees: ["1", "2", "3"],

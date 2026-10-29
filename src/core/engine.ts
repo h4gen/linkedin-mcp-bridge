@@ -1,7 +1,7 @@
 import { VERSION, PROTOCOL } from "../version.js";
 import { Args, Fault, Operation, parse, writes } from "./contracts.js";
 import { Fetcher, graph, mutation, readApi, receipt } from "./api.js";
-import { self } from "./normalize.js";
+import { self, normalize } from "./normalize.js";
 export interface Store {
   get(key: string): Promise<any>;
   set(key: string, value: any): Promise<void>;
@@ -156,7 +156,23 @@ export class Engine {
         } else {
           // Read list pages without opening the thread; do not silently mark messages read.
           let next: Args = {};
-          let found: Args | undefined;
+          // Some message responses include the exact conversation entity. Prefer
+          // that identity-bound read; fall back to category pagination if absent.
+          const history = normalize(
+            await d.fetch(
+              graph("messages", {
+                deliveredAt: d.now(),
+                conversationUrn: a.conversation_urn,
+                countBefore: 1,
+                countAfter: 0,
+              }),
+            ),
+          );
+          let found: Args | undefined = history.entities.find(
+            (x: Args) =>
+              x.entityUrn === a.conversation_urn &&
+              (x.conversationParticipants || x.participants),
+          );
           for (const category of ["INBOX", "ARCHIVE", "SPAM"]) {
             next = {};
             const visited = new Set<string>();
