@@ -138,3 +138,68 @@ it("installs isolated native manifest and round-trips a real native/socket frame
     await fs.rm(home, { recursive: true, force: true });
   }
 }, 10000);
+
+it("validates real MCP responses after tool discovery without losing output passthrough semantics", async () => {
+  const home = await fs.mkdtemp("/tmp/li-schema-");
+  const root = path.join(
+    home,
+    "Library/Application Support/LinkedIn MCP Bridge",
+  );
+  await fs.mkdir(root, { recursive: true });
+  const server = net.createServer((socket) => {
+    let text = "";
+    socket.on("data", (bytes) => {
+      text += bytes;
+      const index = text.indexOf("\n");
+      if (index < 0) return;
+      const request = JSON.parse(text.slice(0, index));
+      socket.end(
+        JSON.stringify({
+          id: request.id,
+          result: {
+            connected: false,
+            capabilities: [],
+            version: "0.3.0",
+            protocol: 1,
+            account_urn: null,
+            transport: "local_native_messaging",
+          },
+        }) + "\n",
+      );
+    });
+  });
+  await new Promise<void>((resolve) =>
+    server.listen(path.join(root, "bridge.sock"), resolve),
+  );
+  const client = new Client({ name: "schema-test", version: "1" });
+  try {
+    await client.connect(
+      new StdioClientTransport({
+        command: process.execPath,
+        args: ["dist/cli.js", "mcp"],
+        env: {
+          ...Object.fromEntries(
+            Object.entries(process.env).filter(
+              (entry): entry is [string, string] => entry[1] !== undefined,
+            ),
+          ),
+          HOME: home,
+        },
+      }),
+    );
+    await client.listTools();
+    const result = await client.callTool({
+      name: "linkedin_health",
+      arguments: {},
+    });
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      version: "0.3.0",
+      connected: false,
+    });
+  } finally {
+    await client.close();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await fs.rm(home, { recursive: true, force: true });
+  }
+});
