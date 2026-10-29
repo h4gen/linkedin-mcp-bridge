@@ -362,3 +362,48 @@ it.each([true, false])(
     expect(f.mutations()).toBe(proof ? 1 : 0);
   },
 );
+
+it("recovers the recorded link-only withdrawal only after fresh source proof", async () => {
+  const f = engineFixture("invitation_withdraw");
+  f.seed();
+  const receipt = Object.values(f.data.journal)[0] as any;
+  Object.assign(receipt, {
+    version: "0.4.1",
+    dispatch_state: "dispatched",
+    attempt_count: 2,
+    previous_attempts: [
+      { recovery: "verified_legacy_pre_dispatch_failure_and_current_target" },
+    ],
+  });
+  delete receipt.error;
+  const deps = {
+    ...f.dependencies,
+    dom: async (op: string, a: any) =>
+      a.preflight
+        ? {
+            preflight: true,
+            dispatch_state: "not_dispatched",
+            legacy_no_dispatch_proof: true,
+          }
+        : f.dependencies.dom(op, a),
+  };
+  const r = await new Engine(deps).run("invitation_withdraw", f.input);
+  expect(r.status).toBe("confirmed");
+  expect(r.previous_attempts.at(-1).recovery).toBe(
+    "verified_legacy_link_only_withdrawal",
+  );
+  expect(f.mutations()).toBe(1);
+});
+it("recovers a known navigation timeout before adapter dispatch", async () => {
+  const f = engineFixture();
+  f.seed();
+  Object.assign(Object.values(f.data.journal)[0] as any, {
+    version: "0.4.1",
+    dispatch_state: "unknown",
+    error: "work_tab_navigation_timeout",
+  });
+  expect((await f.engine.run("invitation_respond", f.input)).status).toBe(
+    "confirmed",
+  );
+  expect(f.mutations()).toBe(1);
+});

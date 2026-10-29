@@ -162,17 +162,29 @@ export class Engine {
       const previous = journal[key];
       const legacyCandidate =
         previous?.status === "unknown_outcome" &&
-        !previous.dispatch_state &&
-        ((op === "conversation_delete" &&
-          previous.error === "conversation_pane_missing") ||
-          (["invitation_respond", "invitation_withdraw"].includes(op) &&
-            previous.error === "ui_control_ambiguous_or_missing"));
+        ((previous.error === "work_tab_navigation_timeout" &&
+          previous.version === "0.4.1" &&
+          previous.dispatch_state === "unknown") ||
+          (!previous.dispatch_state &&
+            ((op === "conversation_delete" &&
+              previous.error === "conversation_pane_missing") ||
+              (["invitation_respond", "invitation_withdraw"].includes(op) &&
+                previous.error === "ui_control_ambiguous_or_missing"))));
       const continuationCandidate =
         previous?.status === "unknown_outcome" &&
         op === "invitation_withdraw" &&
         previous.version === "0.4.1" &&
         previous.dispatch_state === "dispatched" &&
         !previous.error;
+      // The first 0.4.1 recovery adapter clicked the withdrawal link only.
+      // Restrict migration to that recorded attempt, then require a fresh
+      // exact invitation and link-control proof before opening its confirmation.
+      const linkOnlyCandidate =
+        continuationCandidate &&
+        previous.attempt_count === 2 &&
+        previous.previous_attempts?.length === 1 &&
+        previous.previous_attempts[0].recovery ===
+          "verified_legacy_pre_dispatch_failure_and_current_target";
       let resumeConfirmation = false;
       if (previous) {
         if (previous.fingerprint !== scope)
@@ -255,7 +267,8 @@ export class Engine {
           proof.dispatch_state !== "not_dispatched" ||
           !(legacyCandidate
             ? proof.legacy_no_dispatch_proof
-            : resumeConfirmation)
+            : resumeConfirmation ||
+              (linkOnlyCandidate && proof.legacy_no_dispatch_proof))
         )
           return {
             ...previous,
@@ -302,9 +315,11 @@ export class Engine {
                   created_at: previous.created_at,
                   recovery: legacyCandidate
                     ? "verified_legacy_pre_dispatch_failure_and_current_target"
-                    : resumeConfirmation
-                      ? "verified_pending_withdraw_confirmation"
-                      : "failed_before_dispatch",
+                    : linkOnlyCandidate && !resumeConfirmation
+                      ? "verified_legacy_link_only_withdrawal"
+                      : resumeConfirmation
+                        ? "verified_pending_withdraw_confirmation"
+                        : "failed_before_dispatch",
                 },
               ].slice(-10),
             }

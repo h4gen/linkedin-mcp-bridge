@@ -161,7 +161,12 @@ const engine = new Engine({
       (await chrome.tabs.get(id)).status !== "complete";
       attempt++
     ) {
-      if (attempt >= 40) throw new Fault("work_tab_navigation_timeout");
+      if (attempt >= 40)
+        throw new Fault(
+          "work_tab_navigation_timeout",
+          "work_tab_navigation_timeout",
+          { dispatch_state: "not_dispatched" },
+        );
       await new Promise((r) => setTimeout(r, 250));
     }
     if (
