@@ -1,4 +1,8 @@
-import { capabilities, capabilityStatus } from "./capabilities.js";
+import {
+  acceptedWrites,
+  capabilities,
+  capabilityStatus,
+} from "./capabilities.js";
 import { VERSION, PROTOCOL } from "../version.js";
 import { Args, Fault, Operation, parse, writes } from "./contracts.js";
 import {
@@ -115,7 +119,10 @@ export class Engine {
       return {
         version: VERSION,
         protocol: PROTOCOL,
-        accepted_writes: d.allowedWrites ? [...d.allowedWrites] : [],
+        accepted_writes: [...acceptedWrites].filter((op) =>
+          d.allowedWrites?.has(op),
+        ),
+        enabled_writes: d.allowedWrites ? [...d.allowedWrites] : [],
         connected: usable,
         error,
         account_urn: expected ?? null,
@@ -243,6 +250,11 @@ export class Engine {
       )
         throw new Fault("actor_identity_unavailable");
       const preview: Args[] = target?.profile ? [target.profile] : [];
+      if (d.identity && op === "invitation_send") {
+        const identity = await d.identity(a.profile_urn);
+        if (!identity?.name) throw new Fault("recipient_identity_unavailable");
+        preview.push(identity);
+      }
       if (d.identity && op === "message_send") {
         for (const urn of a.expected_participant_urns) {
           const identity = await d.identity(urn);

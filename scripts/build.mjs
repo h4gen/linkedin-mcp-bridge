@@ -1,4 +1,5 @@
 import { acceptanceDefine } from "./build-acceptance.mjs";
+import { testWrites } from "./test-writes.mjs";
 import { build } from "esbuild";
 import { mkdir, writeFile, chmod, rm, cp } from "node:fs/promises";
 const channel =
@@ -6,6 +7,9 @@ const channel =
 const define = {
   "process.env.BRIDGE_CHANNEL": JSON.stringify(channel),
   "process.env.BRIDGE_ACCEPTANCE": await acceptanceDefine(),
+  "process.env.BRIDGE_TEST_WRITES": JSON.stringify(
+    JSON.stringify(testWrites(channel, process.env.BRIDGE_TEST_WRITES)),
+  ),
 };
 await rm("dist", { recursive: true, force: true });
 await mkdir("dist/extension", { recursive: true });

@@ -85,3 +85,11 @@ Outstanding release blockers: authorized targets/content for live testing the se
 A repeat against integrated commit `43e8825` passed all nine read-check groups: two inbox pages, exact conversation lookup/history with unchanged read state, inbox search, profile, two person pages, nonempty location/company lookups plus company-filtered people, sanitized received/sent invitations, eight reaction pages (160 unique), comment pages (17 unique), cursor replay and invalidation, and receipt lookup. Subsequent build-metadata wiring embeds only acceptance evidence matching a clean current canonical revision; it never infers acceptance from enabled status or historical tests. The final matching manifest is `artifacts/acceptance-0.3.0.json`.
 
 The final SDK integration check now discovers tools before calling them. This caught and fixed a registration bug: passing only an output schema's shape discarded its passthrough policy. Registration now passes the complete Zod schema. A real MCP client/server/socket regression test protects the published JSON Schema as well as server-side parsing.
+
+## Scoped mutation acceptance (2026-10-29)
+
+The user authorized a deletion test for Parth Patel, selection of a new invitation recipient, one received invitation each for accept/ignore, and a sent invitation for withdrawal. Public posting is deferred; like/comment targets remain pending. No mutation is accepted merely from this authorization.
+
+A local development build can explicitly expose these four capabilities for acceptance with `BRIDGE_TEST_WRITES=conversation_delete,invitation_send,invitation_respond,invitation_withdraw npm run build`. Each is marked `acceptance_test_only` in health and still requires the normal extension-owned approval and postcondition checks. A normal build disables them; pilot builds reject the flag, and packaged companions ignore it. This does not change accepted capability evidence. Test-build policy and the existing regression suite pass 65 tests.
+
+The extension review page is inaccessible to the browser automation surface due to its security policy. No alternate surface or approval-storage bypass is used. Live mutations require the user to review the prepared requests in the extension; until that happens, they remain pending and must not be reported as accepted.

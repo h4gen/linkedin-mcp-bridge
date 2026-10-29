@@ -1,6 +1,7 @@
 import { cursorEvictions } from "../core/cursor-budget.js";
 import { retryAt } from "../core/errors.js";
-import { Approvals, ACCEPTED_WRITES } from "../core/approvals.js";
+import { Approvals } from "../core/approvals.js";
+import { enabledWrites } from "../core/capabilities.js";
 import { Engine, Store } from "../core/engine.js";
 import { Fault } from "../core/contracts.js";
 import { self, normalize } from "../core/normalize.js";
@@ -124,7 +125,7 @@ const engine = new Engine({
   generation: () => generation,
   identity: (urn) => store.get("identity:" + urn),
   cursorContext: validateDomCursor,
-  allowedWrites: ACCEPTED_WRITES,
+  allowedWrites: enabledWrites,
   authorize: (...args) => approvals.request(...args),
   store,
   fetch: fetchRequest,
