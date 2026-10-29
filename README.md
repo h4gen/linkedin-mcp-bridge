@@ -2,7 +2,7 @@
 
 A separate macOS-first MCP server and Chrome MV3 extension. The local Node process communicates with the extension through Chrome Native Messaging and a private Unix socket. LinkedIn session credentials stay in the browser. No hosted relay, remote scripts, background inbox indexing or telemetry.
 
-**Development build 0.1.0.** The protocol adapters and DOM operations are implemented, but live acceptance against the connected account is still pending. Synthetic tests do not establish that LinkedIn currently accepts an endpoint. See [capability status](docs/protocol.md) before treating any operation as production-ready.
+**Development build 0.1.0.** Local installation, Inbox/history pagination, message delivery and duplicate protection, read/archive management, profile/people/invitation reads and modern feed reads have passed live acceptance. Public posting, invitation mutations and conversation deletion remain unverified. See [live results](docs/validation.md) and [capability status](docs/protocol.md).
 
 ## Install locally
 
@@ -55,7 +55,7 @@ command = "/absolute/path/to/node"
 args = ["/absolute/path/to/linkedin-mcp-bridge/dist/cli.js", "mcp"]
 ```
 
-This is local stdio: it does not directly connect the ChatGPT or Claude websites. Client configuration is provided, not silently added to an existing client configuration.
+This is local stdio: it does not directly connect the ChatGPT or Claude websites. The authorized local installation also registered the `linkedin` server in Codex. The examples above document setup on another machine. [Official MCP configuration documentation](https://learn.chatgpt.com/docs/extend/mcp#configure-with-the-cli).
 
 ## Tools
 
@@ -92,7 +92,7 @@ Calls serialize across MCP clients in the extension. HTTP requests have at least
 
 The DOM adapter uses only packaged operations, exact target URNs, unique visible controls and English/German labels. It never accepts caller-supplied selectors, scripts or URLs. A missing/ambiguous target fails rather than clicking an unrelated control.
 
-Feed and post tools act on the connected tab: open the feed or the exact post first. Feed pagination is a bounded live scroll, marked `partial`. Comments return currently rendered comments, also marked `partial`. Invitation respond/withdraw require the matching invitation URN in the rendered invitation card. Conversation deletion requires the exact thread already open; it deletes from your own inbox, not recipients' inboxes. These DOM contracts need live acceptance and selector updates for LinkedIn UI changes.
+Feed and post tools act on the connected tab: open the feed or the exact post first. Feed pagination is a bounded live scroll, marked `partial`. When a rendered card does not expose its URN, it returns a local `scan_key` and a null permalink; that key is only for read deduplication, never a guessed write target. Comments return currently rendered comments, also marked `partial`. Invitation respond/withdraw require the matching invitation URN in the rendered invitation card. Conversation deletion requires the exact thread already open; it deletes from your own inbox, not recipients' inboxes. These DOM contracts need live acceptance and selector updates for LinkedIn UI changes.
 
 ## Development and packaging
 
