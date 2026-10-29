@@ -20,6 +20,6 @@ https://www.linkedin.com/in/kirstin-taufertshoefer/
 
 The search result showed an existing first-degree connection. No connection invitation is appropriate for that contact. No test message, public post, comment, reaction or conversation deletion was performed.
 
-Chrome installation is awaiting action-time user confirmation required by the browser-control tool. No new extension permissions have been granted and no host was installed in the user's real Chrome profile. All installer tests used an isolated temporary home directory.
+The user approved local installation and a short test message to Kirstin. The browser-control policy then blocked opening chrome://extensions/ (only HTTP/HTTPS is allowed) and explicitly forbids alternate control surfaces as a workaround. Manual Load unpacked and the resulting extension ID are therefore required before host registration and live acceptance can proceed. No host was installed in the user's real Chrome profile. All installer tests used an isolated temporary home directory.
 
 Live endpoint availability, unread preservation, history coverage, modern DOM selector compatibility, real delivery receipt parsing and store publication remain unverified. See `protocol.md` for operation-specific limitations. This record does not claim production readiness or completion of live acceptance.
