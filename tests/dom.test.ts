@@ -43,7 +43,7 @@ it("rejects duplicate post targets instead of choosing the first", async () => {
   );
   await expect(
     domOperation("post_get", { post_urn: "urn:li:activity:123" }, {}),
-  ).rejects.toThrow("post_target_not_unique");
+  ).resolves.toEqual({ bridge_error: "post_target_not_unique" });
 });
 
 it("scrolls the nearest actual overflow container to discover another page", async () => {
@@ -176,4 +176,16 @@ it("checks both exact profile identity and visible first-degree evidence", async
       "urn:li:fsd_profile:ada",
     ),
   ).toBe(false);
+});
+
+it("returns missing scan targets as serializable errors across executeScript", async () => {
+  page("<main></main>");
+  const result = await domOperation(
+    "post_resolve",
+    { scan_key: "local:gone" },
+    {},
+  );
+  expect(JSON.parse(JSON.stringify(result))).toEqual({
+    bridge_error: "post_target_not_unique",
+  });
 });
