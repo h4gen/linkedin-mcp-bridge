@@ -1,12 +1,20 @@
+import { Extractions } from "../core/extractions.js";
+import { parse } from "../core/contracts.js";
+import { Approvals, ACCEPTED_WRITES } from "../core/approvals.js";
 import { Engine, Store } from "../core/engine.js";
 import { Fault } from "../core/contracts.js";
 import { self } from "../core/normalize.js";
 import { pageFetch } from "./page-fetch.js";
+import { extractionOperation } from "./extraction.js";
 import { domOperation } from "./dom.js";
 import type { Request } from "../core/api.js";
-const HOST = "com.hagen.linkedin_mcp_bridge";
+import { VERSION, PROTOCOL, NATIVE_HOST as HOST } from "../version.js";
 const area = (k: string) =>
-  k.startsWith("cursor:") ? chrome.storage.session : chrome.storage.local;
+  k.startsWith("cursor:") ||
+  k.startsWith("approval:") ||
+  k.startsWith("extraction:")
+    ? chrome.storage.session
+    : chrome.storage.local;
 const store: Store = {
   get: async (k) => (await area(k).get(k))[k],
   set: async (k, v) => area(k).set({ [k]: v }),
@@ -47,14 +55,31 @@ async function fetchRequest(r: Request) {
     throw new Fault("empty_browser_response");
   return result.data;
 }
+const approvals = new Approvals(store);
 const engine = new Engine({
+  allowedWrites: ACCEPTED_WRITES,
+  authorize: (...args) => approvals.request(...args),
   store,
   fetch: fetchRequest,
   dom: async (op, a, state) => {
+    const id = await tabId();
+    if (["comments_list", "post_get"].includes(op)) {
+      const url = "https://www.linkedin.com/feed/update/" + a.post_urn + "/";
+      const tab = await chrome.tabs.get(id);
+      if (tab.url !== url) {
+        await chrome.tabs.update(id, { url });
+        for (let attempt = 0; attempt < 40; attempt++) {
+          await new Promise((r) => setTimeout(r, 250));
+          const current = await chrome.tabs.get(id);
+          if (current.status === "complete" && current.url === url) break;
+          if (attempt === 39) throw new Fault("post_navigation_timeout");
+        }
+      }
+    }
     const result = await chrome.scripting.executeScript({
       target: { tabId: await tabId() },
       world: "ISOLATED",
-      func: domOperation,
+      func: op === "comments_list" ? extractionOperation : domOperation,
       args: [op, a, state],
     });
     if (!result[0]?.result) throw new Fault("ui_operation_failed");
@@ -75,6 +100,14 @@ const engine = new Engine({
       .map((x) => x.toString(16).padStart(2, "0"))
       .join(""),
 });
+const extractions = new Extractions(
+  store,
+  (op, a) => engine.run(op, a),
+  async () => {
+    const health = await engine.run("health", {});
+    return health.connected ? health.account_urn : undefined;
+  },
+);
 const cancelled = new Set<string>();
 let port: chrome.runtime.Port | undefined;
 function connectHost() {
@@ -90,13 +123,23 @@ function connectHost() {
         return;
       const current = port;
       try {
-        const result = await engine.run(
-          msg.op,
-          msg.args,
-          Math.min(Number(msg.deadline) || 0, Date.now() + 60000),
-          () => cancelled.has(msg.id),
-        );
-        if (JSON.stringify(result).length > 6 * 1024 * 1024)
+        if (msg.protocol !== PROTOCOL || msg.hostVersion !== VERSION)
+          throw new Fault(
+            "companion_version_mismatch",
+            "Install the matching companion version " + VERSION,
+          );
+        const result = msg.op.startsWith("extraction_")
+          ? await extractions.handle(msg.op, parse(msg.op, msg.args))
+          : await engine.run(
+              msg.op,
+              msg.args,
+              Math.min(Number(msg.deadline) || 0, Date.now() + 60000),
+              () => cancelled.has(msg.id),
+            );
+        if (
+          new TextEncoder().encode(JSON.stringify(result)).byteLength >
+          6 * 1024 * 1024
+        )
           throw new Fault("response_too_large");
         current?.postMessage({ id: msg.id, result });
       } catch (e) {
@@ -126,17 +169,48 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   // Popup only. No content-script bridge or externally_connectable surface.
   if (
     sender.id !== chrome.runtime.id ||
-    sender.tab ||
-    sender.url !== chrome.runtime.getURL("popup.html")
+    !["popup.html", "review.html"].some(
+      (page) => sender.url === chrome.runtime.getURL(page),
+    )
   )
     return;
   (async () => {
+    if (msg.action === "approvals") {
+      const all = await chrome.storage.session.get(null);
+      return {
+        items: Object.entries(all)
+          .filter(
+            ([k, v]) =>
+              k.startsWith("approval:") && (v as any).expires > Date.now(),
+          )
+          .map(([, v]) => v),
+      };
+    }
+    if (msg.action === "decide") {
+      const row = await approvals.decide(msg.key, msg.id, msg.approve === true);
+      if (msg.approve === true) return engine.run(row.operation, row.args);
+      return { status: "rejected" };
+    }
+    if (msg.action === "inbox-permission") {
+      await store.set("allowInboxChanges", msg.enabled === true);
+      return { enabled: msg.enabled === true };
+    }
+    if (msg.action === "clear") {
+      await store.remove("connection");
+      port?.disconnect();
+      port = undefined;
+      await chrome.storage.session.clear();
+      await chrome.storage.local.clear();
+      return { cleared: true };
+    }
     if (msg.action === "status")
       return {
         connection: await store.get("connection"),
         native: !!port,
         extensionId: chrome.runtime.id,
         version: chrome.runtime.getManifest().version,
+        allowInboxChanges: (await store.get("allowInboxChanges")) === true,
+        blockedUntil: await store.get("blockedUntil"),
       };
     if (msg.action === "connect") {
       const [tab] = await chrome.tabs.query({
@@ -184,7 +258,9 @@ chrome.alarms.onAlarm.addListener(async () => {
   const cursors = await chrome.storage.session.get(null);
   for (const [k, v] of Object.entries(cursors))
     if (
-      k.startsWith("cursor:") &&
+      (k.startsWith("cursor:") ||
+        k.startsWith("approval:") ||
+        k.startsWith("extraction:")) &&
       (v as { expires: number }).expires < Date.now()
     )
       await chrome.storage.session.remove(k);
@@ -193,6 +269,11 @@ chrome.alarms.onAlarm.addListener(async () => {
     if (Date.now() - v.created_at > 7 * 86400000) delete journal[k];
   await store.set("journal", journal);
   if (await store.get("connection")) connectHost();
+});
+void chrome.storage.session.get(null).then(async (all) => {
+  for (const [key, row] of Object.entries(all) as [string, any][])
+    if (key.startsWith("extraction:") && row.status === "running")
+      await store.set(key, { ...row, status: "interrupted", partial: true });
 });
 void store.get("connection").then((c) => {
   if (c) connectHost();

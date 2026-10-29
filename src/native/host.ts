@@ -1,3 +1,5 @@
+import { VERSION, PROTOCOL } from "../version.js";
+import { StringDecoder } from "node:string_decoder";
 import net from "node:net";
 import fs from "node:fs/promises";
 import { randomUUID } from "node:crypto";
@@ -66,9 +68,10 @@ const clients = new Set<net.Socket>();
 const server = net.createServer((socket) => {
   clients.add(socket);
   let buffer = "";
+  const textDecoder = new StringDecoder("utf8");
   let outstanding = 0;
   socket.on("data", (chunk) => {
-    buffer += chunk.toString("utf8");
+    buffer += textDecoder.write(chunk);
     if (Buffer.byteLength(buffer) > 1024 * 1024) {
       socket.destroy();
       return;
@@ -116,6 +119,8 @@ const server = net.createServer((socket) => {
         process.stdout.write(
           encodeNativeMessage({
             ...msg,
+            protocol: PROTOCOL,
+            hostVersion: VERSION,
             id: wireId,
             deadline: Date.now() + 60000,
           }),

@@ -1,6 +1,6 @@
 {
   "name": "linkedin-mcp-bridge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "bin": {
@@ -11,6 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check": "npm run typecheck && npm test",
+    "package:companion": "node scripts/package-companion.mjs",
+    "release:check": "node scripts/release-check.mjs",
     "package": "npm run build && cd dist/extension && zip -qr ../linkedin-extension.zip .",
     "pretest": "npm run build",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\" \"scripts/*.mjs\" \"docs/*.md\" README.md",
@@ -18,17 +20,17 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.20.2",
-    "zod": "^3.25.76"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/chrome": "^0.1.24",
     "@types/jsdom": "21.1.7",
     "@types/node": "^22.10.0",
-    "esbuild": "^0.25.0",
+    "esbuild": "^0.28.2",
     "jsdom": "26.1.0",
     "prettier": "3.6.2",
     "typescript": "^5.7.0",
-    "vitest": "^3.2.4"
+    "vitest": "^5.0.5"
   },
   "engines": {
     "node": ">=22"

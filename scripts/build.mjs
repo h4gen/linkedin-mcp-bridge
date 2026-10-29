@@ -1,8 +1,12 @@
 import { build } from "esbuild";
-import { mkdir, writeFile, chmod, rm } from "node:fs/promises";
+import { mkdir, writeFile, chmod, rm, cp } from "node:fs/promises";
+const channel =
+  process.env.BRIDGE_CHANNEL === "pilot" ? "pilot" : "development";
+const define = { "process.env.BRIDGE_CHANNEL": JSON.stringify(channel) };
 await rm("dist", { recursive: true, force: true });
 await mkdir("dist/extension", { recursive: true });
 await build({
+  define,
   entryPoints: { cli: "src/cli.ts", host: "src/native/host.ts" },
   outdir: "dist",
   bundle: true,
@@ -12,7 +16,12 @@ await build({
   packages: "external",
 });
 await build({
-  entryPoints: ["src/extension/background.ts", "src/extension/popup.ts"],
+  define,
+  entryPoints: [
+    "src/extension/background.ts",
+    "src/extension/popup.ts",
+    "src/extension/review.ts",
+  ],
   outdir: "dist/extension",
   bundle: true,
   platform: "browser",
@@ -25,21 +34,16 @@ await writeFile(
   JSON.stringify(
     {
       manifest_version: 3,
-      name: "LinkedIn MCP Bridge",
-      version: "0.1.0",
+      name: "LinkedIn MCP Bridge" + (channel === "pilot" ? " BETA" : " Dev"),
+      version: "0.2.0",
       description:
         "Local MCP access to your connected LinkedIn tab. Messaging, profiles and feed.",
       minimum_chrome_version: "120",
-      permissions: [
-        "storage",
-        "scripting",
-        "tabs",
-        "nativeMessaging",
-        "alarms",
-      ],
+      permissions: ["storage", "scripting", "nativeMessaging", "alarms"],
       host_permissions: ["https://www.linkedin.com/*"],
       background: { service_worker: "background.js" },
       action: { default_popup: "popup.html" },
+      icons: { 16: "icon16.png", 48: "icon48.png", 128: "icon128.png" },
       content_security_policy: {
         extension_pages: "script-src 'self'; object-src 'self'",
       },
@@ -48,7 +52,12 @@ await writeFile(
     2,
   ),
 );
-await writeFile(
-  "dist/extension/popup.html",
-  `<!doctype html><html lang="en"><meta charset="utf-8"><title>LinkedIn MCP Bridge</title><style>body{width:360px;font:14px system-ui;padding:16px;color:#17334c}button{padding:8px;margin:4px}pre{white-space:pre-wrap;overflow-wrap:anywhere}small{display:block;margin-top:16px}</style><h2>LinkedIn MCP Bridge</h2><p>Open LinkedIn in the tab you want to connect.</p><button data-action="connect">Connect this tab</button><button data-action="pause">Pause</button><button data-action="disconnect">Disconnect</button><button data-action="status">Refresh status</button><pre id="status"></pre><small>Install the local host first:<br><code>node dist/cli.js install EXTENSION_ID</code><br>Use the extension ID shown above. Messages stay in your browser; mutation receipts are retained locally for seven days.</small><script src="popup.js"></script></html>`,
-);
+for (const file of [
+  "popup.html",
+  "review.html",
+  "ui.css",
+  "icon16.png",
+  "icon48.png",
+  "icon128.png",
+])
+  await cp("assets/" + file, "dist/extension/" + file);

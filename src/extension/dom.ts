@@ -125,6 +125,26 @@ export async function domOperation(
       scan_key: entityUrn ?? "local:" + String(hash >>> 0),
       text,
       author,
+      author_profile_url:
+        e.querySelector<HTMLAnchorElement>(
+          'a[href*="/in/"],a[href*="/company/"]',
+        )?.href ?? null,
+      published_at: e.querySelector("time")?.getAttribute("datetime") ?? null,
+      visible_time: e.querySelector("time")?.textContent?.trim() ?? null,
+      engagement: Array.from(
+        e.querySelectorAll(
+          '.social-details-social-counts, [aria-label*="reaction"], [aria-label*="comment"]',
+        ),
+      )
+        .map((x) => x.getAttribute("aria-label") || x.textContent?.trim())
+        .filter(Boolean)
+        .slice(0, 8),
+      media: Array.from(
+        e.querySelectorAll("video, .update-components-image img"),
+      ).map((x) => ({
+        type: x.tagName.toLowerCase(),
+        description: x.getAttribute("alt"),
+      })),
       url: entityUrn
         ? "https://www.linkedin.com/feed/update/" + entityUrn
         : null,
@@ -315,8 +335,9 @@ export async function domOperation(
     const thread = a.conversation_urn.match(/,([^,)]+)\)$/)?.[1];
     if (
       !thread ||
-      !/^[\w-]+$/.test(thread) ||
-      location.pathname.replace(/\/$/, "") !== "/messaging/thread/" + thread
+      !/^[\w=+-]+$/.test(thread) ||
+      decodeURIComponent(location.pathname).replace(/\/$/, "") !==
+        "/messaging/thread/" + thread
     )
       fail("open_exact_conversation_before_delete");
     const pane = document.querySelector(".msg-thread");

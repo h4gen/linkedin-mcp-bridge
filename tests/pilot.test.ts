@@ -1,0 +1,158 @@
+import { describe, it, expect, vi } from "vitest";
+import { Approvals, ACCEPTED_WRITES } from "../src/core/approvals.js";
+import { Engine, Store } from "../src/core/engine.js";
+import { readApi } from "../src/core/api.js";
+import { parse } from "../src/core/contracts.js";
+function storage() {
+  const data: Record<string, any> = {};
+  const store: Store = {
+    get: async (k) => structuredClone(data[k]),
+    set: async (k, v) => {
+      data[k] = structuredClone(v);
+    },
+    remove: async (k) => {
+      delete data[k];
+    },
+  };
+  return { data, store };
+}
+const account = "urn:li:fsd_profile:me";
+const send = {
+  account_urn: account,
+  recipient_urn: "urn:li:fsd_profile:friend",
+  expected_participant_urns: ["urn:li:fsd_profile:friend"],
+  text: "Grüße 👋",
+  idempotency_key: "approval-test",
+};
+describe("extension-owned approvals", () => {
+  it("does not send before approval; binds content; rejects external decisions", async () => {
+    const { store } = storage();
+    const approvals = new Approvals(
+      store,
+      () => 1,
+      () => "review-id",
+    );
+    const fetch = vi.fn(async (r: any) =>
+      r.path === "/me"
+        ? { data: { miniProfile: { entityUrn: account } } }
+        : { data: { entityUrn: "urn:li:msg_message:1" } },
+    );
+    const engine = new Engine({
+      store,
+      fetch,
+      dom: vi.fn(),
+      account: async () => account,
+      now: () => 1,
+      uuid: () => "00112233-4455-4677-8899-aabbccddeeff",
+      hash: async (s) => s,
+      authorize: (...args) => approvals.request(...args),
+      allowedWrites: ACCEPTED_WRITES,
+    });
+    const pending = await engine.run("message_send", send);
+    expect(pending.status).toBe("approval_required");
+    expect(fetch.mock.calls.some(([r]) => r.method)).toBe(false);
+    await expect(
+      engine.run("message_send", { ...send, text: "changed" }),
+    ).rejects.toThrow("idempotency_conflict");
+    expect(() => parse("approval_decide", {})).toThrow();
+    await expect(
+      approvals.decide(account + ":" + send.idempotency_key, "wrong", true),
+    ).rejects.toThrow();
+    await approvals.decide(
+      account + ":" + send.idempotency_key,
+      pending.operation_id,
+      true,
+    );
+    expect((await engine.run("message_send", send)).status).toBe("confirmed");
+    expect((await engine.run("message_send", send)).replayed).toBe(true);
+    expect(fetch.mock.calls.filter(([r]) => r.method)).toHaveLength(1);
+  });
+  it("expires drafts and deletes rejected content", async () => {
+    const { store, data } = storage();
+    let now = 1;
+    const approvals = new Approvals(
+      store,
+      () => now,
+      () => "id",
+    );
+    await approvals.request("message_send", send, "hash", "key");
+    await approvals.decide("key", "id", false);
+    expect(data["approval:key"].args).toBeUndefined();
+    await expect(
+      approvals.request("message_send", send, "hash", "key"),
+    ).rejects.toThrow("approval_rejected");
+    now += 1800001;
+    await expect(
+      approvals.request("message_send", send, "hash", "key"),
+    ).rejects.toThrow("approval_expired");
+  });
+});
+describe("GTM and inbox pages", () => {
+  it("passes only typed filters and rejects arbitrary facets", async () => {
+    const a = parse("people_search", {
+      account_urn: account,
+      query: "founder",
+      filters: {
+        connection_degrees: ["2"],
+        company_ids: ["123"],
+        location_ids: ["456"],
+      },
+    });
+    const fetch = vi.fn(async (_r: any) => ({ data: { elements: [] } }));
+    await readApi("people_search", a, {}, fetch);
+    expect(fetch.mock.calls[0][0].path).toContain("key:network,value:List(S)");
+    expect(fetch.mock.calls[0][0].path).toContain("key:geoUrn,value:List(456)");
+    expect(() =>
+      parse("people_search", { ...a, filters: { url: "evil" } }),
+    ).toThrow();
+  });
+  it("searches successive pages without silently discarding overflow results", async () => {
+    let count = 0;
+    const fetch = vi.fn(async () => ({
+      data: {
+        elements: Array.from({ length: 3 }, (_, i) => ({
+          entityUrn: `urn:${count}:${i}`,
+          name: "needle",
+        })),
+        metadata: ++count < 2 ? { nextCursor: "next" } : {},
+      },
+    }));
+    const a = {
+      account_urn: account,
+      category: "INBOX",
+      query: "needle",
+      limit: 2,
+      scan_pages: 3,
+    };
+    const first = await readApi("conversations_search", a, {}, fetch);
+    const second = await readApi("conversations_search", a, first.next, fetch);
+    const third = await readApi("conversations_search", a, second.next, fetch);
+    expect([...first.items, ...second.items, ...third.items]).toHaveLength(6);
+    expect(
+      new Set(
+        [...first.items, ...second.items, ...third.items].map(
+          (x) => x.entityUrn,
+        ),
+      ).size,
+    ).toBe(6);
+    expect(third.next).toBeUndefined();
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+  it("buffers a short history page and never refetches exhausted history", async () => {
+    const fetch = vi.fn(async () => ({
+      data: {
+        elements: [
+          { entityUrn: "urn:a", deliveredAt: 2 },
+          { entityUrn: "urn:b", deliveredAt: 1 },
+        ],
+      },
+    }));
+    const a = { limit: 1, conversation_urn: "urn:li:msg_conversation:x" };
+    const first = await readApi("messages_list", a, {}, fetch);
+    const second = await readApi("messages_list", a, first.next, fetch);
+    expect(first.items[0].entityUrn).toBe("urn:a");
+    expect(second.items[0].entityUrn).toBe("urn:b");
+    expect(second.next).toBeUndefined();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+});

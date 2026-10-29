@@ -13,6 +13,23 @@ const conversation = { conversation_urn: urn };
 const post = {
   post_urn: z.string().regex(/^urn:li:(activity|ugcPost|share):\d+$/),
 };
+const filters = z
+  .object({
+    connection_degrees: z
+      .array(z.enum(["1", "2", "3"]))
+      .max(3)
+      .optional(),
+    location_ids: z
+      .array(z.string().regex(/^\d{1,20}$/))
+      .max(10)
+      .optional(),
+    company_ids: z
+      .array(z.string().regex(/^\d{1,20}$/))
+      .max(10)
+      .optional(),
+  })
+  .strict()
+  .optional();
 const text = z.string().trim().min(1).max(3000);
 export const schemas = {
   health: z.object({}).strict(),
@@ -27,6 +44,7 @@ export const schemas = {
     .object({
       ...page,
       query: z.string().trim().min(1).max(200),
+      scan_pages: z.number().int().min(1).max(10).default(3),
       category: z.enum(["INBOX", "ARCHIVE", "SPAM"]).default("INBOX"),
     })
     .strict(),
@@ -58,8 +76,31 @@ export const schemas = {
     })
     .strict(),
   people_search: z
-    .object({ ...page, query: z.string().trim().min(1).max(200) })
+    .object({ ...page, query: z.string().trim().min(1).max(200), filters })
     .strict(),
+  people_search_filters: z
+    .object({ ...account, query: z.string().trim().min(1).max(200) })
+    .strict(),
+  extraction_start: z
+    .object({
+      ...account,
+      ...post,
+      kind: z.enum(["comments", "reactions"]),
+      max_items: z.number().int().min(1).max(500).default(100),
+    })
+    .strict(),
+  extraction_get: z
+    .object({
+      ...account,
+      operation_id: z.string().uuid(),
+      offset: z.number().int().min(0).max(500).default(0),
+      limit: z.number().int().min(1).max(50).default(20),
+    })
+    .strict(),
+  extraction_cancel: z
+    .object({ ...account, operation_id: z.string().uuid() })
+    .strict(),
+  reactions_list: z.object({ ...page, ...post }).strict(),
   invitations_list: z
     .object({
       ...page,
@@ -129,7 +170,7 @@ export function parse(op: string, args: unknown): Args {
 export const descriptions: Partial<Record<Operation, string>> = {
   health: "Connection, account and capability status. Read this first.",
   conversations_search:
-    "Search one inbox page by participant/title/preview. Continue cursor for older pages; not a full server-side search.",
+    "Search bounded inbox pages by participant/title/preview. Continue cursor for older pages; not a full server-side search.",
   messages_list:
     "Read message history without marking it read. Cursor-bound pagination.",
   message_send:

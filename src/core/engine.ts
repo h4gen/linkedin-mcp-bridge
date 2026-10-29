@@ -1,3 +1,4 @@
+import { VERSION, PROTOCOL } from "../version.js";
 import { Args, Fault, Operation, parse, writes } from "./contracts.js";
 import { Fetcher, graph, mutation, readApi, receipt } from "./api.js";
 import { self } from "./normalize.js";
@@ -14,6 +15,13 @@ export interface Deps {
   now: () => number;
   uuid: () => string;
   hash: (text: string) => Promise<string>;
+  authorize?: (
+    op: Operation,
+    args: Args,
+    fingerprint: string,
+    key: string,
+  ) => Promise<Args | undefined>;
+  allowedWrites?: ReadonlySet<Operation>;
 }
 export class Engine {
   private tail: Promise<unknown> = Promise.resolve();
@@ -55,7 +63,9 @@ export class Engine {
         }
       }
       return {
-        version: "0.1.0",
+        version: VERSION,
+        protocol: PROTOCOL,
+        accepted_writes: d.allowedWrites ? [...d.allowedWrites] : [],
         connected: usable,
         error,
         account_urn: expected ?? null,
@@ -81,7 +91,15 @@ export class Engine {
     const key = await d.hash(`${expected}:${a.idempotency_key ?? ""}`);
     if (op === "operation_get") {
       const row = journal[key];
-      if (!row) return { status: "not_found", retention_days: 7 };
+      if (!row) {
+        const approval = await d.store.get("approval:" + key);
+        return approval
+          ? {
+              status: approval.expires < d.now() ? "expired" : approval.status,
+              operation_id: approval.id,
+            }
+          : { status: "not_found", retention_days: 7 };
+      }
       if (
         row.operation === "message_send" &&
         row.target?.startsWith("urn:li:msg_conversation:") &&
@@ -124,6 +142,12 @@ export class Engine {
           replayed: true,
         };
       }
+      if (d.allowedWrites && !d.allowedWrites.has(op))
+        throw new Fault("capability_not_accepted");
+      if (d.authorize) {
+        const pending = await d.authorize(op, a, scope, key);
+        if (pending) return pending;
+      }
       if (op === "message_send") {
         const wanted = [...a.expected_participant_urns].sort();
         if (a.recipient_urn) {
@@ -133,24 +157,32 @@ export class Engine {
           // Read list pages without opening the thread; do not silently mark messages read.
           let next: Args = {};
           let found: Args | undefined;
-          for (let i = 0; i < 13 && !found; i++) {
-            check();
-            const page = await readApi(
-              "conversations_list",
-              { ...a, category: "INBOX", limit: 50 },
-              next,
-              d.fetch,
-            );
-            found = page.items.find(
-              (x: Args) => x.entityUrn === a.conversation_urn,
-            );
-            if (!page.next) break;
-            next = page.next;
+          for (const category of ["INBOX", "ARCHIVE", "SPAM"]) {
+            next = {};
+            const visited = new Set<string>();
+            while (!found) {
+              check();
+              const page = await readApi(
+                "conversations_list",
+                { ...a, category, limit: 20 },
+                next,
+                d.fetch,
+              );
+              found = page.items.find(
+                (x: Args) => x.entityUrn === a.conversation_urn,
+              );
+              if (!page.next) break;
+              if (visited.has(JSON.stringify(page.next)))
+                throw new Fault("pagination_stalled");
+              visited.add(JSON.stringify(page.next));
+              next = page.next;
+            }
+            if (found) break;
           }
           if (!found)
             throw new Fault(
               "conversation_not_verified",
-              "Conversation must be in the first 260 inbox entries for recipient validation.",
+              "Conversation could not be verified in Inbox, Archive or Spam before dispatch.",
             );
           const participantList =
             found.conversationParticipants ?? found.participants ?? [];
@@ -192,6 +224,7 @@ export class Engine {
       };
       journal[key] = row;
       await d.store.set("journal", journal); // durable before dispatch
+      await d.store.remove("approval:" + key);
       let dispatched = false;
       try {
         check();
@@ -261,6 +294,8 @@ export class Engine {
       "messages_list",
       "profile_get",
       "people_search",
+      "people_search_filters",
+      "reactions_list",
       "invitations_list",
     ].includes(op);
     const result = api

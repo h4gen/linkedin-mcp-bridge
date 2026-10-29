@@ -1,3 +1,4 @@
+import { StringDecoder } from "node:string_decoder";
 import net from "node:net";
 import { randomUUID } from "node:crypto";
 import { socketPath } from "./paths.js";
@@ -13,6 +14,7 @@ export async function call(
     }
     const socket = net.connect(socketPath);
     let buf = "";
+    const textDecoder = new StringDecoder("utf8");
     const id = randomUUID();
     const finish = (err?: Error, result?: unknown) => {
       clearTimeout(timer);
@@ -30,7 +32,7 @@ export async function call(
       socket.write(JSON.stringify({ id, op, args }) + "\n"),
     );
     socket.on("data", (b) => {
-      buf += b.toString("utf8");
+      buf += textDecoder.write(b);
       if (buf.length > 8 * 1024 * 1024) {
         finish(Error("response_too_large"));
         return;

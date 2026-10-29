@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { VERSION } from "./version.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { schemas, descriptions, writes, Operation } from "./core/contracts.js";
@@ -24,7 +25,7 @@ async function main() {
     );
   const server = new McpServer({
     name: "linkedin-mcp-bridge",
-    version: "0.1.0",
+    version: VERSION,
   });
   for (const [name, schema] of Object.entries(schemas)) {
     const op = name as Operation;
