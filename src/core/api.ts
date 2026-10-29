@@ -641,3 +641,52 @@ export async function findInvitation(
     state = page.next;
   }
 }
+
+// Bounded mailbox proof, resumable across receipt reads after a deletion.
+// Absence is confirmed only after all categories are exhausted.
+export async function reconcileDeletion(
+  row: Args,
+  fetch: Fetcher,
+  check: () => void,
+): Promise<boolean> {
+  const categories = ["INBOX", "ARCHIVE", "SPAM"];
+  const scan = row.deletion_scan ?? { category: 0, state: {}, visited: [] };
+  for (
+    let pageIndex = 0;
+    pageIndex < 8 && scan.category < categories.length;
+    pageIndex++
+  ) {
+    check();
+    const page = await readApi(
+      "conversations_list",
+      {
+        account_urn: row.account_urn,
+        category: categories[scan.category],
+        limit: 20,
+      },
+      scan.state,
+      fetch,
+    );
+    if (page.items.some((x: Args) => x.entityUrn === row.target)) {
+      delete row.deletion_scan;
+      row.reconciliation = "conversation_still_present";
+      return false;
+    }
+    if (page.next) {
+      const key = JSON.stringify(page.next);
+      if (scan.visited.includes(key)) throw new Fault("pagination_stalled");
+      scan.visited.push(key);
+      scan.state = page.next;
+    } else {
+      scan.category++;
+      scan.state = {};
+      scan.visited = [];
+    }
+  }
+  row.deletion_scan = scan;
+  row.reconciliation =
+    scan.category === categories.length
+      ? "absent_from_all_mailboxes"
+      : "mailbox_scan_in_progress";
+  return scan.category === categories.length;
+}

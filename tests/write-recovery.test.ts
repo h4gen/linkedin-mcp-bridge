@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { JSDOM } from "jsdom";
 import { domOperation } from "../src/extension/dom.js";
+import { reconcileDeletion } from "../src/core/api.js";
 import { Engine } from "../src/core/engine.js";
 import { Fault, parse } from "../src/core/contracts.js";
 function page(
@@ -406,4 +407,39 @@ it("recovers a known navigation timeout before adapter dispatch", async () => {
     "confirmed",
   );
   expect(f.mutations()).toBe(1);
+});
+
+it("reconciles deletion across bounded calls without repeating the mutation", async () => {
+  const row: any = {
+    target: "urn:li:msg_conversation:deleted",
+    account_urn: "urn:li:fsd_profile:me",
+  };
+  let calls = 0;
+  const fetch = async () => {
+    calls++;
+    return { data: { elements: [], paging: { total: 0 } } };
+  };
+  expect(await reconcileDeletion(row, fetch, () => {})).toBe(true);
+  expect(calls).toBe(3);
+  expect(row.reconciliation).toBe("absent_from_all_mailboxes");
+});
+it("persists deletion scan cursors and never declares partial absence confirmed", async () => {
+  const row: any = {
+    target: "urn:li:msg_conversation:deleted",
+    account_urn: "urn:li:fsd_profile:me",
+  };
+  let calls = 0;
+  const fetch = async () => ({
+    data: {
+      elements: [],
+      metadata: { nextCursor: ++calls <= 10 ? "cursor" + calls : undefined },
+    },
+  });
+  expect(await reconcileDeletion(row, fetch, () => {})).toBe(false);
+  expect(calls).toBe(8);
+  expect(row.deletion_scan.state).toEqual({ nextCursor: "cursor8" });
+  expect(row.reconciliation).toBe("mailbox_scan_in_progress");
+  const persisted = structuredClone(row);
+  expect(await reconcileDeletion(persisted, fetch, () => {})).toBe(true);
+  expect(calls).toBe(13);
 });

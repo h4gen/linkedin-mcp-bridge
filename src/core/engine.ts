@@ -9,6 +9,7 @@ import {
   receipt,
   getConversation,
   reconcileMessage,
+  reconcileDeletion,
   findInvitation,
 } from "./api.js";
 import { self, normalize } from "./normalize.js";
@@ -148,6 +149,21 @@ export class Engine {
             Object.assign(row, match, { status: "confirmed" });
             await d.store.set("journal", journal);
           } else row.reconciliation = "no_matching_receipt_observed";
+        } catch (e) {
+          row.reconciliation =
+            e instanceof Fault ? e.code : "reconciliation_unavailable";
+        }
+      }
+      if (
+        row.operation === "conversation_delete" &&
+        ["pending", "unknown_outcome"].includes(row.status)
+      ) {
+        try {
+          if (self(await d.fetch({ path: "/me" })) !== expected)
+            throw new Fault("account_changed");
+          if (await reconcileDeletion(row, d.fetch, check))
+            row.status = "confirmed";
+          await d.store.set("journal", journal);
         } catch (e) {
           row.reconciliation =
             e instanceof Fault ? e.code : "reconciliation_unavailable";
@@ -366,6 +382,7 @@ export class Engine {
               {},
             );
         row.dispatch_state = "dispatched";
+        await d.store.set("journal", journal);
         let verified = result?.verified === true;
         if (op === "conversation_update") {
           check();
@@ -398,17 +415,8 @@ export class Engine {
           for (let attempt = 0; attempt < 4; attempt++) {
             check();
             if (op === "conversation_delete") {
-              try {
-                await getConversation(a, d.fetch, check, { mailboxOnly: true });
-                verified = false;
-              } catch (e) {
-                if (
-                  e instanceof Fault &&
-                  e.code === "conversation_not_verified"
-                )
-                  verified = true;
-                else throw e;
-              }
+              verified = await reconcileDeletion(row, d.fetch, check);
+              break;
             } else {
               const absent = !(await findInvitation(
                 a,
