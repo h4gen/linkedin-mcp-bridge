@@ -140,6 +140,7 @@ export class Fault extends Error {
   constructor(
     public code: string,
     message = code,
+    public details: Args = {},
   ) {
     super(message);
   }

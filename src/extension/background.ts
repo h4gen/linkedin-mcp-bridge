@@ -46,7 +46,10 @@ async function tabId() {
 async function fetchRequest(r: Request) {
   const requestGeneration = generation;
   const blocked = await store.get("blockedUntil");
-  if (blocked > Date.now()) throw new Fault("session_cooldown");
+  if (blocked > Date.now())
+    throw new Fault("session_cooldown", "session_cooldown", {
+      retry_at: new Date(blocked).toISOString(),
+    });
   await new Promise((r) =>
     setTimeout(r, Math.max(0, lastRequest + 1000 - Date.now())),
   );
@@ -62,7 +65,12 @@ async function fetchRequest(r: Request) {
   if (result?.error) {
     if (result.error === "rate_limited" || result.error === "session_blocked")
       await store.set("blockedUntil", retryAt(result.retry_after, Date.now()));
-    throw new Fault(result.error);
+    const retry = await store.get("blockedUntil");
+    throw new Fault(
+      result.error,
+      result.error,
+      retry > Date.now() ? { retry_at: new Date(retry).toISOString() } : {},
+    );
   }
   if (!result || !Object.hasOwn(result, "data"))
     throw new Fault("empty_browser_response");
@@ -332,6 +340,7 @@ function connectHost() {
         current?.postMessage({
           id: msg.id,
           error: {
+            ...(e instanceof Fault ? e.details : {}),
             code: e instanceof Fault ? e.code : "operation_failed",
             message:
               e instanceof Fault

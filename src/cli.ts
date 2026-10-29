@@ -63,9 +63,18 @@ async function main() {
               {
                 type: "text" as const,
                 text: JSON.stringify({
-                  error: errorDetails(
-                    e instanceof Error ? e.message : "operation_failed",
-                  ),
+                  error: {
+                    ...errorDetails(
+                      e instanceof Error ? e.message : "operation_failed",
+                    ),
+                    ...((e as { details?: { retry_at?: string } })?.details
+                      ?.retry_at
+                      ? {
+                          retry_at: (e as { details: { retry_at: string } })
+                            .details.retry_at,
+                        }
+                      : {}),
+                  },
                 }),
               },
             ],

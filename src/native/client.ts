@@ -42,7 +42,9 @@ export async function call(
         const reply = JSON.parse(buf.slice(0, i));
         if (reply.id !== id) return;
         reply.error
-          ? finish(Error(reply.error.code))
+          ? finish(
+              Object.assign(Error(reply.error.code), { details: reply.error }),
+            )
           : finish(undefined, reply.result);
       } catch {
         finish(Error("invalid_host_response"));

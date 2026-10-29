@@ -146,6 +146,7 @@ it("validates real MCP responses after tool discovery without losing output pass
     "Library/Application Support/LinkedIn MCP Bridge",
   );
   await fs.mkdir(root, { recursive: true });
+  let rateLimited = false;
   const server = net.createServer((socket) => {
     let text = "";
     socket.on("data", (bytes) => {
@@ -153,6 +154,18 @@ it("validates real MCP responses after tool discovery without losing output pass
       const index = text.indexOf("\n");
       if (index < 0) return;
       const request = JSON.parse(text.slice(0, index));
+      if (rateLimited) {
+        socket.end(
+          JSON.stringify({
+            id: request.id,
+            error: {
+              code: "rate_limited",
+              retry_at: "2026-10-29T18:00:00.000Z",
+            },
+          }) + "\n",
+        );
+        return;
+      }
       socket.end(
         JSON.stringify({
           id: request.id,
@@ -196,6 +209,16 @@ it("validates real MCP responses after tool discovery without losing output pass
     expect(result.structuredContent).toMatchObject({
       version: "0.3.0",
       connected: false,
+    });
+    rateLimited = true;
+    const error = await client.callTool({
+      name: "linkedin_health",
+      arguments: {},
+    });
+    expect(error.isError).toBe(true);
+    expect(JSON.parse((error.content as any[])[0].text).error).toMatchObject({
+      code: "rate_limited",
+      retry_at: "2026-10-29T18:00:00.000Z",
     });
   } finally {
     await client.close();
