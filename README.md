@@ -68,7 +68,7 @@ All names have a `linkedin_` prefix. First call `health`, then supply its `accou
 | Feed        | `feed_list`, `post_get`, `post_create`, `post_like`, `post_comment`, `comments_list`                                        |
 | Diagnostics | `health`, `operation_get`                                                                                                   |
 
-Lists default to 20, max 50. Pass the returned opaque `next_cursor` as `cursor` with the **same arguments**. Cursors expire after 30 minutes, are bound to account, filters and operation, and reset with the browser session. Lists are live, not immutable snapshots. Deduplicate by entity URN when traversing a changing inbox. `conversations_search` searches participant/title/preview content in each fetched page; follow its cursor to search older pages. It is not full historical message search.
+Lists default to 20, max 50. LinkedIn Inbox requests are capped at 20 per backend page because live requests for 50 return an unusable response; use the cursor to continue. Pass the returned opaque `next_cursor` as `cursor` with the **same arguments**. Cursors expire after 30 minutes, are bound to account, filters and operation, and reset with the browser session. Lists are live, not immutable snapshots. Deduplicate by entity URN when traversing a changing inbox. `conversations_search` searches participant/title/preview content in each fetched page; follow its cursor to search older pages. It is not full historical message search.
 
 Inbox/history reads use HTTP only and never intentionally open a conversation or mark it read. Attachment metadata can appear in normalized read results; uploading or downloading attachment content is not implemented.
 
@@ -76,7 +76,7 @@ Inbox/history reads use HTTP only and never intentionally open a conversation or
 
 Every write requires `idempotency_key`. Use the same key for a retry of the same operation; changing its payload produces `idempotency_conflict`. Receipts survive service-worker/native-host restarts for seven days. After seven days a key is no longer protected: check LinkedIn before replaying an old action.
 
-`message_send` requires either `conversation_urn` or `recipient_urn`, plus exact `expected_participant_urns` excluding yourself. Existing-conversation validation currently searches the first 250 Inbox threads. Archived/older threads fail closed rather than guessing recipients. New recipient sends require one exact profile URN. Group replies use the exact participant set; group creation is excluded.
+`message_send` requires either `conversation_urn` or `recipient_urn`, plus exact `expected_participant_urns` excluding yourself. Existing-conversation validation currently searches the first 260 Inbox threads. Archived/older threads fail closed rather than guessing recipients. New recipient sends require one exact profile URN. Group replies use the exact participant set; group creation is excluded.
 
 Statuses:
 

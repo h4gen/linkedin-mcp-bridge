@@ -47,7 +47,7 @@ export async function readApi(
             { conversationCategoryPredicate: { category: a.category } },
           ],
         },
-        count: a.limit,
+        count: Math.min(a.limit, 20),
         mailboxUrn: a.account_urn,
         ...(state.nextCursor ? { nextCursor: state.nextCursor } : {}),
       }),

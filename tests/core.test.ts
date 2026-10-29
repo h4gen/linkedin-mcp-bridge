@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { Engine, Store } from "../src/core/engine.js";
 import { parse, schemas } from "../src/core/contracts.js";
 import { collection, restli, self } from "../src/core/normalize.js";
-import { mutation } from "../src/core/api.js";
+import { mutation, readApi } from "../src/core/api.js";
 import {
   NativeMessageDecoder,
   encodeNativeMessage,
@@ -312,4 +312,18 @@ it("confirms read-state mutation only after a matching postcondition", async () 
   });
   expect(result.status).toBe("confirmed");
   expect(f.fetch.mock.calls.filter(([r]) => r.method)).toHaveLength(1);
+});
+
+it("caps live inbox backend pages to 20 while retaining the remote cursor", async () => {
+  const fetch = vi.fn(async (_r: any) => ({
+    data: { elements: [], metadata: { nextCursor: "next" } },
+  }));
+  const page = await readApi(
+    "conversations_list",
+    { account_urn: account, category: "INBOX", limit: 50 },
+    {},
+    fetch,
+  );
+  expect(fetch.mock.calls[0][0].path).toContain("count:20");
+  expect(page.next).toEqual({ nextCursor: "next" });
 });

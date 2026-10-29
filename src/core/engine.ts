@@ -133,7 +133,7 @@ export class Engine {
           // Read list pages without opening the thread; do not silently mark messages read.
           let next: Args = {};
           let found: Args | undefined;
-          for (let i = 0; i < 5 && !found; i++) {
+          for (let i = 0; i < 13 && !found; i++) {
             check();
             const page = await readApi(
               "conversations_list",
@@ -150,7 +150,7 @@ export class Engine {
           if (!found)
             throw new Fault(
               "conversation_not_verified",
-              "Conversation must be in the first 250 inbox entries for recipient validation.",
+              "Conversation must be in the first 260 inbox entries for recipient validation.",
             );
           const participantList =
             found.conversationParticipants ?? found.participants ?? [];
