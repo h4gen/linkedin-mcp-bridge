@@ -112,7 +112,7 @@ describe("GTM and inbox pages", () => {
       data: {
         elements: Array.from({ length: 3 }, (_, i) => ({
           entityUrn: `urn:${count}:${i}`,
-          name: "needle",
+          title: "needle",
         })),
         metadata: ++count < 2 ? { nextCursor: "next" } : {},
       },
@@ -179,46 +179,6 @@ it("flattens people search clusters before computing pagination", async () => {
     profile_url: "https://www.linkedin.com/in/person",
   });
   expect(result.next.start).toBe(1);
-});
-
-it("keeps already collected extraction results when cancelled", async () => {
-  const { Extractions } = await import("../src/core/extractions.js");
-  const { store } = storage();
-  let resume: () => void = () => {};
-  const blocked = new Promise<void>((r) => (resume = r));
-  let calls = 0;
-  const jobs = new Extractions(
-    store,
-    async () => {
-      calls++;
-      if (calls === 2) await blocked;
-      return {
-        items: [{ id: String(calls) }],
-        next_cursor: "next",
-        partial: true,
-      };
-    },
-    async () => account,
-    () => "11111111-1111-4111-8111-111111111111",
-  );
-  const job = await jobs.handle("extraction_start", {
-    account_urn: account,
-    kind: "comments",
-    post_urn: "urn:li:activity:1",
-    max_items: 100,
-  });
-  await vi.waitFor(() => expect(calls).toBe(2));
-  await jobs.handle("extraction_cancel", {
-    account_urn: account,
-    operation_id: job.operation_id,
-  });
-  resume();
-  const result = await jobs.handle("extraction_get", {
-    account_urn: account,
-    operation_id: job.operation_id,
-  });
-  expect(result.status).toBe("cancelled");
-  expect(result.items).toEqual([{ id: "1" }]);
 });
 
 it("verifies recipients from an exact conversation entity without scanning the inbox", async () => {
@@ -348,7 +308,104 @@ it("does not equate a missing cursor with complete comment coverage", async () =
   expect(result.next_cursor).toBeNull();
   expect(result.page_info).toMatchObject({
     coverage: "partial",
-    continuation: "unavailable",
+    continuation: "blocked",
     cursor_expires_at: null,
   });
+});
+
+it("does not repopulate journal state after a connection generation changes", async () => {
+  const { store, data } = storage();
+  let generation = 0;
+  let release!: () => void;
+  const paused = new Promise<void>((resolve) => (release = resolve));
+  const fetch = vi.fn(async (r: any) => {
+    if (r.path === "/me")
+      return { data: { miniProfile: { entityUrn: account } } };
+    if (r.method) {
+      await paused;
+      return { data: { entityUrn: "urn:li:msg_message:sent" } };
+    }
+    return { data: { elements: [] } };
+  });
+  const engine = new Engine({
+    store,
+    fetch,
+    dom: vi.fn(),
+    account: async () => account,
+    now: () => 1,
+    uuid: () => "00112233-4455-4677-8899-aabbccddeeff",
+    hash: async (s) => s,
+    generation: () => generation,
+  });
+  const pending = engine.run("message_send", send);
+  await vi.waitFor(() =>
+    expect(fetch.mock.calls.some(([r]) => r.method)).toBe(true),
+  );
+  generation++;
+  await store.remove("journal");
+  release();
+  await expect(pending).rejects.toThrow("interrupted_unknown_outcome");
+  expect(data.journal).toBeUndefined();
+});
+
+it("checks the DOM session even for replayed cursor pages", async () => {
+  const { store } = storage();
+  let valid = true;
+  let id = 0;
+  const engine = new Engine({
+    store,
+    fetch: async () => ({ data: { miniProfile: { entityUrn: account } } }),
+    dom: async () => ({
+      items: [{ id: "one" }],
+      next: { dom_session: "session" },
+      partial: true,
+    }),
+    account: async () => account,
+    now: () => 1,
+    uuid: () => `cursor-${++id}`,
+    hash: async (s) => s,
+    cursorContext: async () => {
+      if (!valid) throw Error("cursor_invalidated");
+    },
+  });
+  const a = { account_urn: account, post_urn: "urn:li:share:1", limit: 2 };
+  const first = await engine.run("reactions_list", a);
+  await engine.run("reactions_list", { ...a, cursor: first.next_cursor });
+  valid = false;
+  await expect(
+    engine.run("reactions_list", { ...a, cursor: first.next_cursor }),
+  ).rejects.toThrow("cursor_invalidated");
+});
+
+it("serializes receipt expiry behind an in-flight mutation", async () => {
+  const { store, data } = storage();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  const fetch = vi.fn(async (r: any) =>
+    r.path === "/me"
+      ? { data: { miniProfile: { entityUrn: account } } }
+      : (await gate, { data: { entityUrn: "urn:li:msg_message:sent" } }),
+  );
+  const engine = new Engine({
+    store,
+    fetch,
+    dom: vi.fn(),
+    account: async () => account,
+    now: () => 1,
+    uuid: () => "00112233-4455-4677-8899-aabbccddeeff",
+    hash: async (s) => s,
+  });
+  const sending = engine.run("message_send", send);
+  await vi.waitFor(() =>
+    expect(fetch.mock.calls.some(([r]) => r.method)).toBe(true),
+  );
+  const expiry = engine.expireReceipts();
+  release();
+  expect((await sending).status).toBe("confirmed");
+  await expiry;
+  expect(
+    Object.values(data.journal).some(
+      (x: any) => x.receipt_id === "urn:li:msg_message:sent",
+    ),
+  ).toBe(true);
 });

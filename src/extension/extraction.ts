@@ -9,6 +9,31 @@ export async function extractionOperation(
     type Profile = Record<string, any>;
     const elementText = (e: Element | null): string =>
       ((e as HTMLElement)?.innerText || e?.textContent || "").trim();
+    const waitFor = async (
+      ready: () => boolean,
+      root: Node,
+      timeout = 2000,
+    ): Promise<boolean> => {
+      if (ready()) return true;
+      return new Promise((resolve) => {
+        const observer = new window.MutationObserver(() => {
+          if (ready()) finish(true);
+        });
+        const timer = setTimeout(() => finish(ready()), timeout);
+        const finish = (value: boolean) => {
+          clearTimeout(timer);
+          observer.disconnect();
+          resolve(value);
+        };
+        observer.observe(root, {
+          childList: true,
+          subtree: true,
+          characterData: true,
+          attributes: true,
+        });
+        if (ready()) finish(true);
+      });
+    };
     const COMMENT_SELECTOR =
       'article.comments-comment-entity, .comments-comment-item, div[componentkey^="replaceableComment_"]';
 
@@ -218,7 +243,15 @@ export async function extractionOperation(
           item.querySelector<HTMLAnchorElement>('a[href*="commentUrn="]')
             ?.href ||
           undefined;
-        const key = comment_id || link.href + "\n" + comment_text;
+        const w = window as any;
+        w.__liBridgeCommentIds ??= new WeakMap();
+        const signature = link.href + "\n" + comment_text;
+        let local = w.__liBridgeCommentIds.get(item);
+        if (!local || local.signature !== signature) {
+          local = { signature, id: "session:" + crypto.randomUUID() };
+          w.__liBridgeCommentIds.set(item, local);
+        }
+        const key = comment_id || local.id;
         profiles.set(key, {
           reaction_type: "Comment",
           profile_url: link.href,
@@ -230,7 +263,8 @@ export async function extractionOperation(
               ? item.querySelector("h3.comments-comment-meta__description")
               : metaLink,
           ).match(/•\s*([123])(?:st|nd|rd)?\+?/i)?.[1],
-          comment_id,
+          comment_id: key,
+          identity_quality: comment_id ? "source" : "session",
           parent_comment_id: (() => {
             const parent = item.parentElement?.closest(COMMENT_SELECTOR);
             return parent
@@ -432,6 +466,7 @@ export async function extractionOperation(
           : null;
     if (!root) throw Error("post_target_not_unique");
     const seen = new Set<string>(state.seen ?? []);
+    if (seen.size >= 10000) throw Error("traversal_limit_reached");
     const items: Profile[] = [];
     const usable = (e: HTMLElement) =>
       !!e.offsetParent &&
@@ -443,6 +478,8 @@ export async function extractionOperation(
       if (
         prior &&
         !(
+          (state.dom_session &&
+            prior.getAttribute("data-bridge-post") === a.post_urn) ||
           onPermalink ||
           (prior.id && trigger?.getAttribute("aria-controls") === prior.id)
         )
@@ -459,13 +496,16 @@ export async function extractionOperation(
           throw Error("unrelated_dialog_open");
         if (!trigger) throw Error("reaction_control_missing");
         activateReactionTrigger(trigger);
-        for (let attempt = 0; attempt < 12 && !dialog; attempt++) {
-          await new Promise((r) => setTimeout(r, 200));
-          dialog = findReactionDialog();
-        }
+        await waitFor(() => !!findReactionDialog(), document, 3000);
+        dialog = findReactionDialog();
       }
       if (!dialog) throw Error("reaction_dialog_missing");
-      try {
+      dialog.setAttribute("data-bridge-post", a.post_urn);
+      await waitFor(() => !!extractReactors(dialog!).length, dialog, 3000);
+      if (!extractReactors(dialog).length)
+        throw Error("reaction_content_not_loaded");
+      {
+        let progressed = false;
         for (let step = 0; step < 5 && items.length < a.limit; step++) {
           for (const p of extractReactors(dialog)) {
             const key = p.profile_url?.split(/[?#]/)[0];
@@ -474,25 +514,26 @@ export async function extractionOperation(
             items.push({ ...p, id: key, headline: p.description });
           }
           if (items.length >= a.limit) break;
+          const before = dialog.textContent;
           scrollExtractionList(dialog);
-          await new Promise((r) => setTimeout(r, 700));
+          await waitFor(() => dialog!.textContent !== before, dialog);
+          progressed ||= dialog.textContent !== before;
         }
         return {
           items,
           partial: true,
           completeness: "bounded_visible_results",
-          next: items.length ? { seen: [...seen].slice(-5000) } : undefined,
+          next: items.length || progressed ? { seen: [...seen] } : undefined,
+          reason:
+            items.length || progressed
+              ? "bounded_visible_results"
+              : "visible_list_stalled",
         };
-      } finally {
-        if (!prior)
-          dialog
-            .querySelector<HTMLElement>(
-              'button[aria-label="Dismiss"],button[aria-label="Close"],button[aria-label="Schließen"],.artdeco-modal__dismiss',
-            )
-            ?.click();
       }
     }
-    if (!root.querySelector(COMMENT_SELECTOR)) {
+
+    const commentsRoot = findCommentsRoot(root);
+    if (!commentsRoot.querySelector(COMMENT_SELECTOR)) {
       const comments = Array.from(
         root.querySelectorAll<HTMLButtonElement>("button"),
       ).filter((e) =>
@@ -500,17 +541,16 @@ export async function extractionOperation(
       );
       if (comments.length === 1) {
         comments[0].click();
-        for (
-          let attempt = 0;
-          attempt < 15 && !root.querySelector(COMMENT_SELECTOR);
-          attempt++
-        )
-          await new Promise((r) => setTimeout(r, 200));
+        await waitFor(
+          () => !!commentsRoot.querySelector(COMMENT_SELECTOR),
+          commentsRoot,
+          3000,
+        );
       }
     }
     let advances = 0;
     for (let step = 0; step < 5 && items.length < a.limit; step++) {
-      for (const p of extractCommenters(root)) {
+      for (const p of extractCommenters(commentsRoot)) {
         const key = p.comment_id || p.profile_url + "\n" + p.comment_text;
         if (seen.has(key) || items.length >= a.limit) continue;
         seen.add(key);
@@ -526,11 +566,12 @@ export async function extractionOperation(
           text: p.comment_text,
           truncated: p.comment_text_truncated,
           parent_id: p.parent_comment_id ?? null,
+          parent_relation: p.parent_comment_id ? "known" : "unknown",
         });
       }
       if (items.length >= a.limit) break;
       const controls = Array.from(
-        root.querySelectorAll<HTMLElement>('button,[role="button"]'),
+        commentsRoot.querySelectorAll<HTMLElement>('button,[role="button"]'),
       ).filter(usable);
       const more = controls.find((e) =>
         /^(?:(?:load|show|view)\s+)?(?:\d+\s+)?more comments?\b|^Weitere Kommentare|^Mehr Kommentare|^(?:View|Show) (?:\d+ )?(?:more )?repl(?:y|ies)|^\d+ Antworten|^Antworten anzeigen/i.test(
@@ -538,9 +579,10 @@ export async function extractionOperation(
         ),
       );
       if (!more) break;
+      const before = commentsRoot.textContent;
       more.click();
       advances++;
-      await new Promise((r) => setTimeout(r, 800));
+      await waitFor(() => commentsRoot.textContent !== before, commentsRoot);
     }
     return {
       items,
@@ -548,8 +590,7 @@ export async function extractionOperation(
       completeness: "bounded_visible_results",
       reason: "linkedin_may_rank_or_hide_comments",
       advances,
-      next:
-        items.length || advances ? { seen: [...seen].slice(-5000) } : undefined,
+      next: items.length || advances ? { seen: [...seen] } : undefined,
     };
   } catch (e) {
     return {

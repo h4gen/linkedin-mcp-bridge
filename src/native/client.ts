@@ -1,3 +1,4 @@
+import { writes, type Operation } from "../core/contracts.js";
 import { StringDecoder } from "node:string_decoder";
 import net from "node:net";
 import { randomUUID } from "node:crypto";
@@ -7,6 +8,7 @@ export async function call(
   args: unknown,
   signal?: AbortSignal,
 ): Promise<any> {
+  const outcome = writes.has(op as Operation) ? "_unknown_outcome" : "";
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
       reject(Error("cancelled"));
@@ -22,11 +24,8 @@ export async function call(
       socket.destroy();
       err ? reject(err) : resolve(result);
     };
-    const abort = () => finish(Error("cancelled_unknown_outcome"));
-    const timer = setTimeout(
-      () => finish(Error("timeout_unknown_outcome")),
-      70000,
-    );
+    const abort = () => finish(Error("cancelled" + outcome));
+    const timer = setTimeout(() => finish(Error("timeout" + outcome)), 70000);
     signal?.addEventListener("abort", abort, { once: true });
     socket.once("connect", () =>
       socket.write(JSON.stringify({ id, op, args }) + "\n"),
@@ -52,8 +51,6 @@ export async function call(
     socket.on("error", () =>
       finish(Error("bridge_unavailable_open_extension")),
     );
-    socket.on("end", () =>
-      finish(Error("bridge_disconnected_unknown_outcome")),
-    );
+    socket.on("end", () => finish(Error("bridge_disconnected" + outcome)));
   });
 }

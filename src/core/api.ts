@@ -13,12 +13,11 @@ export type Fetcher = (r: Request) => Promise<any>;
 export const queries = {
   conversations: "messengerConversations.9501074288a12f3ae9e3c7ea243bccbf",
   messages: "messengerMessages.d8ea76885a52fd5dc5c317078ab7c977",
-  reactions: "voyagerSocialDashReactions.759f60600a6108d4110bc8b8f6ecd507",
   people: "voyagerSearchDashClusters.e438ab99259203e9c1cd3f358e217282",
 };
 export function graph(kind: keyof typeof queries, variables: Args): Request {
   return {
-    path: `/${kind === "people" || kind === "reactions" ? "graphql" : "voyagerMessagingGraphQL/graphql"}?queryId=${queries[kind]}&variables=${restli(variables)}`,
+    path: `/${kind === "people" ? "graphql" : "voyagerMessagingGraphQL/graphql"}?queryId=${queries[kind]}&variables=${restli(variables)}`,
   };
 }
 export async function readApi(
@@ -28,23 +27,36 @@ export async function readApi(
   fetch: Fetcher,
 ): Promise<Args> {
   let raw: any;
-  if (op === "messages_list" && state.exhausted) {
+  if (op === "messages_list" && (state.exhausted || state.buffered?.length)) {
     const items = (state.buffered ?? []).slice(0, a.limit);
     const remaining = (state.buffered ?? []).slice(a.limit);
     return {
       items,
-      partial: remaining.length > 0,
-      next: remaining.length ? { ...state, buffered: remaining } : undefined,
-      completeness: remaining.length ? "more_available" : "source_exhausted",
+      partial: remaining.length > 0 || !state.exhausted || !!state.blocked,
+      next:
+        remaining.length || (!state.exhausted && !state.blocked)
+          ? { ...state, buffered: remaining }
+          : undefined,
+      completeness: state.blocked
+        ? "timestamp_boundary_unresolved"
+        : remaining.length || !state.exhausted
+          ? "more_available"
+          : "source_exhausted",
     };
   }
   if (op === "conversations_search") {
     const items: Args[] = [];
     let next = state;
     let scanned = 0;
-    let more = false;
+    let more = !state.exhausted && !!state.nextCursor;
     const seen = new Set<string>(state.seen ?? []);
-    for (let i = 0; i < a.scan_pages && !state.exhausted; i++) {
+    for (
+      let i = 0;
+      i < a.scan_pages &&
+      !state.exhausted &&
+      (state.buffered?.length ?? 0) + items.length < a.limit;
+      i++
+    ) {
       const page = await readApi(
         "conversations_list",
         { ...a, limit: 20 },
@@ -55,7 +67,7 @@ export async function readApi(
       for (const item of page.items) {
         if (
           !seen.has(item.entityUrn) &&
-          JSON.stringify(item)
+          conversationSearchText(item)
             .toLocaleLowerCase()
             .includes(a.query.toLocaleLowerCase())
         ) {
@@ -74,7 +86,11 @@ export async function readApi(
     return {
       items: buffered.slice(0, a.limit),
       scanned,
-      partial: more,
+      partial: more || buffered.length > a.limit,
+      completeness:
+        more || buffered.length > a.limit
+          ? "more_available"
+          : "source_exhausted",
       search_scope: "participants_title_preview_not_full_message_history",
       next:
         more || buffered.length > a.limit
@@ -82,7 +98,7 @@ export async function readApi(
               ...next,
               exhausted: !more,
               buffered: buffered.slice(a.limit),
-              seen: [...seen].slice(-5000),
+              seen: [...seen],
             }
           : undefined,
     };
@@ -113,19 +129,40 @@ export async function readApi(
       source: "linkedin_public_typeahead",
     };
   }
-  if (op === "profile_get")
-    return normalize(
-      await fetch({
-        path:
-          "/identity/dash/profiles?" +
-          new URLSearchParams({
-            q: "memberIdentity",
-            memberIdentity: a.public_identifier,
-            decorationId:
-              "com.linkedin.voyager.dash.deco.identity.profile.WebTopCardCore-19",
-          }),
-      }),
+  if (op === "conversations_get")
+    return { conversation: await getConversation(a, fetch) };
+  if (op === "profile_get") {
+    const rawProfile = await fetch({
+      path:
+        "/identity/dash/profiles?" +
+        new URLSearchParams({
+          q: "memberIdentity",
+          memberIdentity: a.public_identifier,
+          decorationId:
+            "com.linkedin.voyager.dash.deco.identity.profile.WebTopCardCore-19",
+        }),
+    });
+    const normalized = normalize(rawProfile);
+    const matches = normalized.entities.filter(
+      (x: Args) => x.publicIdentifier === a.public_identifier,
     );
+    const candidates = matches.length
+      ? matches
+      : collection(rawProfile).items.filter(
+          (x: Args) => x.publicIdentifier === a.public_identifier,
+        );
+    if (candidates.length !== 1) throw new Fault("profile_not_unique");
+    const p = candidates[0];
+    return {
+      profile: {
+        entityUrn: p.entityUrn ?? null,
+        name: [p.firstName, p.lastName].filter(Boolean).join(" "),
+        headline: p.headline ?? p.occupation ?? null,
+        profile_url: "https://www.linkedin.com/in/" + p.publicIdentifier + "/",
+        public_identifier: p.publicIdentifier,
+      },
+    };
+  }
   if (op === "conversations_list")
     raw = await fetch(
       graph("conversations", {
@@ -180,14 +217,6 @@ export async function readApi(
         },
       }),
     );
-  else if (op === "reactions_list")
-    raw = await fetch(
-      graph("reactions", {
-        threadUrn: a.post_urn,
-        count: a.limit,
-        start: state.start ?? 0,
-      }),
-    );
   else if (op === "invitations_list")
     raw = await fetch({
       path:
@@ -202,7 +231,7 @@ export async function readApi(
         }),
     });
   else throw new Fault("not_api_operation");
-  const c = collection(raw);
+  const c = collection(raw, op);
   let items = c.items;
   if (op === "people_search") {
     const rows: Args[] = [];
@@ -235,14 +264,19 @@ export async function readApi(
       return true;
     });
     if (c.items.length && !rows.length) throw new Fault("people_shape_changed");
-    const more = rows.length >= a.limit;
+    const sourceStart = c.paging.start ?? state.start ?? 0;
+    const sourceCount = c.paging.count ?? a.limit;
+    const total = c.paging.total;
+    const nextStart = sourceStart + sourceCount;
+    const more =
+      typeof total === "number" ? nextStart < total : c.items.length > 0;
+    if (more && (sourceCount <= 0 || nextStart <= (state.start ?? -1)))
+      throw new Fault("pagination_stalled");
     return {
       items: unique,
       partial: more,
       completeness: more ? "more_available" : "source_exhausted",
-      next: more
-        ? { start: (state.start ?? 0) + a.limit, seen: [...seen].slice(-5000) }
-        : undefined,
+      next: more ? { start: nextStart, seen: [...seen] } : undefined,
       scanned: rows.length,
     };
   }
@@ -269,8 +303,9 @@ export async function readApi(
       next = {
         before,
         buffered: available.slice(a.limit),
-        seen: [...seen].slice(-5000),
+        seen: [...seen],
         exhausted: !more,
+        blocked: stalled,
       };
     return {
       items,
@@ -286,42 +321,35 @@ export async function readApi(
   } else if (
     items.length >= a.limit &&
     (c.paging.total === undefined ||
+      c.paging.total < (state.start ?? 0) + items.length ||
       (state.start ?? 0) + items.length < c.paging.total)
   )
     next = { start: (state.start ?? 0) + items.length };
-  if (op === "reactions_list") {
-    const seen = new Set<string>(state.seen ?? []);
-    items = items
-      .map((x) => {
-        const l = x.reactorLockup ?? {};
-        const p = x.actor?.miniProfile ?? x.actor ?? {};
-        return {
-          id: x.entityUrn ?? x.actorUrn ?? l.navigationUrl,
-          profile_urn: x.actorUrn ?? p.entityUrn ?? null,
-          profile_url:
-            l.navigationUrl ??
-            (p.publicIdentifier
-              ? "https://www.linkedin.com/in/" + p.publicIdentifier + "/"
-              : null),
-          name:
-            l.title?.text ??
-            l.title ??
-            [p.firstName, p.lastName].filter(Boolean).join(" "),
-          headline: l.subtitle?.text ?? l.subtitle ?? p.occupation ?? null,
-          connection_degree: l.label?.text ?? l.label ?? null,
-          reaction_type: x.reactionType ?? null,
-          created_at: x.createdAt ?? null,
-        };
-      })
-      .filter((x) => {
-        if (!x.id || seen.has(x.id)) return false;
-        seen.add(x.id);
-        return true;
-      });
-    if (c.items.length && !items.length && !state.seen?.length)
-      throw new Fault("reaction_shape_changed");
-    if (next) next.seen = [...seen].slice(-5000);
-  }
+  if (op === "invitations_list")
+    items = items.map((x) => {
+      const invitation = x.invitation ?? x;
+      const member =
+        a.direction === "sent"
+          ? (invitation.toMember ?? invitation.invitee?.miniProfile)
+          : invitation.fromMember;
+      if (!invitation.entityUrn || !member)
+        throw new Fault("invitation_shape_changed");
+      return {
+        entityUrn: invitation.entityUrn,
+        direction: a.direction,
+        sent_at: invitation.sentTime ?? null,
+        message:
+          typeof invitation.message === "string" ? invitation.message : null,
+        profile: {
+          entityUrn: member.dashEntityUrn ?? member.entityUrn ?? null,
+          name: [member.firstName, member.lastName].filter(Boolean).join(" "),
+          headline: member.occupation ?? null,
+          profile_url: member.publicIdentifier
+            ? "https://www.linkedin.com/in/" + member.publicIdentifier + "/"
+            : null,
+        },
+      };
+    });
   if (a.unread_only)
     items = items.filter((x) => x.read === false || x.unreadCount > 0);
   return {
@@ -395,7 +423,7 @@ export function mutation(
     };
   return undefined;
 }
-export function receipt(raw: any): string | undefined {
+export function receipt(raw: any, operation?: Operation): string | undefined {
   const values = normalize(raw ?? {});
   let found: string | undefined;
   const scan = (x: any, depth = 0) => {
@@ -407,11 +435,204 @@ export function receipt(raw: any): string | undefined {
         /^urn:li:(msg_message|fsd_invitation|fs_invitation|activity|share|ugcPost):/.test(
           v,
         )
-      )
-        found ??= v;
-      else scan(v, depth + 1);
+      ) {
+        const expected =
+          operation === "message_send"
+            ? /^urn:li:msg_message:/
+            : operation === "invitation_send"
+              ? /^urn:li:(fsd_invitation|fs_invitation):/
+              : operation === "post_create"
+                ? /^urn:li:(activity|share|ugcPost):/
+                : operation
+                  ? /$^/
+                  : /^urn:li:/;
+        if (expected.test(v)) found ??= v;
+      } else scan(v, depth + 1);
     }
   };
   scan(values);
   return found;
+}
+
+// Deliberately select user-visible fields, never arbitrary serialized identifiers.
+export function conversationSearchText(item: Args): string {
+  const participants = item.conversationParticipants ?? item.participants ?? [];
+  const names = (
+    Array.isArray(participants) ? participants : (participants.elements ?? [])
+  ).map((p: Args) => {
+    const m = p.participantType?.member ?? p.member ?? p;
+    return [m.firstName, m.lastName, m.name]
+      .filter((x) => typeof x === "string")
+      .join(" ");
+  });
+  const previews = [
+    item.preview,
+    item.lastMessage?.body?.text,
+    ...(item.messages?.elements ?? []).map((m: Args) => m.body?.text),
+  ];
+  return [item.title, ...names, ...previews]
+    .filter((x) => typeof x === "string")
+    .join("\n");
+}
+
+export async function getConversation(
+  a: Args,
+  fetch: Fetcher,
+  check = () => {},
+  options: { mailboxOnly?: boolean; fields?: string[] } = {},
+): Promise<Args> {
+  check();
+  if (!options.mailboxOnly) {
+    const raw = await fetch(
+      graph("messages", {
+        deliveredAt: Date.now(),
+        conversationUrn: a.conversation_urn,
+        countBefore: 1,
+        countAfter: 0,
+      }),
+    );
+    const direct = normalize(raw).entities.find(
+      (x: Args) =>
+        x.entityUrn === a.conversation_urn &&
+        (x.conversationParticipants || x.participants) &&
+        (options.fields ?? []).every((key) => key in x),
+    );
+    if (direct) return direct;
+  }
+  for (const category of ["INBOX", "ARCHIVE", "SPAM"]) {
+    let state: Args = {};
+    const visited = new Set<string>();
+    for (;;) {
+      check();
+      const page = await readApi(
+        "conversations_list",
+        { account_urn: a.account_urn, category, limit: 20 },
+        state,
+        fetch,
+      );
+      const found = page.items.find(
+        (x: Args) => x.entityUrn === a.conversation_urn,
+      );
+      if (found) return found;
+      if (!page.next) break;
+      const key = JSON.stringify(page.next);
+      if (visited.has(key)) throw new Fault("pagination_stalled");
+      visited.add(key);
+      state = page.next;
+    }
+  }
+  throw new Fault("conversation_not_verified");
+}
+
+export async function reconcileMessage(
+  row: Args,
+  fetch: Fetcher,
+  check: () => void,
+): Promise<Args | undefined> {
+  async function* candidates(): AsyncGenerator<string> {
+    if (
+      row.conversation_urn ||
+      row.target?.startsWith("urn:li:msg_conversation:")
+    ) {
+      yield row.conversation_urn ?? row.target;
+      return;
+    }
+    if (!row.target?.startsWith("urn:li:fsd_profile:")) return;
+    for (const category of ["INBOX", "ARCHIVE", "SPAM"]) {
+      let state: Args = {};
+      const visited = new Set<string>();
+      for (;;) {
+        check();
+        const page = await readApi(
+          "conversations_list",
+          { account_urn: row.account_urn, category, limit: 20 },
+          state,
+          fetch,
+        );
+        for (const thread of page.items) {
+          const source =
+            thread.conversationParticipants ?? thread.participants ?? [];
+          const participants = (
+            Array.isArray(source) ? source : (source.elements ?? [])
+          )
+            .map(
+              (p: Args) =>
+                p.hostIdentityUrn ??
+                p.participantType?.member?.entityUrn ??
+                p.member?.entityUrn,
+            )
+            .filter((urn: string) => urn !== row.account_urn);
+          if (participants.length === 1 && participants[0] === row.target)
+            yield thread.entityUrn;
+        }
+        if (!page.next) break;
+        const key = JSON.stringify(page.next);
+        if (visited.has(key)) throw new Fault("pagination_stalled");
+        visited.add(key);
+        state = page.next;
+      }
+    }
+  }
+  const checked = new Set<string>();
+  for await (const conversation of candidates()) {
+    if (checked.has(conversation)) continue;
+    checked.add(conversation);
+    let before = Date.now();
+    for (;;) {
+      check();
+      const raw = await fetch(
+        graph("messages", {
+          deliveredAt: before,
+          conversationUrn: conversation,
+          countBefore: 50,
+          countAfter: 0,
+        }),
+      );
+      const match = (raw.included ?? []).find(
+        (x: Args) =>
+          x.originToken === row.origin_token &&
+          /^urn:li:msg_message:/.test(x.entityUrn ?? ""),
+      );
+      if (match)
+        return { receipt_id: match.entityUrn, conversation_urn: conversation };
+      const page = collection(raw, "messages_list");
+      const times = page.items
+        .map((x) => x.deliveredAt)
+        .filter((x) => typeof x === "number");
+      const next = times.length ? Math.min(...times) + 1 : undefined;
+      if (page.items.length < 50 || !next || next < row.created_at - 60000)
+        break;
+      if (next >= before) throw new Fault("timestamp_boundary_unresolved");
+      before = next;
+    }
+  }
+  return undefined; // Absence is never evidence that dispatch failed.
+}
+
+export async function findInvitation(
+  a: Args,
+  direction: "received" | "sent",
+  fetch: Fetcher,
+  check: () => void,
+): Promise<Args | undefined> {
+  let state: Args = {};
+  const visited = new Set<string>();
+  for (;;) {
+    check();
+    const page = await readApi(
+      "invitations_list",
+      { account_urn: a.account_urn, direction, limit: 20 },
+      state,
+      fetch,
+    );
+    const found = page.items.find(
+      (x: Args) => x.entityUrn === a.invitation_urn,
+    );
+    if (found) return found;
+    if (!page.next) return undefined;
+    const key = JSON.stringify(page.next);
+    if (visited.has(key)) throw new Fault("pagination_stalled");
+    visited.add(key);
+    state = page.next;
+  }
 }

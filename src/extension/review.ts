@@ -13,19 +13,23 @@ async function refresh() {
     const account = document.createElement("p");
     account.textContent = "Account: " + (row.args?.account_urn ?? "");
     article.append(heading, account);
-    const recipients =
-      row.args?.expected_participant_urns ??
-      (row.args?.profile_urn ? [row.args.profile_urn] : []);
-    for (const urn of recipients) {
+    for (const recipient of row.preview ?? []) {
       const line = document.createElement("p");
-      line.append("Recipient: ");
-      const link = document.createElement("a");
-      link.href = "https://www.linkedin.com/in/" + urn.split(":").pop() + "/";
-      link.textContent = "Open recipient profile";
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      line.append(link);
+      line.textContent = "Recipient: " + recipient.name;
+      if (recipient.profile_url?.startsWith("https://www.linkedin.com/in/")) {
+        const link = document.createElement("a");
+        link.href = recipient.profile_url;
+        link.textContent = " Open verified profile";
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        line.append(link);
+      }
       article.append(line);
+    }
+    if (row.args?.conversation_urn) {
+      const target = document.createElement("p");
+      target.textContent = "Conversation: " + row.args.conversation_urn;
+      article.append(target);
     }
     article.append(body);
     const details = document.createElement("details");
@@ -61,27 +65,6 @@ async function refresh() {
   }
   if (!actions.children.length) actions.textContent = "No pending actions.";
   const s = await chrome.runtime.sendMessage({ action: "status" });
-  const jobs = document.querySelector("#extractions")!;
-  jobs.replaceChildren();
-  for (const row of s.extractions ?? []) {
-    const p = document.createElement("p");
-    p.textContent = `${row.kind}: ${row.count} results · ${row.status}`;
-    if (row.status === "running") {
-      const stop = document.createElement("button");
-      stop.textContent = "Stop";
-      stop.onclick = async () => {
-        await chrome.runtime.sendMessage({
-          action: "cancel-extraction",
-          id: row.id,
-        });
-        await refresh();
-      };
-      p.append(stop);
-    }
-    jobs.append(p);
-  }
-  if (!jobs.children.length)
-    jobs.textContent = "No extraction jobs in this session.";
   document.querySelector<HTMLInputElement>("#inbox")!.checked =
     s.allowInboxChanges;
 }

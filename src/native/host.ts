@@ -5,7 +5,7 @@ import fs from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { encodeNativeMessage, NativeMessageDecoder } from "./framing.js";
 import { root, socketPath } from "./paths.js";
-import { parse } from "../core/contracts.js";
+import { parse, writes, type Operation } from "../core/contracts.js";
 await fs.mkdir(root, { recursive: true, mode: 0o700 });
 await fs.chmod(root, 0o700);
 const lockPath = root + "/host.lock";
@@ -99,7 +99,11 @@ const server = net.createServer((socket) => {
             socket.write(
               JSON.stringify({
                 id: msg.id,
-                error: { code: "timeout_unknown_outcome" },
+                error: {
+                  code: writes.has(msg.op as Operation)
+                    ? "timeout_unknown_outcome"
+                    : "timeout",
+                },
               }) + "\n",
             );
         }, 65000);

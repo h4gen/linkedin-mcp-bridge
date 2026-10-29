@@ -1,48 +1,35 @@
-# LinkedIn MCP interface contract
+# Interface contract — 0.3
 
-## Decisions for the 0.2 pilot
+## Source-shaped reads
 
-Use narrow resource tools: `*_list`, `*_get`, `*_search`, and explicit mutations. The agent should not operate a generic browser or guess URLs. Account identity is required on every account operation. Page and message text is untrusted data, never instructions.
+Use narrow list/get/search tools. Lists accept an account, a limit and an optional opaque cursor. Keep query, target, filters and page size identical when continuing. No background extraction jobs exist in 0.3.
 
-### Reads: cursor pages first
+| Source        | Tools                     | Continuation                                                                             |
+| ------------- | ------------------------- | ---------------------------------------------------------------------------------------- |
+| Server cursor | Inbox                     | Captured next cursor                                                                     |
+| Timestamp     | History                   | Boundary overlap plus buffered overflow; unresolved equal-time boundaries remain partial |
+| Offset        | People, invitations       | Source paging rather than extracted row count                                            |
+| Local scan    | Inbox search              | Explicit participant/title/preview scope and scan budget                                 |
+| DOM session   | Feed, reactions, comments | Dedicated work tab, exact target and live document/session                               |
 
-`comments_list` and `reactions_list` are the primary interfaces. Both accept `account_urn`, `post_urn`, `limit`, and an optional opaque `cursor`, just like history, feed and search. Collection jobs are optional convenience wrappers over these same readers, not a separate extraction mechanism.
+Every list has `items`, `next_cursor`, `partial` and `page_info`. `page_info` includes source, observed order, observation time, returned count, requested limit, cursor expiry, reason, continuation (`available`, `exhausted`, `blocked`) and coverage (`complete_for_scope`, `partial`, `unknown`). A short/empty page is not necessarily final; no cursor is not necessarily completeness. Source exhaustion only establishes coverage for that source/query, not all LinkedIn data.
 
-List responses preserve `items`, `next_cursor`, and `partial` and add `page_info`:
+Cursor lifetime is 30 minutes. Replays return cached results but validate account and DOM session first. Cursor cache/state share a 5 MiB budget; eviction returns `cursor_evicted`, never a silent restart. Oversized pages and traversal limits fail explicitly. Results are a live traversal, not a snapshot.
 
-```json
-{
-  "items": [],
-  "next_cursor": null,
-  "partial": true,
-  "page_info": {
-    "returned_count": 0,
-    "requested_limit": 20,
-    "continuation": "unavailable",
-    "coverage": "partial",
-    "consistency": "live_traversal",
-    "reason": "linkedin_may_rank_or_hide_comments",
-    "cursor_expires_at": null
-  }
-}
-```
+DOM reads bring the separate work tab forward. One DOM traversal is active at a time; new DOM operations or user control clicks invalidate the previous session. API operations do not. Reaction dialogs remain open across pages. Lost document/session state requires a fresh query. Unknown post locations are not replaced by guessed share/ugcPost permalinks.
 
-- `next_cursor` means another bounded traversal can be attempted, not that another record is guaranteed. A short or empty page alone is not an end-of-data signal.
-- `coverage` is `partial`, `complete_for_query`, or `unknown`. Complete applies only to the requested source/query, never all LinkedIn data. No cursor does not imply completeness.
-- Keep all arguments identical while continuing, including page size and filters. Cursors are bound to account, operation and arguments, expire after 30 minutes, and live in session storage. Invalid/expired cursors fail explicitly; restart the query to refresh.
-- Retrying a consumed cursor returns its cached page until that cursor expires; it does not scroll again. The next cursor has its own original expiry, which is not extended by replay. The first request without a cursor is a fresh read, not an immutable snapshot.
-- New/deleted/reordered LinkedIn data can change subsequent pages. There is no snapshot guarantee. Use stable IDs to merge results; preserve deduplication bounds and distinguish unavailable fields from empty values.
-- Comment IDs are used when exposed; the current fallback is a synthetic profile/text key and can collapse identical repeated comments. A null parent ID means unknown, not necessarily a root comment. Reaction actors are deduplicated by profile URL. Full reply trees and complete engagement totals are not promised.
-- UI-based reads may open dialogs, scroll, and load more results. They do not publish content; profile reads may count as visits.
+Comments expose identity quality (`source` or `session`), text truncation and parent relation. Identical comments without source IDs are separate nodes rather than collapsed by author/text. A null parent means unknown. Profile URLs are observed/resolved, not constructed from arbitrary URN suffixes.
 
-### Jobs: optional bounded collection
+## Writes and recovery
 
-`extraction_start` creates a local job over the same cursor reader; it is not idempotent and must not be automatically retried after an ambiguous response. `extraction_get` reads append-only stored results with offsets. Offsets are appropriate here because this is a bounded local result array, unlike a changing LinkedIn list. `extraction_cancel` stops between source pages. Partial source coverage remains partial even when the job stops normally. There is no background monitoring or unlimited crawl.
+Writes use exact targets, idempotency keys and extension-owned payload confirmation. A preview is not a send. Message previews use resolved recipient names and verified profile URLs. Existing-thread sends validate all participants. Only message send and read/archive changes are enabled pending further acceptance.
 
-### Writes: explicit intent and receipts
+Operation receipts survive updates for seven days. A pending/interrupted send is unknown, never automatically resent. `operation_get` can read known receipts without a live network session and attempts bounded reconciliation for unknown sends. Reconciliation uses the origin token and exact conversation, traversing older history or locating a new-recipient conversation. Missing evidence never proves failure.
 
-The pilot enables plain-text `message_send` and `conversation_update` only. Send arguments identify the exact account, target, expected recipients, text, and idempotency key. A pending preview is not a sent message. Confirmation belongs in the extension UI, bound to the exact payload. The UI executes the approved mutation once; the agent reads `operation_get` to reconcile. An unknown outcome must never trigger a fresh key/re-send. Inbox changes can use the explicit local inbox permission; default is review.
+Read timeouts permit read retry; ambiguous writes require receipt inspection. Cursor loss requires restarting the query. Session/account errors require reconnecting. Rate-limit cooldowns parse seconds and HTTP dates. Pause/disconnect/data-clear invalidate queued work; already dispatched mutations cannot be recalled.
 
-### Follow-up interface work before broad release
+## Compatibility and capability reporting
 
-Keep this backward-compatible pilot contract while validating it. Next priorities are per-tool output schemas and machine-readable error recovery (`retry_after`, safe retry vs reconcile), capability status distinguishing enabled/verified/degraded, explicit source/order metadata, and typed identity quality for synthetic comment IDs. Do not expose guessed sort/filter controls until the adapter and live acceptance support them. Long-running extraction still needs a reliable repeated live acceptance run; cursor metadata does not fix source loading failures.
+0.3 removes the three extraction job tools and introduces `conversations_get` and output schemas for every operation. Profile and invitation results are compact typed views. Temporary 0.2 cursors/drafts are cleared on migration; content-free send receipts are retained. Original write inputs and fingerprints remain compatible.
+
+The capability registry is shared by dispatch, tool listing and release checking. The development build exposes 17 of 24 operations. All original capabilities are mandatory for the full pilot; seven unaccepted writes are blockers, not silently dropped scope. Current-build live acceptance must be documented separately from historical evidence and passing unit tests.

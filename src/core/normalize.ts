@@ -8,12 +8,16 @@ export function normalize(raw: Obj) {
   );
   const resolve = (x: any, depth = 0, seen = new Set<string>()): any => {
     if (depth > 14) return undefined;
-    if (Array.isArray(x))
-      return x.slice(0, 100).map((v) => resolve(v, depth + 1, seen));
+    if (Array.isArray(x)) return x.map((v) => resolve(v, depth + 1, seen));
     if (!x || typeof x !== "object") return x;
     const out: Obj = {};
     for (const [k, v] of Object.entries(x)) {
-      if (/tracking|token|cookie|csrf|authorization/i.test(k)) continue;
+      if (
+        /secret|anti_abuse|^tracking|^(originToken|accessToken|refreshToken|csrfToken|token|cookie|csrf|authorization)$/i.test(
+          k,
+        )
+      )
+        continue;
       if (k.startsWith("*")) {
         const ref = (u: any) =>
           typeof u === "string" && index.has(u) && !seen.has(u)
@@ -29,26 +33,52 @@ export function normalize(raw: Obj) {
     entities: [...index.values()].map((x) => resolve(x)),
   };
 }
-export function collection(raw: Obj): {
+export function collection(
+  raw: Obj,
+  operation?: string,
+): {
   items: Obj[];
   metadata: Obj;
   paging: Obj;
 } {
   const n = normalize(raw);
-  const walk = (x: any, depth = 0): any => {
-    if (!x || typeof x !== "object" || depth > 8) return;
-    if (Array.isArray(x.elements))
-      return {
-        items: x.elements,
-        metadata: x.metadata ?? {},
-        paging: x.paging ?? {},
-      };
-    for (const v of Object.values(x)) {
-      const r = walk(v, depth + 1);
-      if (r) return r;
+  const paths: Record<string, string[]> = {
+    conversations_list: [
+      "messengerConversationsBySyncToken",
+      "messengerConversations",
+    ],
+    messages_list: ["messengerMessagesBySyncToken", "messengerMessages"],
+    people_search: ["searchDashClustersByAll", "searchDashClusters"],
+    invitations_list: [],
+  };
+  const candidates: any[] = [];
+  const visit = (x: any, depth = 0) => {
+    if (!x || typeof x !== "object" || Array.isArray(x) || depth > 8) return;
+    if (Array.isArray(x.elements)) {
+      candidates.push(x);
+      return;
+    }
+    for (const [key, value] of Object.entries(x)) {
+      if (
+        operation &&
+        depth === 0 &&
+        key !== "data" &&
+        !(paths[operation] ?? []).some((name) => key.endsWith(name))
+      )
+        continue;
+      visit(value, depth + 1);
     }
   };
-  const result = walk(n.data);
+  visit(n.data);
+  if (candidates.length > 1) throw new Fault("ambiguous_collection");
+  const node = candidates[0];
+  const result = node
+    ? {
+        items: node.elements,
+        metadata: node.metadata ?? {},
+        paging: node.paging ?? {},
+      }
+    : undefined;
   if (!result)
     throw new Fault(
       "response_shape_changed",

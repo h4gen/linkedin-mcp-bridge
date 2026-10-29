@@ -2,7 +2,7 @@
 
 A separate macOS-first MCP server and Chrome MV3 extension. The local Node process communicates with the extension through Chrome Native Messaging and a private Unix socket. LinkedIn session credentials stay in the browser. No hosted relay, remote scripts, background inbox indexing or telemetry.
 
-**Pilot candidate 0.2.0 — not submitted to the Chrome Web Store.** Outgoing messages now require content-bound extension review. Public writes, invitation mutations and deletion are disabled pending acceptance. Inbox/history, filtered people search, feed identity resolution and paginated reaction/comment reads have live checks; see [validation](docs/validation.md). The pilot includes a separate bundled macOS companion and a release gate that fails until publishing prerequisites and acceptance are complete.
+**Development candidate 0.3.0 — not submitted to the Chrome Web Store.** Outgoing messages now require content-bound extension review. Public writes, invitation mutations and deletion are disabled pending acceptance. Inbox/history, filtered people search, feed identity resolution and paginated reaction/comment reads have live checks; see [validation](docs/validation.md). The pilot includes a separate bundled macOS companion and a release gate that fails until publishing prerequisites and acceptance are complete.
 
 ## Install locally
 
@@ -61,13 +61,13 @@ This is local stdio: it does not directly connect the ChatGPT or Claude websites
 
 All names have a `linkedin_` prefix. First call `health`, then supply its `account_urn` to every account operation.
 
-| Area        | Tools                                                                                                                       |
-| ----------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Inbox       | `conversations_list`, `conversations_search`, `messages_list`, `message_send`, `conversation_update`, `conversation_delete` |
-| People      | `profile_get`, `people_search`, `invitations_list`, `invitation_send`, `invitation_respond`, `invitation_withdraw`          |
-| Feed        | `feed_list`, `post_get`, `post_create`, `post_like`, `post_comment`, `comments_list`                                        |
-| GTM         | `people_search_filters`, `reactions_list`, `post_resolve`, `extraction_start`, `extraction_get`, `extraction_cancel`        |
-| Diagnostics | `health`, `operation_get`                                                                                                   |
+| Area        | Tools                                                                                                                                            |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Inbox       | `conversations_list`, `conversations_search`, `conversations_get`, `messages_list`, `message_send`, `conversation_update`, `conversation_delete` |
+| People      | `profile_get`, `people_search`, `invitations_list`, `invitation_send`, `invitation_respond`, `invitation_withdraw`                               |
+| Feed        | `feed_list`, `post_get`, `post_create`, `post_like`, `post_comment`, `comments_list`                                                             |
+| GTM         | `people_search_filters`, `reactions_list`, `post_resolve`                                                                                        |
+| Diagnostics | `health`, `operation_get`                                                                                                                        |
 
 Lists default to 20, max 50. LinkedIn Inbox requests are capped at 20 per backend page because live requests for 50 return an unusable response; use the cursor to continue. Pass the returned opaque `next_cursor` as `cursor` with the **same arguments**. Cursors expire after 30 minutes, are bound to account, filters and operation, and reset with the browser session. Lists are live, not immutable snapshots. Deduplicate by entity URN when traversing a changing inbox. `conversations_search` searches participant/title/preview content in each fetched page; follow its cursor to search older pages. It is not full historical message search.
 
@@ -87,7 +87,7 @@ Statuses:
 - `unknown_outcome`: the action may have happened. Do not submit a new key or switch adapters. Inspect LinkedIn or use `operation_get`.
 - `failed_before_dispatch`: no mutation was dispatched, although a read/precondition failed.
 
-`operation_get` can reconcile an uncertain existing-thread message if its origin token appears in the latest 50 messages. No matching token is **not** proof of non-delivery. Read/unread and archive/unarchive changes also get a bounded list-based state check after dispatch. Other uncertain operations remain uncertain until checked in LinkedIn. HTTP success without an identifiable receipt/state is deliberately not reported as verified success.
+`operation_get` can reconcile an uncertain existing-thread message if its origin token appears in bounded older-history traversal. No matching token is **not** proof of non-delivery. Read/unread and archive/unarchive changes also get a bounded list-based state check after dispatch. Other uncertain operations remain uncertain until checked in LinkedIn. HTTP success without an identifiable receipt/state is deliberately not reported as verified success.
 
 Calls serialize across MCP clients in the extension. HTTP requests have at least one second spacing and a 15-second fetch timeout. Queued calls expire after 60 seconds. Cancellation prevents queued work and checks before dispatch; an in-flight browser operation may finish and its receipt remains available. No automatic write retries or HTTP-to-DOM mutation fallbacks.
 
@@ -95,13 +95,15 @@ Calls serialize across MCP clients in the extension. HTTP requests have at least
 
 The DOM adapter uses only packaged operations, exact target URNs, unique visible controls and English/German labels. It never accepts caller-supplied selectors, scripts or URLs. A missing/ambiguous target fails rather than clicking an unrelated control.
 
-Feed pagination is a bounded live scroll. `post_resolve` resolves a rendered card's `scan_key` through its scoped control menu and binds its exact identity to that card. A share ID is not advertised as a verified public permalink. Read reactions/comments on the resolved card; if no matching card exists, post reads may navigate the connected tab to the exact requested post. No arbitrary navigation URL is accepted.
+Feed pagination is a bounded live scroll. `post_resolve` resolves a rendered card's `scan_key` through its scoped control menu and binds its exact identity to that card. A share ID is not advertised as a verified public permalink. Read reactions/comments on the resolved card; if no matching card exists, post reads navigate only the work tab when a supported activity location or observed permalink is available. No arbitrary navigation URL is accepted.
 
-`comments_list` expands comments/replies and returns bounded, deduplicated pages with author profiles and truncation indicators. `reactions_list` opens only the selected post's visible reaction dialog and closes the dialog it opened. Both remain partial because LinkedIn may rank or omit entries. Reply parent IDs are supplied only when the DOM establishes the relationship.
+`comments_list` expands comments/replies and returns bounded, deduplicated pages with author profiles and truncation indicators. `reactions_list` opens only the selected post's visible reaction dialog and retains that dialog for cursor continuation. Both remain partial because LinkedIn may rank or omit entries. Reply parent IDs are supplied only when the DOM establishes the relationship.
 
 `people_search` supports `filters.connection_degrees` (`1`, `2`, `3`), `location_ids` and `company_ids`. `people_search_filters` takes `kind: location|company` and a name query to resolve numeric values through LinkedIn's public typeahead. No Sales Navigator requests are made.
 
-`extraction_start` starts a bounded job (maximum 500 records / 25 pages). `extraction_get` reads progress and paginated results, `extraction_cancel` stops between pages. Restarted workers label interrupted jobs instead of silently restarting them. Temporary results expire after 30 minutes. The review page also displays progress and a Stop control.
+Collection jobs were removed in 0.3. Use direct cursor pages. DOM reads use a dedicated LinkedIn work tab and bring it forward to avoid background timer throttling. Navigating or clicking controls in that tab invalidates its traversal cursor; API reads do not. A consumed cursor replays its cached page. Session cursors expire after 30 minutes and share a 5 MiB storage budget. See [interface contract](docs/interface-patterns.md).
+
+The registry defines 24 operations; 17 are currently exposed. The seven unaccepted write operations remain disabled. `health` reports implementation, current-build acceptance, enablement and availability separately. `release:check` requires every original basic capability to be enabled and backed by current-commit acceptance evidence; disabled operations are release blockers.
 
 ## Development and packaging
 

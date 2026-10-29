@@ -1,15 +1,18 @@
-import { Extractions } from "../core/extractions.js";
-import { parse } from "../core/contracts.js";
+import { cursorEvictions } from "../core/cursor-budget.js";
+import { retryAt } from "../core/errors.js";
 import { Approvals, ACCEPTED_WRITES } from "../core/approvals.js";
 import { Engine, Store } from "../core/engine.js";
 import { Fault } from "../core/contracts.js";
-import { self } from "../core/normalize.js";
+import { self, normalize } from "../core/normalize.js";
 import { pageFetch } from "./page-fetch.js";
 import { extractionOperation } from "./extraction.js";
+import { firstDegreeConnection } from "./profile-state.js";
 import { domOperation } from "./dom.js";
 import type { Request } from "../core/api.js";
 import { VERSION, PROTOCOL, NATIVE_HOST as HOST } from "../version.js";
 const area = (k: string) =>
+  k.startsWith("identity:") ||
+  k.startsWith("post-url:") ||
   k.startsWith("cursor:") ||
   k.startsWith("approval:") ||
   k.startsWith("extraction:")
@@ -17,9 +20,20 @@ const area = (k: string) =>
     : chrome.storage.local;
 const store: Store = {
   get: async (k) => (await area(k).get(k))[k],
-  set: async (k, v) => area(k).set({ [k]: v }),
+  set: async (k, v) => {
+    if (k.startsWith("cursor:")) {
+      const evict = cursorEvictions(
+        await chrome.storage.session.get(null),
+        k,
+        v,
+      );
+      if (evict.length) await chrome.storage.session.remove(evict);
+    }
+    await area(k).set({ [k]: v });
+  },
   remove: async (k) => area(k).remove(k),
 };
+let generation = 0;
 let lastRequest = 0;
 async function tabId() {
   const c = await store.get("connection");
@@ -30,6 +44,7 @@ async function tabId() {
   return c.tabId as number;
 }
 async function fetchRequest(r: Request) {
+  const requestGeneration = generation;
   const blocked = await store.get("blockedUntil");
   if (blocked > Date.now()) throw new Fault("session_cooldown");
   await new Promise((r) =>
@@ -42,29 +57,122 @@ async function fetchRequest(r: Request) {
     func: pageFetch,
     args: [r],
   });
+  if (generation !== requestGeneration) throw new Fault("cancelled");
   const result = out[0]?.result;
   if (result?.error) {
     if (result.error === "rate_limited" || result.error === "session_blocked")
-      await store.set(
-        "blockedUntil",
-        Date.now() + Math.max(60000, Number(result.retry_after || 3600) * 1000),
-      );
+      await store.set("blockedUntil", retryAt(result.retry_after, Date.now()));
     throw new Fault(result.error);
   }
   if (!result || !Object.hasOwn(result, "data"))
     throw new Fault("empty_browser_response");
+  const identities = normalize(result.data).entities;
+  for (const p of identities) {
+    const urn = p.dashEntityUrn ?? p.entityUrn;
+    const name = [p.firstName, p.lastName].filter(Boolean).join(" ");
+    if (typeof urn === "string" && /^urn:li:fsd_profile:/.test(urn) && name)
+      await store.set("identity:" + urn, {
+        urn,
+        name,
+        profile_url:
+          typeof p.publicIdentifier === "string"
+            ? "https://www.linkedin.com/in/" + p.publicIdentifier + "/"
+            : null,
+      });
+  }
   return result.data;
+}
+async function invalidateDocument() {
+  const c = await store.get("connection");
+  if (c?.tabId)
+    await chrome.scripting
+      .executeScript({
+        target: { tabId: c.tabId },
+        world: "ISOLATED",
+        func: () => {
+          (window as any).__liBridgeSession = undefined;
+        },
+      })
+      .catch(() => {});
+}
+async function validateDomCursor(_op: string, state: Record<string, any>) {
+  if (!state.dom_session) return;
+  const id = await tabId();
+  if (id !== state.tab_id) throw new Fault("cursor_invalidated");
+  const check = await chrome.scripting.executeScript({
+    target: { tabId: id },
+    world: "ISOLATED",
+    func: () =>
+      (window as any).__liBridgeSessionPath ===
+      location.pathname + location.search
+        ? (window as any).__liBridgeSession
+        : null,
+  });
+  if (check[0]?.result !== state.dom_session)
+    throw new Fault("cursor_invalidated");
 }
 const approvals = new Approvals(store);
 const engine = new Engine({
+  generation: () => generation,
+  identity: (urn) => store.get("identity:" + urn),
+  cursorContext: validateDomCursor,
   allowedWrites: ACCEPTED_WRITES,
   authorize: (...args) => approvals.request(...args),
   store,
   fetch: fetchRequest,
   dom: async (op, a, state) => {
     const id = await tabId();
-    if (["comments_list", "reactions_list", "post_get"].includes(op)) {
-      const url = "https://www.linkedin.com/feed/update/" + a.post_urn + "/";
+    if (state.dom_session) await validateDomCursor(op, state);
+    await chrome.tabs.update(id, { active: true });
+    if (op === "conversation_delete") {
+      const target = a.verified_target;
+      if (!target || target.entityUrn !== a.conversation_urn)
+        throw new Fault("conversation_not_verified");
+      const url = target.conversationUrl;
+      if (
+        typeof url !== "string" ||
+        !url.startsWith("https://www.linkedin.com/messaging/thread/")
+      )
+        throw new Fault("conversation_location_unresolved");
+      if ((await chrome.tabs.get(id)).url !== url)
+        await chrome.tabs.update(id, { url });
+    }
+    if (["invitation_respond", "invitation_withdraw"].includes(op)) {
+      if (!a.verified_target?.profile?.profile_url)
+        throw new Fault("invitation_not_verified");
+      const url =
+        "https://www.linkedin.com/mynetwork/invitation-manager/" +
+        (op === "invitation_withdraw" ? "sent/" : "received/");
+      if ((await chrome.tabs.get(id)).url !== url)
+        await chrome.tabs.update(id, { url });
+    }
+    if (
+      op === "post_create" &&
+      !(await chrome.tabs.get(id)).url?.startsWith(
+        "https://www.linkedin.com/feed/",
+      )
+    )
+      await chrome.tabs.update(id, { url: "https://www.linkedin.com/feed/" });
+    for (
+      let attempt = 0;
+      (await chrome.tabs.get(id)).status !== "complete";
+      attempt++
+    ) {
+      if (attempt >= 40) throw new Fault("work_tab_navigation_timeout");
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    if (
+      [
+        "comments_list",
+        "reactions_list",
+        "post_get",
+        "post_like",
+        "post_comment",
+      ].includes(op)
+    ) {
+      const url = a.post_urn.startsWith("urn:li:activity:")
+        ? "https://www.linkedin.com/feed/update/" + a.post_urn + "/"
+        : await store.get("post-url:" + a.post_urn);
       const tab = await chrome.tabs.get(id);
       const target = await chrome.scripting.executeScript({
         target: { tabId: id },
@@ -81,6 +189,8 @@ const engine = new Engine({
           ),
         args: [a.post_urn],
       });
+      if (!target[0]?.result && !url)
+        throw new Fault("post_location_unresolved");
       if (!target[0]?.result && tab.url !== url) {
         await chrome.tabs.update(id, { url });
         for (let attempt = 0; attempt < 40; attempt++) {
@@ -91,22 +201,89 @@ const engine = new Engine({
         }
       }
     }
+    const session = state.dom_session ?? crypto.randomUUID();
+    if (!state.dom_session) {
+      await chrome.scripting.executeScript({
+        target: { tabId: id },
+        world: "ISOLATED",
+        func: (session: string) => {
+          const w = window as any;
+          for (const dialog of document.querySelectorAll<HTMLElement>(
+            "[data-bridge-post]",
+          )) {
+            const dismiss = dialog.querySelector<HTMLElement>(
+              'button[aria-label="Dismiss"],button[aria-label="Close"],button[aria-label="Schließen"],.artdeco-modal__dismiss',
+            );
+            if (dismiss) dismiss.click();
+            else if (dialog.getClientRects().length) throw Error("ui_conflict");
+          }
+          w.__liBridgeSession = session;
+          w.__liBridgeSessionPath = location.pathname + location.search;
+          if (!w.__liBridgeSessionGuard) {
+            w.__liBridgeSessionGuard = true;
+            document.addEventListener(
+              "click",
+              (event) => {
+                if (
+                  event.isTrusted &&
+                  (event.target as Element)?.closest("button,a,[role=button]")
+                )
+                  w.__liBridgeSession = undefined;
+              },
+              true,
+            );
+          }
+        },
+        args: [session],
+      });
+    }
     const result = await chrome.scripting.executeScript({
-      target: { tabId: await tabId() },
+      target: { tabId: id },
       world: "ISOLATED",
       func: ["comments_list", "reactions_list"].includes(op)
         ? extractionOperation
         : domOperation,
-      args: [op, a, state],
+      args: [op, { ...a, execution_session: session }, state],
     });
     if (!result[0]?.result) throw new Fault("ui_operation_failed");
     if (result[0].result.bridge_error)
       throw new Fault(result[0].result.bridge_error);
-    return result[0].result;
+    const value = result[0].result;
+    if (op === "invitation_respond" && a.action === "accept") {
+      const profile = a.verified_target.profile;
+      await chrome.tabs.update(id, { url: profile.profile_url });
+      for (let attempt = 0; attempt < 40; attempt++) {
+        const tab = await chrome.tabs.get(id);
+        if (
+          tab.status === "complete" &&
+          tab.url?.replace(/\/$/, "") === profile.profile_url.replace(/\/$/, "")
+        )
+          break;
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      const proof = await chrome.scripting.executeScript({
+        target: { tabId: id },
+        world: "ISOLATED",
+        func: firstDegreeConnection,
+        args: [profile.profile_url, profile.entityUrn],
+      });
+      value.verified = proof[0]?.result === true;
+      value.verification = value.verified
+        ? "profile_first_degree"
+        : "connection_state_unverified";
+    }
+    if (value.next)
+      value.next = { ...value.next, dom_session: session, tab_id: id };
+    if (value.entityUrn && value.url)
+      await store.set("post-url:" + value.entityUrn, value.url);
+    for (const post of value.items ?? [])
+      if (post.entityUrn && post.url)
+        await store.set("post-url:" + post.entityUrn, post.url);
+    return value;
   },
   account: async () => {
     const c = await store.get("connection");
-    return c && !c.paused ? c.account : undefined;
+    return c?.account;
   },
   now: Date.now,
   uuid: () => crypto.randomUUID(),
@@ -119,13 +296,6 @@ const engine = new Engine({
       .map((x) => x.toString(16).padStart(2, "0"))
       .join(""),
 });
-const extractions = new Extractions(
-  store,
-  (op, a) => engine.run(op, a),
-  async () => {
-    return (await store.get("connection"))?.account;
-  },
-);
 const cancelled = new Set<string>();
 let port: chrome.runtime.Port | undefined;
 function connectHost() {
@@ -146,14 +316,12 @@ function connectHost() {
             "companion_version_mismatch",
             "Install the matching companion version " + VERSION,
           );
-        const result = msg.op.startsWith("extraction_")
-          ? await extractions.handle(msg.op, parse(msg.op, msg.args))
-          : await engine.run(
-              msg.op,
-              msg.args,
-              Math.min(Number(msg.deadline) || 0, Date.now() + 60000),
-              () => cancelled.has(msg.id),
-            );
+        const result = await engine.run(
+          msg.op,
+          msg.args,
+          Math.min(Number(msg.deadline) || 0, Date.now() + 60000),
+          () => cancelled.has(msg.id),
+        );
         if (
           new TextEncoder().encode(JSON.stringify(result)).byteLength >
           6 * 1024 * 1024
@@ -193,6 +361,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   )
     return;
   (async () => {
+    await initialized;
     if (msg.action === "approvals") {
       const all = await chrome.storage.session.get(null);
       return {
@@ -216,6 +385,8 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       return { enabled: msg.enabled === true };
     }
     if (msg.action === "clear") {
+      generation++;
+      await invalidateDocument();
       await store.remove("connection");
       port?.disconnect();
       port = undefined;
@@ -223,11 +394,10 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       await chrome.storage.local.clear();
       return { cleared: true };
     }
-    if (msg.action === "cancel-extraction")
-      return extractions.handle("extraction_cancel", {
-        account_urn: (await store.get("connection"))?.account,
-        operation_id: msg.id,
-      });
+    if (msg.action === "open-work-tab") {
+      await chrome.tabs.update(await tabId(), { active: true });
+      return { opened: true };
+    }
     if (msg.action === "status")
       return {
         connection: await store.get("connection"),
@@ -236,19 +406,9 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
         version: chrome.runtime.getManifest().version,
         allowInboxChanges: (await store.get("allowInboxChanges")) === true,
         blockedUntil: await store.get("blockedUntil"),
-        extractions: Object.entries(await chrome.storage.session.get(null))
-          .filter(
-            ([k, v]) =>
-              k.startsWith("extraction:") && (v as any).expires > Date.now(),
-          )
-          .map(([, v]) => ({
-            id: (v as any).id,
-            kind: (v as any).kind,
-            status: (v as any).status,
-            count: (v as any).items.length,
-          })),
       };
     if (msg.action === "connect") {
+      generation++;
       const [tab] = await chrome.tabs.query({
         active: true,
         currentWindow: true,
@@ -258,8 +418,21 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       await store.set("connection", { tabId: tab.id, paused: false });
       try {
         const account = self(await fetchRequest({ path: "/me" }));
+        const previous = await store.get("workTabId");
+        const existing = previous
+          ? await chrome.tabs.get(previous).catch(() => undefined)
+          : undefined;
+        const work = existing?.url?.startsWith("https://www.linkedin.com/")
+          ? existing
+          : await chrome.tabs.create({
+              url: "https://www.linkedin.com/feed/",
+              active: false,
+              windowId: tab.windowId,
+            });
+        if (!work.id) throw new Fault("work_tab_unavailable");
+        await store.set("workTabId", work.id);
         await store.set("connection", {
-          tabId: tab.id,
+          tabId: work.id,
           account,
           paused: false,
         });
@@ -271,11 +444,15 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       }
     }
     if (msg.action === "pause") {
+      generation++;
+      await invalidateDocument();
       const c = await store.get("connection");
       if (c) await store.set("connection", { ...c, paused: true });
       return { paused: true };
     }
     if (msg.action === "disconnect") {
+      generation++;
+      await invalidateDocument();
       await store.remove("connection");
       port?.disconnect();
       port = undefined;
@@ -300,17 +477,17 @@ chrome.alarms.onAlarm.addListener(async () => {
       (v as { expires: number }).expires < Date.now()
     )
       await chrome.storage.session.remove(k);
-  const journal = (await store.get("journal")) ?? {};
-  for (const [k, v] of Object.entries(journal) as [string, any][])
-    if (Date.now() - v.created_at > 7 * 86400000) delete journal[k];
-  await store.set("journal", journal);
+  await engine.expireReceipts();
   if (await store.get("connection")) connectHost();
 });
-void chrome.storage.session.get(null).then(async (all) => {
-  for (const [key, row] of Object.entries(all) as [string, any][])
-    if (key.startsWith("extraction:") && row.status === "running")
-      await store.set(key, { ...row, status: "interrupted", partial: true });
-});
-void store.get("connection").then((c) => {
-  if (c) connectHost();
-});
+const initialized = (async () => {
+  if ((await store.get("schemaVersion")) !== VERSION) {
+    generation++;
+    await chrome.storage.session.clear();
+    const connection = await store.get("connection");
+    if (connection)
+      await store.set("connection", { ...connection, paused: true });
+    await store.set("schemaVersion", VERSION);
+  }
+  if (await store.get("connection")) connectHost();
+})();

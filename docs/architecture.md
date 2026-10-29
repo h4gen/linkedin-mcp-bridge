@@ -13,7 +13,7 @@ flowchart LR
   DOM --> LinkedIn
 ```
 
-- `src/core/contracts.ts`: 26 strict tool schemas; no generic transport or browser tool.
+- `src/core/contracts.ts`: 24 strict input contracts, paired output schemas and a shared capability registry; no generic transport or browser tool.
 - `src/core/engine.ts`: serialization, account checks, pagination, mutation journal, cancellation boundary and reconciliation.
 - `src/core/api.ts`: typed routes, Rest.li variables and operation-specific response handling.
 - `src/core/normalize.ts`: bounded normalized-reference resolution; missing collection is a schema error.
@@ -31,6 +31,14 @@ No cloud dependencies or runtime coupling to the existing Google Ads bridge or L
 
 Extension-owned session approvals bind the exact account/operation/payload hash/key and expire after 30 minutes. Only packaged popup/review page senders can decide them; no approval tool exists in MCP. Enabled mutations are message_send and conversation_update. The original unaccepted handlers remain present but cannot execute through the extension.
 
-GTM extraction uses copied owned-source parsers, scoped feed-card identity and owned reaction dialogs. Bounded jobs use session storage with result retention and cancellation between pages. A Chrome worker restart leaves jobs interrupted, not automatically resumed. Search normalization flattens actual SearchClusterViewModel entries before determining pagination. Public filter lookup is a fixed guest endpoint with credentials omitted.
+GTM extraction uses copied owned-source parsers, scoped feed-card identity and owned reaction dialogs. Historical 0.2 jobs were removed in 0.3; direct cursor reads own the browser traversal state. Search normalization flattens actual SearchClusterViewModel entries before determining pagination. Public filter lookup is a fixed guest endpoint with credentials omitted.
 
 The companion build bundles Node-side dependencies and accepts a separately supplied official Node binary for arm64/x64. Pilot and development hosts are distinct. Wire requests include protocol and exact companion version. Chromium's native framing limits are asymmetric (1 MiB host-to-Chrome; 64 MiB reverse); the application further caps responses at 6 MiB of UTF-8 bytes. Socket streams decode UTF-8 across fragmented chunks.
+
+## 0.3 adapter boundaries
+
+API adapters own server cursor, timestamp and offset semantics. DOM adapters own a session in a dedicated work tab. The Engine only scopes, caches and budgets cursors and translates explicit adapter coverage into the public envelope. `capabilities.ts` owns adapter dispatch, output schemas and tool exposure; unavailable writes cannot be called through the production extension.
+
+Conversation lookup is shared by public reads, exact recipient validation and mutation postconditions. State verification requests the necessary source fields instead of accepting a partial conversation entity. Delete verification scans mailbox membership, not still-readable historical messages. Message reconciliation follows older pages and can locate new-recipient conversations without dispatching again.
+
+A connection-generation change invalidates queued operations and guards journal writes. In-flight external actions may still have taken effect; no retry is implied. Old pending receipts stay unknown. Updating to 0.3 clears temporary cursors/drafts, pauses the connection for reconnection to the work tab, and retains the seven-day mutation journal.

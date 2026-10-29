@@ -18,6 +18,7 @@ it("boots the actual MV3 bundle without Node dependencies", async () => {
     get: async () => ({}),
     set: async () => {},
     remove: async () => {},
+    clear: async () => {},
   };
   const chrome = {
     storage: { local: area, session: area },
@@ -58,7 +59,11 @@ it("serves all typed tools through actual MCP stdio", async () => {
   try {
     await client.connect(transport);
     const result = await client.listTools();
-    expect(result.tools).toHaveLength(26);
+    expect(result.tools).toHaveLength(17);
+    expect(result.tools.every((x) => x.outputSchema)).toBe(true);
+    expect(
+      result.tools.some((x) => x.name.startsWith("linkedin_extraction_")),
+    ).toBe(false);
     expect(result.tools.some((x) => x.name === "linkedin_message_send")).toBe(
       true,
     );

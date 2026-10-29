@@ -1,9 +1,6 @@
 import { Args, Fault, Operation } from "./contracts.js";
 import type { Store } from "./engine.js";
-export const ACCEPTED_WRITES: ReadonlySet<Operation> = new Set([
-  "message_send",
-  "conversation_update",
-]);
+export { acceptedWrites as ACCEPTED_WRITES } from "./capabilities.js";
 export const APPROVAL_TTL = 30 * 60 * 1000;
 export class Approvals {
   constructor(
@@ -16,6 +13,7 @@ export class Approvals {
     args: Args,
     fingerprint: string,
     key: string,
+    preview?: Args[],
   ): Promise<Args | undefined> {
     if (
       op === "conversation_update" &&
@@ -42,6 +40,7 @@ export class Approvals {
       operation: op,
       args,
       fingerprint,
+      preview,
       status: "approval_required",
       expires: this.now() + APPROVAL_TTL,
     };

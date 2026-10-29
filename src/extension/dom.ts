@@ -16,6 +16,11 @@ export async function domOperation(
   const visible = (e: Element) => !!(e as HTMLElement).offsetParent;
   const wait = () => new Promise((r) => setTimeout(r, 800));
   const button = (root: ParentNode, pattern: RegExp) => {
+    if (
+      a.execution_session &&
+      (window as any).__liBridgeSession !== a.execution_session
+    )
+      fail("cancelled");
     const matches = [...root.querySelectorAll('button,[role="button"]')].filter(
       (e) =>
         visible(e) &&
@@ -81,6 +86,11 @@ export async function domOperation(
     return all[0];
   };
   const fill = (e: HTMLElement, text: string) => {
+    if (
+      a.execution_session &&
+      (window as any).__liBridgeSession !== a.execution_session
+    )
+      fail("cancelled");
     e.focus();
     if (e instanceof HTMLTextAreaElement || e instanceof HTMLInputElement) {
       Object.getOwnPropertyDescriptor(
@@ -126,10 +136,27 @@ export async function domOperation(
       scan_key: entityUrn ?? "local:" + String(hash >>> 0),
       text,
       author,
-      author_profile_url:
-        e.querySelector<HTMLAnchorElement>(
-          'a[href*="/in/"],a[href*="/company/"]',
-        )?.href ?? null,
+      author_profile_url: (() => {
+        const link = e.querySelector<HTMLAnchorElement>(
+          ".update-components-actor__meta-link,.feed-shared-actor__container-link",
+        );
+        if (link?.href) return link.href;
+        const candidates = Array.from(
+          e.querySelectorAll<HTMLAnchorElement>(
+            'a[href*="/in/"],a[href*="/company/"],a[href*="/school/"]',
+          ),
+        )
+          .filter((a) => {
+            const label = (
+              a.getAttribute("aria-label") ??
+              a.textContent ??
+              ""
+            ).trim();
+            return label === author || label.startsWith(author + " ");
+          })
+          .map((a) => a.href.split(/[?#]/)[0]);
+        return new Set(candidates).size === 1 ? candidates[0] : null;
+      })(),
       published_at: e.querySelector("time")?.getAttribute("datetime") ?? null,
       visible_time: e.querySelector("time")?.textContent?.trim() ?? null,
       engagement: Array.from(
@@ -146,15 +173,23 @@ export async function domOperation(
         type: x.tagName.toLowerCase(),
         description: x.getAttribute("alt"),
       })),
-      url: entityUrn
-        ? "https://www.linkedin.com/feed/update/" + entityUrn
-        : null,
+      url:
+        Array.from(
+          e.querySelectorAll<HTMLAnchorElement>(
+            'a[href*="/feed/update/"],a[href*="/posts/"]',
+          ),
+        )
+          .map((a) => a.href)
+          .find(
+            (url) => entityUrn && decodeURIComponent(url).includes(entityUrn),
+          ) ?? null,
     };
   };
   if (op === "feed_list") {
     if (!location.pathname.startsWith("/feed"))
       fail("open_feed_in_connected_tab");
     const seen = new Set<string>(state.seen ?? []);
+    if (seen.size >= 10000) fail("traversal_limit_reached");
     let items: Record<string, any>[] = [];
     let stagnant = 0;
     for (let i = 0; i < 5 && items.length < a.limit; i++) {
@@ -189,7 +224,7 @@ export async function domOperation(
       items,
       partial: true,
       reason: "bounded_live_feed_scan",
-      next: items.length ? { seen: [...seen].slice(-1000) } : undefined,
+      next: items.length ? { seen: [...seen] } : undefined,
       scans: stagnant,
     };
   }
@@ -266,34 +301,6 @@ export async function domOperation(
     }
   }
   if (op === "post_get") return postData(card());
-  if (op === "comments_list") {
-    const root = card();
-    const seen = new Set<string>(state.seen ?? []);
-    const items = [
-      ...root.querySelectorAll(
-        ".comments-comment-item,.comments-comment-entity",
-      ),
-    ]
-      .map((e) => ({
-        id: e.getAttribute("data-id") ?? e.id,
-        text:
-          e
-            .querySelector(
-              ".comments-comment-item__main-content,.comments-comment-entity__content",
-            )
-            ?.textContent?.trim() ?? "",
-        author: e.querySelector('a[href*="/in/"]')?.textContent?.trim() ?? "",
-      }))
-      .filter((e) => e.id && !seen.has(e.id))
-      .slice(0, a.limit);
-    items.forEach((x) => seen.add(x.id));
-    return {
-      items,
-      partial: true,
-      reason: "currently_rendered_comments",
-      next: items.length ? { seen: [...seen] } : undefined,
-    };
-  }
   if (op === "post_like") {
     const root = card();
     const b = button(
@@ -338,7 +345,16 @@ export async function domOperation(
           ?.textContent?.trim() === a.text,
     );
     return {
-      verified: !!newComment?.getAttribute("data-id"),
+      verified:
+        !!newComment?.getAttribute("data-id") &&
+        !!a.verified_actor?.profile_url &&
+        Array.from(
+          newComment.querySelectorAll<HTMLAnchorElement>('a[href*="/in/"]'),
+        ).some(
+          (link) =>
+            link.href.split(/[?#]/)[0].replace(/\/$/, "") ===
+            a.verified_actor.profile_url.replace(/\/$/, ""),
+        ),
       receipt_id: newComment?.getAttribute("data-id") ?? undefined,
     };
   }
@@ -369,17 +385,30 @@ export async function domOperation(
     const own = [...document.querySelectorAll('[data-urn^="urn:li:activity:"]')]
       .map(postData)
       .find((p) => p.text === a.text && !beforePosts.has(p.entityUrn));
-    return own
+    return own && a.verified_actor?.name === own.author
       ? { verified: true, receipt_id: own.entityUrn }
       : { verified: false };
   }
   if (op === "invitation_respond" || op === "invitation_withdraw") {
-    const targets = [
-      ...document.querySelectorAll("[data-urn],[data-id]"),
-    ].filter(
-      (e) =>
-        e.getAttribute("data-urn") === a.invitation_urn ||
-        e.getAttribute("data-id") === a.invitation_urn,
+    const verified = a.verified_target;
+    if (!verified || verified.entityUrn !== a.invitation_urn)
+      fail("invitation_not_verified");
+    const url = verified.profile.profile_url;
+    const cards = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        ".invitation-card,li,[role='listitem']",
+      ),
+    ).filter((card) =>
+      Array.from(
+        card.querySelectorAll<HTMLAnchorElement>('a[href*="/in/"]'),
+      ).some(
+        (link) =>
+          link.href.split(/[?#]/)[0].replace(/\/$/, "") ===
+          url.replace(/\/$/, ""),
+      ),
+    );
+    const targets = cards.filter(
+      (card) => !cards.some((other) => other !== card && card.contains(other)),
     );
     if (targets.length !== 1) fail("invitation_target_not_unique");
     const target = targets[0];

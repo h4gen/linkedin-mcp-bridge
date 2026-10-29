@@ -1,6 +1,16 @@
+import { capabilities, capabilityStatus } from "./capabilities.js";
 import { VERSION, PROTOCOL } from "../version.js";
 import { Args, Fault, Operation, parse, writes } from "./contracts.js";
-import { Fetcher, graph, mutation, readApi, receipt } from "./api.js";
+import {
+  Fetcher,
+  graph,
+  mutation,
+  readApi,
+  receipt,
+  getConversation,
+  reconcileMessage,
+  findInvitation,
+} from "./api.js";
 import { self, normalize } from "./normalize.js";
 export interface Store {
   get(key: string): Promise<any>;
@@ -20,8 +30,13 @@ export interface Deps {
     args: Args,
     fingerprint: string,
     key: string,
+    preview?: Args[],
   ) => Promise<Args | undefined>;
   allowedWrites?: ReadonlySet<Operation>;
+  cursorContext?: (op: Operation, state: Args) => Promise<void>;
+  checkpoint?: () => Promise<void>;
+  generation?: () => number;
+  identity?: (urn: string) => Promise<Args | undefined>;
 }
 export class Engine {
   private tail: Promise<unknown> = Promise.resolve();
@@ -32,9 +47,27 @@ export class Engine {
     deadline = this.d.now() + 45000,
     cancelled = () => false,
   ): Promise<Args> {
+    const generation = this.d.generation?.();
     const task = this.tail.then(() =>
-      this.execute(op as Operation, parse(op, input), deadline, cancelled),
+      this.execute(
+        op as Operation,
+        parse(op, input),
+        deadline,
+        () => cancelled() || this.d.generation?.() !== generation,
+      ),
     );
+    this.tail = task.catch(() => {});
+    return task;
+  }
+  expireReceipts(): Promise<void> {
+    const generation = this.d.generation?.();
+    const task = this.tail.then(async () => {
+      const journal = (await this.d.store.get("journal")) ?? {};
+      for (const [key, value] of Object.entries(journal) as [string, Args][])
+        if (this.d.now() - value.created_at > 7 * 86400000) delete journal[key];
+      if (this.d.generation?.() === generation)
+        await this.d.store.set("journal", journal);
+    });
     this.tail = task.catch(() => {});
     return task;
   }
@@ -44,7 +77,24 @@ export class Engine {
     deadline: number,
     cancelled: () => boolean,
   ): Promise<Args> {
-    const d = this.d;
+    const d: Deps = {
+      ...this.d,
+      store: {
+        ...this.d.store,
+        set: async (key, value) => {
+          check();
+          await this.d.store.set(key, value);
+        },
+        remove: async (key) => {
+          check();
+          await this.d.store.remove(key);
+        },
+      },
+      fetch: async (request) => {
+        check();
+        return this.d.fetch(request);
+      },
+    };
     const check = () => {
       if (cancelled()) throw new Fault("cancelled");
       if (d.now() > deadline) throw new Fault("deadline_exceeded");
@@ -69,14 +119,16 @@ export class Engine {
         connected: usable,
         error,
         account_urn: expected ?? null,
-        live_validation: "pending",
+        capabilities: capabilityStatus(usable),
         transport: "local_native_messaging",
       };
     }
     if (!expected || a.account_urn !== expected)
       throw new Fault("account_mismatch");
-    const actual = self(await d.fetch({ path: "/me" }));
-    if (actual !== expected) throw new Fault("account_changed");
+    if (op !== "operation_get") {
+      const actual = self(await d.fetch({ path: "/me" }));
+      if (actual !== expected) throw new Fault("account_changed");
+    }
     const scope = await d.hash(
       JSON.stringify([
         op,
@@ -102,26 +154,19 @@ export class Engine {
       }
       if (
         row.operation === "message_send" &&
-        row.target?.startsWith("urn:li:msg_conversation:") &&
-        row.status !== "confirmed"
+        ["pending", "unknown_outcome"].includes(row.status)
       ) {
-        const raw = await d.fetch(
-          graph("messages", {
-            deliveredAt: Date.now(),
-            conversationUrn: row.target,
-            countBefore: 50,
-            countAfter: 0,
-          }),
-        );
-        const match = (raw.included ?? []).find(
-          (x: Args) =>
-            x.originToken === row.origin_token &&
-            typeof x.entityUrn === "string",
-        );
-        if (match) {
-          row.status = "confirmed";
-          row.receipt_id = match.entityUrn;
-          await d.store.set("journal", journal);
+        try {
+          if (self(await d.fetch({ path: "/me" })) !== expected)
+            throw new Fault("account_changed");
+          const match = await reconcileMessage(row, d.fetch, check);
+          if (match) {
+            Object.assign(row, match, { status: "confirmed" });
+            await d.store.set("journal", journal);
+          } else row.reconciliation = "no_matching_receipt_observed";
+        } catch (e) {
+          row.reconciliation =
+            e instanceof Fault ? e.code : "reconciliation_unavailable";
         }
       }
       return {
@@ -144,62 +189,13 @@ export class Engine {
       }
       if (d.allowedWrites && !d.allowedWrites.has(op))
         throw new Fault("capability_not_accepted");
-      if (d.authorize) {
-        const pending = await d.authorize(op, a, scope, key);
-        if (pending) return pending;
-      }
       if (op === "message_send") {
         const wanted = [...a.expected_participant_urns].sort();
         if (a.recipient_urn) {
           if (JSON.stringify(wanted) !== JSON.stringify([a.recipient_urn]))
             throw new Fault("recipient_mismatch");
         } else {
-          // Read list pages without opening the thread; do not silently mark messages read.
-          let next: Args = {};
-          // Some message responses include the exact conversation entity. Prefer
-          // that identity-bound read; fall back to category pagination if absent.
-          const history = normalize(
-            await d.fetch(
-              graph("messages", {
-                deliveredAt: d.now(),
-                conversationUrn: a.conversation_urn,
-                countBefore: 1,
-                countAfter: 0,
-              }),
-            ),
-          );
-          let found: Args | undefined = history.entities.find(
-            (x: Args) =>
-              x.entityUrn === a.conversation_urn &&
-              (x.conversationParticipants || x.participants),
-          );
-          for (const category of ["INBOX", "ARCHIVE", "SPAM"]) {
-            next = {};
-            const visited = new Set<string>();
-            while (!found) {
-              check();
-              const page = await readApi(
-                "conversations_list",
-                { ...a, category, limit: 20 },
-                next,
-                d.fetch,
-              );
-              found = page.items.find(
-                (x: Args) => x.entityUrn === a.conversation_urn,
-              );
-              if (!page.next) break;
-              if (visited.has(JSON.stringify(page.next)))
-                throw new Fault("pagination_stalled");
-              visited.add(JSON.stringify(page.next));
-              next = page.next;
-            }
-            if (found) break;
-          }
-          if (!found)
-            throw new Fault(
-              "conversation_not_verified",
-              "Conversation could not be verified in Inbox, Archive or Spam before dispatch.",
-            );
+          const found = await getConversation(a, d.fetch, check);
           const participantList =
             found.conversationParticipants ?? found.participants ?? [];
           const participants = (
@@ -222,10 +218,48 @@ export class Engine {
             throw new Fault("recipient_mismatch");
         }
       }
+      let target: Args | undefined;
+      if (["invitation_respond", "invitation_withdraw"].includes(op)) {
+        target = await findInvitation(
+          a,
+          op === "invitation_withdraw" ? "sent" : "received",
+          d.fetch,
+          check,
+        );
+        if (!target) throw new Fault("invitation_not_verified");
+      }
+      if (op === "conversation_delete")
+        target = await getConversation(a, d.fetch, check, {
+          fields: ["conversationUrl"],
+        });
+      const actor =
+        ["post_create", "post_comment"].includes(op) && d.identity
+          ? await d.identity(expected)
+          : undefined;
+      if (
+        ["post_create", "post_comment"].includes(op) &&
+        d.identity &&
+        !actor?.name
+      )
+        throw new Fault("actor_identity_unavailable");
+      const preview: Args[] = target?.profile ? [target.profile] : [];
+      if (d.identity && op === "message_send") {
+        for (const urn of a.expected_participant_urns) {
+          const identity = await d.identity(urn);
+          if (!identity?.name)
+            throw new Fault("recipient_identity_unavailable");
+          preview.push(identity);
+        }
+      }
+      if (d.authorize) {
+        const pending = await d.authorize(op, a, scope, key, preview);
+        if (pending) return pending;
+      }
       check();
       const origin = d.uuid();
       const row: Args = {
         operation: op,
+        ...(op === "conversation_update" ? { action: a.action } : {}),
         fingerprint: scope,
         account_urn: expected,
         created_at: d.now(),
@@ -239,6 +273,7 @@ export class Engine {
           a.invitation_urn,
       };
       journal[key] = row;
+      await d.checkpoint?.();
       await d.store.set("journal", journal); // durable before dispatch
       await d.store.remove("approval:" + key);
       let dispatched = false;
@@ -249,78 +284,110 @@ export class Engine {
         check();
         if ((await d.account()) !== expected)
           throw new Fault("account_changed");
+        await d.checkpoint?.();
         const request = mutation(op, a, origin);
         dispatched = true;
         const result = request
           ? await d.fetch(request)
-          : await d.dom(op, a, {});
+          : await d.dom(
+              op,
+              { ...a, verified_target: target, verified_actor: actor },
+              {},
+            );
         let verified = result?.verified === true;
         if (op === "conversation_update") {
           check();
-          const category = a.action === "archive" ? "ARCHIVE" : "INBOX";
-          let next: Args = {};
-          for (let i = 0; i < 3; i++) {
-            check();
-            const page = await readApi(
-              "conversations_list",
-              { account_urn: expected, category, limit: 50 },
-              next,
-              d.fetch,
-            );
-            const thread = page.items.find(
-              (x: Args) => x.entityUrn === a.conversation_urn,
-            );
-            if (thread) {
-              verified =
-                a.action === "read"
-                  ? thread.read === true
-                  : a.action === "unread"
-                    ? thread.read === false
-                    : Array.isArray(thread.categories) &&
-                      (a.action === "archive"
-                        ? thread.categories.includes("ARCHIVE")
-                        : !thread.categories.includes("ARCHIVE"));
-              break;
-            }
-            if (!page.next) break;
-            next = page.next;
+          const thread = await getConversation(a, d.fetch, check, {
+            fields: [
+              a.action === "read" || a.action === "unread"
+                ? "read"
+                : "categories",
+            ],
+          });
+          verified =
+            a.action === "read"
+              ? thread.read === true
+              : a.action === "unread"
+                ? thread.read === false
+                : Array.isArray(thread.categories) &&
+                  (a.action === "archive"
+                    ? thread.categories.includes("ARCHIVE")
+                    : !thread.categories.includes("ARCHIVE"));
+        }
+
+        if (
+          op === "invitation_withdraw" ||
+          (op === "invitation_respond" && a.action === "ignore")
+        ) {
+          verified = !(await findInvitation(
+            a,
+            op === "invitation_withdraw" ? "sent" : "received",
+            d.fetch,
+            check,
+          ));
+        }
+        if (op === "invitation_respond" && a.action === "accept") {
+          verified =
+            verified && !(await findInvitation(a, "received", d.fetch, check));
+        }
+        if (op === "conversation_delete") {
+          try {
+            await getConversation(a, d.fetch, check, { mailboxOnly: true });
+            verified = false;
+          } catch (e) {
+            if (e instanceof Fault && e.code === "conversation_not_verified")
+              verified = true;
+            else throw e;
           }
         }
-        const id = receipt(result) ?? result?.receipt_id;
+        const id =
+          receipt(result, op) ??
+          (result?.verified === true ? result?.receipt_id : undefined);
         row.status = id || verified ? "confirmed" : "unknown_outcome";
         if (id) row.receipt_id = id;
+        if (op === "message_send") {
+          const entity = normalize(result ?? {}).entities.find(
+            (x: Args) => x.entityUrn === id,
+          );
+          row.conversation_urn =
+            a.conversation_urn ??
+            entity?.conversationUrn ??
+            entity?.conversation?.entityUrn ??
+            null;
+        }
       } catch (e) {
         row.status = dispatched ? "unknown_outcome" : "failed_before_dispatch";
         row.error = e instanceof Fault ? e.code : "transport_error";
       }
-      await d.store.set("journal", journal);
+      try {
+        await d.checkpoint?.();
+        await d.store.set("journal", journal);
+      } catch (e) {
+        if (dispatched) throw new Fault("interrupted_unknown_outcome");
+        throw e;
+      }
       return row;
     }
     let state: Args = {};
     let cursorRecord: Args | undefined;
     if (a.cursor) {
       const saved = await d.store.get("cursor:" + a.cursor);
+      if (!saved) throw new Fault("cursor_evicted");
       if (!saved || saved.scope !== scope || saved.expires < d.now())
         throw new Fault("invalid_cursor");
+      await d.cursorContext?.(op, saved.state);
       if (saved.response) return saved.response;
       cursorRecord = saved;
       state = saved.state;
     }
     check();
-    const api = [
-      "conversations_list",
-      "conversations_search",
-      "messages_list",
-      "profile_get",
-      "people_search",
-      "people_search_filters",
-      "invitations_list",
-    ].includes(op);
+    const api = capabilities[op].adapter === "api";
     const result = api
       ? await readApi(op, a, state, d.fetch)
       : await d.dom(op, a, state);
     if (self(await d.fetch({ path: "/me" })) !== expected)
       throw new Fault("account_changed");
+    await d.checkpoint?.();
     if (result.next) {
       const token = d.uuid();
       await d.store.set("cursor:" + token, {
@@ -333,17 +400,26 @@ export class Engine {
     }
     if (Array.isArray(result.items) && "limit" in a) {
       result.next_cursor ??= null;
+      result.partial = result.partial !== false || !!result.next_cursor;
       result.page_info = {
         returned_count: result.items.length,
         requested_limit: a.limit,
-        continuation: result.next_cursor ? "available" : "unavailable",
+        continuation: result.next_cursor
+          ? "available"
+          : result.completeness === "source_exhausted"
+            ? "exhausted"
+            : "blocked",
         coverage:
           result.partial || result.next_cursor
             ? "partial"
-            : result.partial === false
-              ? "complete_for_query"
+            : result.partial === false &&
+                result.completeness === "source_exhausted"
+              ? "complete_for_scope"
               : "unknown",
         consistency: "live_traversal",
+        source: capabilities[op].source,
+        order: result.order ?? capabilities[op].order,
+        observed_at: new Date(d.now()).toISOString(),
         reason: result.reason ?? result.completeness ?? null,
         cursor_expires_at: result.next_cursor
           ? new Date(d.now() + 1800000).toISOString()
