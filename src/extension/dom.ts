@@ -192,6 +192,74 @@ export async function domOperation(
       scans: stagnant,
     };
   }
+  if (op === "post_resolve") {
+    const matches = roots().filter((e) => postData(e).scan_key === a.scan_key);
+    if (matches.length !== 1) fail("post_target_not_unique");
+    const post = matches[0];
+    const initial = postData(post);
+    if (initial.entityUrn) return initial;
+    const trigger = post.querySelector<HTMLButtonElement>(
+      'button[aria-label^="Open control menu for post by "]',
+    );
+    if (!trigger) return fail("post_menu_missing");
+    const opened = trigger.getAttribute("aria-expanded") === "true";
+    const before = new Set(
+      [...document.querySelectorAll('[role="menu"]')].filter(visible),
+    );
+    let owned: Element | undefined;
+    try {
+      if (!opened) trigger.click();
+      for (let attempt = 0; attempt < 6; attempt++) {
+        await wait();
+        const menus = [...document.querySelectorAll('[role="menu"]')].filter(
+          visible,
+        );
+        const appeared = menus.filter((m) => !before.has(m));
+        owned =
+          menus.find(
+            (m) => m.id && m.id === trigger.getAttribute("aria-controls"),
+          ) ??
+          menus.find((m) => post.contains(m)) ??
+          (!opened && appeared.length === 1 ? appeared[0] : undefined);
+        if (owned) {
+          const links = [
+            ...owned.querySelectorAll<HTMLAnchorElement>("a[href]"),
+          ];
+          for (const link of links) {
+            let href = link.href;
+            try {
+              href = decodeURIComponent(href);
+            } catch {}
+            const urn = href.match(
+              /urn:li:(?:activity|share|ugcPost):\d+/,
+            )?.[0];
+            if (
+              urn &&
+              post.isConnected &&
+              postData(post).scan_key === initial.scan_key
+            )
+              return {
+                ...initial,
+                entityUrn: urn,
+                url: "https://www.linkedin.com/feed/update/" + urn,
+              };
+          }
+        }
+      }
+      return fail("post_identity_unavailable");
+    } finally {
+      if (
+        !opened &&
+        trigger.isConnected &&
+        trigger.getAttribute("aria-expanded") === "true"
+      )
+        trigger.click();
+      else if (!opened && owned?.isConnected)
+        owned.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+        );
+    }
+  }
   if (op === "post_get") return postData(card());
   if (op === "comments_list") {
     const root = card();

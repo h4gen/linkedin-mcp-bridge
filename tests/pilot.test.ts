@@ -156,3 +156,27 @@ describe("GTM and inbox pages", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 });
+
+it("flattens people search clusters before computing pagination", async () => {
+  const row = {
+    entityUrn:
+      "urn:li:fsd_entityResultViewModel:(urn:li:fsd_profile:one,SEARCH_SRP,DEFAULT)",
+    navigationUrl: "https://www.linkedin.com/in/person?tracking=x",
+    title: { text: "Person" },
+    badgeText: { text: "• 1st" },
+  };
+  const result = await readApi(
+    "people_search",
+    { query: "founder", limit: 1 },
+    {},
+    async () => ({
+      data: { elements: [{ items: [{ item: { entityResult: row } }] }] },
+    }),
+  );
+  expect(result.items[0]).toMatchObject({
+    entityUrn: "urn:li:fsd_profile:one",
+    name: "Person",
+    profile_url: "https://www.linkedin.com/in/person",
+  });
+  expect(result.next.start).toBe(1);
+});

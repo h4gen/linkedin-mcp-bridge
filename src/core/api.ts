@@ -115,7 +115,7 @@ export async function readApi(
         });
       for (const v of Object.values(x)) walk(v, depth + 1);
     };
-    walk(n.data);
+    walk(n);
     return {
       options,
       connection_degrees: ["1", "2", "3"],
@@ -215,6 +215,49 @@ export async function readApi(
   else throw new Fault("not_api_operation");
   const c = collection(raw);
   let items = c.items;
+  if (op === "people_search") {
+    const rows: Args[] = [];
+    const walk = (x: any, depth = 0) => {
+      if (!x || typeof x !== "object" || depth > 12) return;
+      if (
+        typeof x.navigationUrl === "string" &&
+        /linkedin\.com\/in\//.test(x.navigationUrl) &&
+        x.title?.text
+      ) {
+        rows.push(x);
+        return;
+      }
+      for (const v of Object.values(x)) walk(v, depth + 1);
+    };
+    walk(c.items);
+    const seen = new Set<string>(state.seen ?? []);
+    const extracted = rows.map((x) => ({
+      entityUrn: x.entityUrn?.match(/urn:li:fsd_profile:[\w-]+/)?.[0] ?? null,
+      profile_url: x.navigationUrl.split("?")[0],
+      name: x.title.text,
+      headline: x.primarySubtitle?.text ?? null,
+      location: x.secondarySubtitle?.text ?? null,
+      connection_degree: x.badgeText?.text ?? null,
+    }));
+    const unique = extracted.filter((x) => {
+      const key = x.entityUrn ?? x.profile_url;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    if (c.items.length && !rows.length) throw new Fault("people_shape_changed");
+    const more = rows.length >= a.limit;
+    return {
+      items: unique,
+      partial: more,
+      completeness: more ? "more_available" : "source_exhausted",
+      next: more
+        ? { start: (state.start ?? 0) + a.limit, seen: [...seen].slice(-5000) }
+        : undefined,
+      scanned: rows.length,
+    };
+  }
+
   let next: Args | undefined;
   if (op.startsWith("conversations_")) {
     if (c.metadata.nextCursor) next = { nextCursor: c.metadata.nextCursor };

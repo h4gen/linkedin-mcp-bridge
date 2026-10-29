@@ -58,7 +58,7 @@ it("serves all typed tools through actual MCP stdio", async () => {
   try {
     await client.connect(transport);
     const result = await client.listTools();
-    expect(result.tools).toHaveLength(25);
+    expect(result.tools).toHaveLength(26);
     expect(result.tools.some((x) => x.name === "linkedin_message_send")).toBe(
       true,
     );

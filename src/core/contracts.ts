@@ -123,6 +123,9 @@ export const schemas = {
     .strict(),
   invitation_withdraw: z.object({ ...write, invitation_urn: urn }).strict(),
   feed_list: z.object({ ...page }).strict(),
+  post_resolve: z
+    .object({ ...account, scan_key: z.string().min(1).max(200) })
+    .strict(),
   post_get: z.object({ ...account, ...post }).strict(),
   post_create: z.object({ ...write, text }).strict(),
   post_like: z
