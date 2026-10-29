@@ -45,3 +45,20 @@ it("rejects duplicate post targets instead of choosing the first", async () => {
     domOperation("post_get", { post_urn: "urn:li:activity:123" }, {}),
   ).rejects.toThrow("post_target_not_unique");
 });
+
+it("scrolls the nearest actual overflow container to discover another page", async () => {
+  const dom = page(
+    '<div id="scroller" style="overflow-y:auto"><main><div role="listitem"><button aria-label="Open control menu for post by One"></button><div data-testid="expandable-text-box">First</div></div></main></div>',
+  );
+  const scroller = dom.window.document.querySelector("#scroller")!;
+  Object.defineProperty(scroller, "scrollHeight", { value: 2000 });
+  Object.defineProperty(scroller, "clientHeight", { value: 500 });
+  const scroll = vi.fn(() => {
+    scroller.innerHTML +=
+      '<div role="listitem"><button aria-label="Open control menu for post by Two"></button><div data-testid="expandable-text-box">Second</div></div>';
+  });
+  Object.defineProperty(scroller, "scrollBy", { value: scroll });
+  const result = await domOperation("feed_list", { limit: 2 }, {});
+  expect(scroll).toHaveBeenCalledTimes(1);
+  expect(result.items.map((x: any) => x.text)).toEqual(["First", "Second"]);
+});

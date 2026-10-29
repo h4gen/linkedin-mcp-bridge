@@ -149,13 +149,17 @@ export async function domOperation(
         }
       if (items.length >= a.limit) break;
       stagnant++;
-      const scrolling =
-        [
-          ...document.querySelectorAll<HTMLElement>(
-            'main,[role="main"],[data-testid="mainFeed"]',
-          ),
-        ].find((e) => e.scrollHeight > e.clientHeight + 100) ??
-        document.scrollingElement;
+      let scrolling: Element | null = roots()[0]?.parentElement ?? null;
+      while (scrolling) {
+        const overflow = window.getComputedStyle(scrolling).overflowY;
+        if (
+          /auto|scroll/.test(overflow) &&
+          scrolling.scrollHeight > scrolling.clientHeight + 100
+        )
+          break;
+        scrolling = scrolling.parentElement;
+      }
+      scrolling ??= document.scrollingElement;
       if (scrolling) scrolling.scrollBy(0, Math.max(innerHeight, 700));
       else window.scrollBy(0, Math.max(innerHeight, 700));
       await wait();
