@@ -167,10 +167,21 @@ export class Engine {
           previous.error === "conversation_pane_missing") ||
           (["invitation_respond", "invitation_withdraw"].includes(op) &&
             previous.error === "ui_control_ambiguous_or_missing"));
+      const continuationCandidate =
+        previous?.status === "unknown_outcome" &&
+        op === "invitation_withdraw" &&
+        previous.version === "0.4.1" &&
+        previous.dispatch_state === "dispatched" &&
+        !previous.error;
+      let resumeConfirmation = false;
       if (previous) {
         if (previous.fingerprint !== scope)
           throw new Fault("idempotency_conflict");
-        if (previous.status !== "failed_before_dispatch" && !legacyCandidate)
+        if (
+          previous.status !== "failed_before_dispatch" &&
+          !legacyCandidate &&
+          !continuationCandidate
+        )
           return {
             ...previous,
             status:
@@ -223,7 +234,7 @@ export class Engine {
         target = await getConversation(a, d.fetch, check, {
           fields: ["conversationUrl"],
         });
-      if (legacyCandidate) {
+      if (legacyCandidate || continuationCandidate) {
         // An exact source entity must still exist and its original failed control
         // path must be proven non-dispatching. Never infer this from absence.
         const proof = await d.dom(
@@ -237,10 +248,14 @@ export class Engine {
           {},
         );
         check();
+        resumeConfirmation =
+          continuationCandidate && proof.continuation_ready === true;
         if (
           !proof.preflight ||
           proof.dispatch_state !== "not_dispatched" ||
-          !proof.legacy_no_dispatch_proof
+          !(legacyCandidate
+            ? proof.legacy_no_dispatch_proof
+            : resumeConfirmation)
         )
           return {
             ...previous,
@@ -287,7 +302,9 @@ export class Engine {
                   created_at: previous.created_at,
                   recovery: legacyCandidate
                     ? "verified_legacy_pre_dispatch_failure_and_current_target"
-                    : "failed_before_dispatch",
+                    : resumeConfirmation
+                      ? "verified_pending_withdraw_confirmation"
+                      : "failed_before_dispatch",
                 },
               ].slice(-10),
             }
@@ -329,6 +346,7 @@ export class Engine {
                 verified_target: target,
                 verified_actor: actor,
                 execution_deadline: deadline,
+                resume_confirmation: resumeConfirmation,
               },
               {},
             );

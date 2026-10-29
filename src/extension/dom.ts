@@ -20,9 +20,10 @@ export async function domOperation(
       /checkpoint|challenge|login/.test(location.pathname)
     )
       fail("session_unavailable");
-    const visible = (e: Element) => !!(e as HTMLElement).offsetParent;
+    const visible = (e: Element) =>
+      !!(e as HTMLElement).offsetParent || e.getClientRects().length > 0;
     const wait = () => new Promise((r) => setTimeout(r, 800));
-    const button = (root: ParentNode, pattern: RegExp) => {
+    const matchingControls = (root: ParentNode, pattern: RegExp) => {
       if (
         a.execution_session &&
         (window as any).__liBridgeSession !== a.execution_session
@@ -41,8 +42,12 @@ export async function domOperation(
           e.getAttribute("aria-disabled") !== "true" &&
           !(e as HTMLButtonElement).disabled,
       );
+      return matches as HTMLElement[];
+    };
+    const button = (root: ParentNode, pattern: RegExp) => {
+      const matches = matchingControls(root, pattern);
       if (matches.length !== 1) return fail("ui_control_ambiguous_or_missing");
-      return matches[0] as HTMLElement;
+      return matches[0];
     };
     // Modern SDUI and legacy post structure, adapted from the user's LinkedIn extractor.
     const roots = () => {
@@ -432,15 +437,23 @@ export async function domOperation(
         await new Promise((r) => setTimeout(r, 200));
       }
     };
+    const readyButton = (root: ParentNode, pattern: RegExp) =>
+      ready(() => {
+        const matches = matchingControls(root, pattern);
+        if (matches.length > 1) fail("ui_control_ambiguous_or_missing");
+        return matches[0];
+      }, "ui_control_ambiguous_or_missing");
     const mutate = (control: HTMLElement) => {
       guard();
       mutationStarted = true; // Immediately before the potentially mutating click.
       control.click();
     };
     const dialogs = () =>
-      [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].filter(
-        visible,
-      );
+      [
+        ...document.querySelectorAll<HTMLElement>(
+          'dialog[open],[role="dialog"],[role="alertdialog"]',
+        ),
+      ].filter(visible);
     if (op === "invitation_respond" || op === "invitation_withdraw") {
       const verified = a.verified_target;
       if (!verified || verified.entityUrn !== a.invitation_urn)
@@ -495,12 +508,23 @@ export async function domOperation(
         if (minimal.length > 1) fail("invitation_target_not_unique");
         return minimal[0];
       }, "invitation_target_not_unique");
-      const control = button(target, pattern);
+      const control = await readyButton(target, pattern);
       if (
         control.tagName === "A" &&
         new URL((control as HTMLAnchorElement).href).origin !== location.origin
       )
         fail("invitation_control_location_mismatch");
+      const label = control.getAttribute("aria-label");
+      const pendingConfirmation = () => {
+        if (op !== "invitation_withdraw" || !label) return undefined;
+        const matching = dialogs().filter((d) =>
+          matchingControls(d, pattern).some(
+            (b) => b.getAttribute("aria-label") === label,
+          ),
+        );
+        if (matching.length > 1) fail("withdraw_dialog_not_unique");
+        return matching[0];
+      };
       if (a.preflight) {
         // The previous adapter excluded links and matched only the whole aria-label.
         const oldPattern =
@@ -512,6 +536,7 @@ export async function domOperation(
         return {
           preflight: true,
           dispatch_state: "not_dispatched",
+          continuation_ready: !!pendingConfirmation(),
           legacy_no_dispatch_proof:
             control.tagName === "A" ||
             !oldPattern.test(
@@ -523,17 +548,26 @@ export async function domOperation(
             ),
         };
       }
-      const before = new Set(dialogs());
-      mutate(control); // Also conservative for variants that withdraw without a dialog.
-      await wait();
       if (op === "invitation_withdraw") {
-        const appeared = dialogs().filter((d) => !before.has(d));
-        if (appeared.length > 1) fail("withdraw_dialog_not_unique");
-        if (appeared.length === 1) {
-          mutate(button(appeared[0], /^(Withdraw|Zurückziehen)$/i));
-          await wait();
+        let dialog = pendingConfirmation();
+        if (!dialog) {
+          if (a.resume_confirmation) fail("withdraw_confirmation_lost");
+          const before = new Set(dialogs());
+          mutate(control); // A transport interruption here remains unknown.
+          dialog = await ready(() => {
+            const appeared = dialogs().filter((d) => !before.has(d));
+            if (appeared.length > 1) fail("withdraw_dialog_not_unique");
+            return appeared[0];
+          }, "withdraw_dialog_missing");
         }
-      }
+        // Observed confirmation means the final mutation has not been clicked.
+        mutationStarted = false;
+        const final = await readyButton(dialog, pattern);
+        if (!label || final.getAttribute("aria-label") !== label)
+          fail("withdraw_confirmation_target_mismatch");
+        mutate(final);
+      } else mutate(control);
+      await wait();
       return {
         verified: false,
         dispatch_state: "dispatched",
@@ -575,7 +609,7 @@ export async function domOperation(
         };
       const beforeDialogs = new Set(dialogs());
       guard();
-      trigger.click();
+      if (trigger.getAttribute("aria-expanded") !== "true") trigger.click();
       const menu = await ready(() => {
         const id = trigger.getAttribute("aria-controls");
         const owned = id
@@ -588,16 +622,18 @@ export async function domOperation(
         return owned && visible(owned) ? owned : undefined;
       }, "conversation_menu_missing");
       guard();
-      button(
-        menu,
-        /^(Delete conversation|Delete|Unterhaltung löschen|Löschen)$/i,
+      (
+        await readyButton(
+          menu,
+          /^(Delete conversation|Delete|Unterhaltung löschen|Löschen)$/i,
+        )
       ).click();
       const dialog = await ready(() => {
         const fresh = dialogs().filter((d) => !beforeDialogs.has(d));
         if (fresh.length > 1) fail("delete_dialog_not_unique");
         return fresh[0];
       }, "delete_dialog_not_unique");
-      mutate(button(dialog, /^(Delete|Löschen)$/i));
+      mutate(await readyButton(dialog, /^(Delete|Löschen)$/i));
       await wait();
       return { verified: false, dispatch_state: "dispatched" };
     }

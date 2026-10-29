@@ -50,11 +50,23 @@ it.each([
       `<main><div><a href="/in/other/">Other</a><button>Accept</button></div><div><a href="/in/friend/">Friend</a><div><${tag} ${tag === "a" ? 'href="/mynetwork/invitation-manager/sent/"' : ""} aria-label="${label}">${text}</${tag}></div></div></main>`,
     );
     let hits = 0;
+    let confirmations = 0;
     doc
       .querySelector(`[aria-label="${label}"]`)!
       .addEventListener("click", (e) => {
         e.preventDefault();
         hits++;
+        if (action === "withdraw")
+          setTimeout(() => {
+            const dialog = doc.createElement("dialog");
+            dialog.setAttribute("open", "");
+            dialog.innerHTML =
+              '<button aria-label="' + label + '">Withdraw</button>';
+            dialog
+              .querySelector("button")!
+              .addEventListener("click", () => confirmations++);
+            doc.body.append(dialog);
+          }, 300);
       });
     const op =
       action === "withdraw" ? "invitation_withdraw" : "invitation_respond";
@@ -72,6 +84,7 @@ it.each([
     await vi.runAllTimersAsync();
     expect(await result).toMatchObject({ dispatch_state: "dispatched" });
     expect(hits).toBe(1);
+    expect(confirmations).toBe(action === "withdraw" ? 1 : 0);
   },
 );
 it("fails before dispatch for duplicate controls and ignores disabled controls", async () => {
@@ -117,17 +130,26 @@ it("waits for the exact thread and uses its owned menu and newly opened dialog",
     const pane = doc.createElement("section");
     pane.className = "msg-thread";
     pane.innerHTML =
-      '<div id="thread-detail-jump-target"><div class="artdeco-dropdown"><button id="trigger" aria-controls="owned" aria-label="Open the options list in your conversation with Friend">...</button><div role="menu" id="owned" style="display:none"><div role="menuitem">Delete conversation</div></div></div></div>';
+      '<div id="thread-detail-jump-target"><div class="artdeco-dropdown"><button id="trigger" aria-controls="owned" aria-label="Open the options list in your conversation with Friend">...</button><div role="menu" id="owned" style="display:none"></div></div></div>';
     doc.body.append(pane);
     doc.querySelector("#trigger")!.addEventListener("click", () => {
       (doc.querySelector("#owned") as HTMLElement).style.display = "block";
-    });
-    doc.querySelector("[role=menuitem]")!.addEventListener("click", () => {
-      const d = doc.createElement("div");
-      d.setAttribute("role", "dialog");
-      d.innerHTML = "<button>Delete</button>";
-      d.querySelector("button")!.addEventListener("click", () => deleted++);
-      doc.body.append(d);
+      setTimeout(() => {
+        doc.querySelector("#owned")!.innerHTML =
+          '<div role="button">Delete conversation</div>';
+        doc
+          .querySelector("#owned [role=button]")!
+          .addEventListener("click", () => {
+            const d = doc.createElement("div");
+            d.setAttribute("role", "dialog");
+            d.innerHTML = "<button>Delete</button>";
+            d.querySelector("button")!.addEventListener(
+              "click",
+              () => deleted++,
+            );
+            doc.body.append(d);
+          });
+      }, 300);
     });
   }, 500);
   const r = domOperation(
@@ -165,7 +187,7 @@ it("reports a post-click failure as dispatched and cancels changed sessions befo
     dispatch_state: "not_dispatched",
   });
 });
-function engineFixture() {
+function engineFixture(op = "invitation_respond") {
   const data: Record<string, any> = {};
   let present = true;
   let failure: string | undefined;
@@ -174,7 +196,7 @@ function engineFixture() {
   const input = {
     account_urn: "urn:li:fsd_profile:me",
     invitation_urn: invitation.entityUrn,
-    action: "accept",
+    ...(op === "invitation_respond" ? { action: "accept" } : {}),
     idempotency_key: "same-key-recovery",
   };
   const dependencies = {
@@ -201,7 +223,9 @@ function engineFixture() {
                     {
                       invitation: {
                         entityUrn: invitation.entityUrn,
-                        fromMember: {
+                        [op === "invitation_withdraw"
+                          ? "toMember"
+                          : "fromMember"]: {
                           dashEntityUrn: invitation.profile.entityUrn,
                           firstName: "Friend",
                           publicIdentifier: "friend",
@@ -219,6 +243,7 @@ function engineFixture() {
           preflight: true,
           dispatch_state: "not_dispatched",
           legacy_no_dispatch_proof: legacyProof,
+          continuation_ready: legacyProof,
         };
       if (failure)
         throw new Fault("ui_control_ambiguous_or_missing", "failed", {
@@ -233,10 +258,10 @@ function engineFixture() {
   const seed = () => {
     data.journal = {
       [input.account_urn + ":" + input.idempotency_key]: {
-        operation: "invitation_respond",
+        operation: op,
         fingerprint: JSON.stringify([
-          "invitation_respond",
-          { ...parse("invitation_respond", input), idempotency_key: undefined },
+          op,
+          { ...parse(op, input), idempotency_key: undefined },
         ]),
         created_at: 1000,
         status: "unknown_outcome",
@@ -315,5 +340,25 @@ it.each(["dispatched", "unknown"])(
       true,
     );
     expect(f.mutations()).toBe(0);
+  },
+);
+
+it.each([true, false])(
+  "continues withdrawal only with the exact pending confirmation: %s",
+  async (proof) => {
+    const f = engineFixture("invitation_withdraw");
+    f.seed();
+    const receipt = Object.values(f.data.journal)[0] as any;
+    receipt.version = "0.4.1";
+    receipt.dispatch_state = "dispatched";
+    delete receipt.error;
+    f.proof(proof);
+    const r = await f.engine.run("invitation_withdraw", f.input);
+    expect(r.status).toBe(proof ? "confirmed" : "unknown_outcome");
+    expect(f.mutations()).toBe(proof ? 1 : 0);
+    expect((await f.engine.run("invitation_withdraw", f.input)).replayed).toBe(
+      true,
+    );
+    expect(f.mutations()).toBe(proof ? 1 : 0);
   },
 );
