@@ -2,7 +2,7 @@
 
 A separate macOS-first MCP server and Chrome MV3 extension. The local Node process communicates with the extension through Chrome Native Messaging and a private Unix socket. LinkedIn session credentials stay in the browser. No hosted relay, remote scripts, background inbox indexing or telemetry.
 
-**Development candidate 0.4.1 — not submitted to the Chrome Web Store.** All 24 operations are available. Writes execute directly after account, target and idempotency checks, without extension confirmation. Inbox/history, filtered people search, feed identity resolution and paginated reaction/comment reads have live checks; see [validation](docs/validation.md). The pilot includes a separate bundled macOS companion and a release gate that fails until publishing prerequisites and acceptance are complete.
+**Development candidate 0.5.0 — not submitted to the Chrome Web Store.** All 27 operations are available. Writes execute directly after account, target and idempotency checks, without extension confirmation. Inbox/history, filtered people search, feed identity resolution and paginated reaction/comment reads have live checks; see [validation](docs/validation.md). The pilot includes a separate bundled macOS companion and a release gate that fails until publishing prerequisites and acceptance are complete.
 
 ## Install locally
 
@@ -65,13 +65,22 @@ All names have a `linkedin_` prefix. First call `health`, then supply its `accou
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Inbox       | `conversations_list`, `conversations_search`, `conversations_get`, `messages_list`, `message_send`, `conversation_update`, `conversation_delete` |
 | People      | `profile_get`, `people_search`, `invitations_list`, `invitation_send`, `invitation_respond`, `invitation_withdraw`                               |
-| Feed        | `feed_list`, `post_get`, `post_create`, `post_like`, `post_comment`, `comments_list`                                                             |
+| Feed        | `feed_list`, `post_get`, `post_like`, `post_comment`, `comments_list`                                                                            |
+| Planning    | `post_draft_create`, `post_schedule`, `scheduled_posts_list`, `scheduled_post_cancel`                                                            |
 | GTM         | `people_search_filters`, `reactions_list`, `post_resolve`                                                                                        |
 | Diagnostics | `health`, `operation_get`                                                                                                                        |
 
 Lists default to 20, max 50. LinkedIn Inbox requests are capped at 20 per backend page because live requests for 50 return an unusable response; use the cursor to continue. Pass the returned opaque `next_cursor` as `cursor` with the **same arguments**. Cursors expire after 30 minutes, are bound to account, filters and operation, and reset with the browser session. Lists are live, not immutable snapshots. Deduplicate by entity URN when traversing a changing inbox. `conversations_search` searches participant/title/preview content in each fetched page; follow its cursor to search older pages. It is not full historical message search.
 
 Inbox/history reads use HTTP only and never intentionally open a conversation or mark it read. Attachment metadata can appear in normalized read results; uploading or downloading attachment content is not implemented.
+
+### Native drafts and scheduling
+
+`post_create` has been removed. `post_draft_create` saves a personal text-only post as a native LinkedIn draft and verifies it by reopening it. It refuses to replace any existing draft. `post_schedule` schedules text in LinkedIn using an ISO `scheduled_at` with explicit timezone, whole-minute precision, at least ten minutes and at most three months ahead. LinkedIn owns the schedule; no local background publisher is installed.
+
+`scheduled_posts_list` returns native scheduled posts with account-bound `scheduled_ref` values. Pass one to `scheduled_post_cancel` to remove exactly the matching text/time entry. Unknown layouts, ambiguous entries and mismatched accounts fail closed. Planning currently targets the observed English LinkedIn composer. Scheduling does not fall back to immediate publication.
+
+Planning receipts expose `outcome`: `draft_saved`, `scheduled`, or `schedule_cancelled`. Unknown outcomes can be reconciled with `operation_get` or the original key, without repeating the mutation. Schedule references contain hashes and timestamps, not post bodies, and expire seven days after the scheduled time on the next operation. Clear local data removes them immediately.
 
 ### Writes and uncertain results
 

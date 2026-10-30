@@ -1,3 +1,4 @@
+import { composerOperation } from "./composer.js";
 import { cursorEvictions } from "../core/cursor-budget.js";
 import { retryAt } from "../core/errors.js";
 import { Engine, Store } from "../core/engine.js";
@@ -150,7 +151,12 @@ const engine = new Engine({
         await chrome.tabs.update(id, { url });
     }
     if (
-      op === "post_create" &&
+      [
+        "post_draft_create",
+        "post_schedule",
+        "scheduled_posts_list",
+        "scheduled_post_cancel",
+      ].includes(op) &&
       !(await chrome.tabs.get(id)).url?.startsWith(
         "https://www.linkedin.com/feed/",
       )
@@ -261,7 +267,14 @@ const engine = new Engine({
       world: "ISOLATED",
       func: ["comments_list", "reactions_list"].includes(op)
         ? extractionOperation
-        : domOperation,
+        : [
+              "post_draft_create",
+              "post_schedule",
+              "scheduled_posts_list",
+              "scheduled_post_cancel",
+            ].includes(op)
+          ? composerOperation
+          : domOperation,
       args: [op, { ...a, execution_session: session }, state],
     });
     if (!result[0]?.result) throw new Fault("ui_operation_failed");

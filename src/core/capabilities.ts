@@ -155,7 +155,22 @@ const definitions = {
   conversation_delete: { adapter: "dom", output: mutation },
   invitation_respond: { adapter: "dom", output: mutation },
   invitation_withdraw: { adapter: "dom", output: mutation },
-  post_create: { adapter: "dom", output: mutation },
+  post_draft_create: { adapter: "dom", output: mutation },
+  post_schedule: { adapter: "dom", output: mutation },
+  scheduled_post_cancel: { adapter: "dom", output: mutation },
+  scheduled_posts_list: {
+    adapter: "dom",
+    output: row({
+      items: z.array(
+        row({
+          scheduled_ref: z.string(),
+          text: z.string(),
+          scheduled_at: z.string(),
+        }),
+      ),
+      complete: z.boolean(),
+    }),
+  },
   post_like: { adapter: "dom", output: mutation },
   post_comment: { adapter: "dom", output: mutation },
 } satisfies Record<

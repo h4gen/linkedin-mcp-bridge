@@ -13,7 +13,7 @@ flowchart LR
   DOM --> LinkedIn
 ```
 
-- `src/core/contracts.ts`: 24 strict input contracts, paired output schemas and a shared capability registry; no generic transport or browser tool.
+- `src/core/contracts.ts`: 27 strict input contracts, paired output schemas and a shared capability registry; no generic transport or browser tool.
 - `src/core/engine.ts`: serialization, account checks, pagination, mutation journal, cancellation boundary and reconciliation.
 - `src/core/api.ts`: typed routes, Rest.li variables and operation-specific response handling.
 - `src/core/normalize.ts`: bounded normalized-reference resolution; missing collection is a schema error.
@@ -46,3 +46,7 @@ A connection-generation change invalidates queued operations and guards journal 
 ## 0.4 direct writes
 
 All 24 operations are exposed in every build. The approval module, review UI, inbox permission and test-write build flag have been removed. Writes retain account/target checks, serialization, durable receipts and postconditions. Acceptance metadata informs release readiness only. Migration clears session drafts and the old inbox preference without replaying actions or deleting the mutation journal; it pauses the bound connection for reconnection. Local data clearing is available in the popup.
+
+## 0.5 native post planning
+
+The self-contained composer adapter owns native draft save/reopen, time confirmation, schedule listing and exact cancellation. It rejects immediate publish controls. The Engine binds schedule references to account, normalized text hash and timestamp, stores them without post bodies and expires them seven days after their scheduled time. Unknown planning receipts reconcile without redispatch. `post_create` is removed from the contract and executable adapter.

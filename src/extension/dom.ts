@@ -377,39 +377,6 @@ export async function domOperation(
         receipt_id: newComment?.getAttribute("data-id") ?? undefined,
       };
     }
-    if (op === "post_create") {
-      const beforePosts = new Set(
-        [...document.querySelectorAll('[data-urn^="urn:li:activity:"]')].map(
-          (e) => e.getAttribute("data-urn"),
-        ),
-      );
-      button(
-        document,
-        /^(Start a post|Beitrag beginnen|Beitrag erstellen)$/i,
-      ).click();
-      await wait();
-      const dialogs = [...document.querySelectorAll('[role="dialog"]')].filter(
-        visible,
-      );
-      if (dialogs.length !== 1) fail("composer_not_unique");
-      const dialog = dialogs[0];
-      const editor = dialog.querySelector<HTMLElement>(
-        '[contenteditable="true"][role="textbox"],.ql-editor[contenteditable="true"]',
-      );
-      if (!editor) return fail("composer_missing");
-      fill(editor, a.text);
-      button(dialog, /^(Post|Posten|Veröffentlichen)$/i).click();
-      await wait();
-      // A closed dialog alone does not prove publication.
-      const own = [
-        ...document.querySelectorAll('[data-urn^="urn:li:activity:"]'),
-      ]
-        .map(postData)
-        .find((p) => p.text === a.text && !beforePosts.has(p.entityUrn));
-      return own && a.verified_actor?.name === own.author
-        ? { verified: true, receipt_id: own.entityUrn }
-        : { verified: false };
-    }
     const readyUntil = Math.min(
       Date.now() + 10000,
       a.execution_deadline ?? Infinity,

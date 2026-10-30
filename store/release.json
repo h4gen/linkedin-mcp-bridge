@@ -1,5 +1,5 @@
 {
-  "version": "0.4.1",
+  "version": "0.5.0",
   "visibility": "unlisted",
   "platform": "macOS",
   "developer_name": null,
@@ -9,5 +9,5 @@
   "store_extension_id": null,
   "screenshots": [],
   "signed_companions": [],
-  "acceptance_manifest": "artifacts/acceptance-0.4.1.json"
+  "acceptance_manifest": "artifacts/acceptance-0.5.0.json"
 }

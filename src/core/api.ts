@@ -441,11 +441,9 @@ export function receipt(raw: any, operation?: Operation): string | undefined {
             ? /^urn:li:msg_message:/
             : operation === "invitation_send"
               ? /^urn:li:(fsd_invitation|fs_invitation):/
-              : operation === "post_create"
-                ? /^urn:li:(activity|share|ugcPost):/
-                : operation
-                  ? /$^/
-                  : /^urn:li:/;
+              : operation
+                ? /$^/
+                : /^urn:li:/;
         if (expected.test(v)) found ??= v;
       } else scan(v, depth + 1);
     }

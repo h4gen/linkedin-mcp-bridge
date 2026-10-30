@@ -76,7 +76,7 @@ describe("contracts", () => {
     ).toThrow();
   });
   it("caps pages and validates all tool schemas", () => {
-    expect(Object.keys(schemas)).toHaveLength(24);
+    expect(Object.keys(schemas)).toHaveLength(27);
     expect(() =>
       parse("messages_list", {
         account_urn: account,

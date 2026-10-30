@@ -16,4 +16,6 @@ All executable adapters are bundled. No arbitrary URL, selector, JavaScript or n
 
 Known platform limitation: LinkedIn prohibits scraping/automation. Google approval do not resolve that separate platform restriction.
 
-Release prerequisite: all original basic capabilities, including deletion, invitation mutations and public text interactions, require per-capability acceptance evidence. All 24 tools are exposed, but availability does not establish live acceptance or store readiness.
+Release prerequisite: all original basic capabilities, including deletion, invitation mutations and public text interactions, require per-capability acceptance evidence. All 27 tools are exposed, but availability does not establish live acceptance or store readiness.
+
+Version 0.5 replaces immediate post creation with native text drafts and scheduling. Verify draft preservation, future-time validation, scheduled listing and cancellation using disposable test content; never publish a test immediately.

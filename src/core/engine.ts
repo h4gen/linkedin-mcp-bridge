@@ -1,3 +1,4 @@
+import { planningWrites, scheduleTime } from "./post-planning.js";
 import { capabilities, capabilityStatus } from "./capabilities.js";
 import { VERSION, PROTOCOL } from "../version.js";
 import { Args, Fault, Operation, parse, writes } from "./contracts.js";
@@ -134,9 +135,67 @@ export class Engine {
       if (d.now() - v.created_at > 7 * 86400000) delete journal[k];
     await d.store.set("journal", journal);
     const key = await d.hash(`${expected}:${a.idempotency_key ?? ""}`);
+    const scheduledTargets = (await d.store.get("scheduled-targets")) ?? {};
+    for (const [ref, target] of Object.entries(scheduledTargets) as [
+      string,
+      Args,
+    ][])
+      if (Date.parse(target.scheduled_at) + 7 * 86400000 < d.now())
+        delete scheduledTargets[ref];
+    await d.store.set("scheduled-targets", scheduledTargets);
+    const registerSchedule = async (item: Args) => {
+      const ref = await d.hash(
+        JSON.stringify([expected, item.text_hash, item.scheduled_at]),
+      );
+      scheduledTargets[ref] = {
+        text_hash: item.text_hash,
+        scheduled_at: item.scheduled_at,
+        native_id: item.native_id ?? null,
+        account_urn: expected,
+      };
+      await d.store.set("scheduled-targets", scheduledTargets);
+      return ref;
+    };
+    const reconcilePlanning = async (row: Args) => {
+      const result = await d.dom(
+        row.operation,
+        {
+          account_urn: expected,
+          reconcile: true,
+          text_hash: row.text_hash,
+          scheduled_at: row.scheduled_at,
+          verified_target: row.planning_target,
+          verified_actor: await d.identity?.(expected),
+          execution_deadline: deadline,
+        },
+        {},
+      );
+      if (result.verified) {
+        row.status = "confirmed";
+        row.outcome = result.outcome;
+        if (result.scheduled_item)
+          row.scheduled_ref = await registerSchedule(result.scheduled_item);
+        delete row.error;
+        await d.store.set("journal", journal);
+      }
+      return row;
+    };
     if (op === "operation_get") {
       const row = journal[key];
       if (!row) return { status: "not_found", retention_days: 7 };
+      if (
+        planningWrites.has(row.operation) &&
+        ["pending", "unknown_outcome"].includes(row.status)
+      ) {
+        if (self(await d.fetch({ path: "/me" })) !== expected)
+          throw new Fault("account_changed");
+        try {
+          await reconcilePlanning(row);
+        } catch (e) {
+          row.reconciliation =
+            e instanceof Fault ? e.code : "reconciliation_unavailable";
+        }
+      }
       if (
         row.operation === "message_send" &&
         ["pending", "unknown_outcome"].includes(row.status)
@@ -206,6 +265,25 @@ export class Engine {
         if (previous.fingerprint !== scope)
           throw new Fault("idempotency_conflict");
         if (
+          planningWrites.has(op) &&
+          ["pending", "unknown_outcome"].includes(previous.status)
+        ) {
+          try {
+            await reconcilePlanning(previous);
+          } catch (e) {
+            previous.reconciliation =
+              e instanceof Fault ? e.code : "reconciliation_unavailable";
+          }
+          return {
+            ...previous,
+            status:
+              previous.status === "pending"
+                ? "unknown_outcome"
+                : previous.status,
+            replayed: true,
+          };
+        }
+        if (
           previous.status !== "failed_before_dispatch" &&
           !legacyCandidate &&
           !continuationCandidate
@@ -219,6 +297,8 @@ export class Engine {
             replayed: true,
           };
       }
+      if (op === "post_schedule")
+        a.scheduled_at = scheduleTime(a.scheduled_at, d.now());
       if (op === "message_send") {
         const wanted = [...a.expected_participant_urns].sort();
         if (a.recipient_urn) {
@@ -292,12 +372,17 @@ export class Engine {
             reconciliation: "legacy_dispatch_not_disproven",
           };
       }
+      if (op === "scheduled_post_cancel") {
+        target = scheduledTargets[a.scheduled_ref];
+        if (!target || target.account_urn !== expected)
+          throw new Fault("scheduled_reference_unknown");
+      }
       const actor =
-        ["post_create", "post_comment"].includes(op) && d.identity
+        (planningWrites.has(op) || op === "post_comment") && d.identity
           ? await d.identity(expected)
           : undefined;
       if (
-        ["post_create", "post_comment"].includes(op) &&
+        (planningWrites.has(op) || op === "post_comment") &&
         d.identity &&
         !actor?.name
       )
@@ -340,6 +425,21 @@ export class Engine {
               ].slice(-10),
             }
           : {}),
+        ...(planningWrites.has(op)
+          ? {
+              text_hash: a.text
+                ? await d.hash(
+                    a.text
+                      .replace(/\r\n/g, "\n")
+                      .replace(/\u00a0/g, " ")
+                      .trim(),
+                  )
+                : undefined,
+              scheduled_at: a.scheduled_at,
+              planning_target:
+                op === "scheduled_post_cancel" ? target : undefined,
+            }
+          : {}),
         ...(op === "conversation_update" ? { action: a.action } : {}),
         fingerprint: scope,
         account_urn: expected,
@@ -352,7 +452,8 @@ export class Engine {
           a.recipient_urn ??
           a.post_urn ??
           a.profile_urn ??
-          a.invitation_urn,
+          a.invitation_urn ??
+          a.scheduled_ref,
       };
       journal[key] = row;
       await d.checkpoint?.();
@@ -384,6 +485,13 @@ export class Engine {
         row.dispatch_state = "dispatched";
         await d.store.set("journal", journal);
         let verified = result?.verified === true;
+        if (planningWrites.has(op)) {
+          row.outcome = result.outcome;
+          if (result.scheduled_item)
+            row.scheduled_ref = await registerSchedule(result.scheduled_item);
+          if (op === "scheduled_post_cancel")
+            row.scheduled_ref = a.scheduled_ref;
+        }
         if (op === "conversation_update") {
           check();
           const thread = await getConversation(a, d.fetch, check, {
@@ -453,11 +561,12 @@ export class Engine {
         if (
           e instanceof Fault &&
           e.details.dispatch_state === "not_dispatched" &&
-          [
-            "invitation_respond",
-            "invitation_withdraw",
-            "conversation_delete",
-          ].includes(op)
+          (planningWrites.has(op) ||
+            [
+              "invitation_respond",
+              "invitation_withdraw",
+              "conversation_delete",
+            ].includes(op))
         )
           dispatched = false;
         row.status = dispatched ? "unknown_outcome" : "failed_before_dispatch";
@@ -493,7 +602,26 @@ export class Engine {
     const api = capabilities[op].adapter === "api";
     const result = api
       ? await readApi(op, a, state, d.fetch)
-      : await d.dom(op, a, state);
+      : await d.dom(
+          op,
+          op === "scheduled_posts_list"
+            ? {
+                ...a,
+                verified_actor: await d.identity?.(expected),
+                execution_deadline: deadline,
+              }
+            : a,
+          state,
+        );
+    if (op === "scheduled_posts_list") {
+      result.items = await Promise.all(
+        result.items.map(async (item: Args) => ({
+          text: item.text,
+          scheduled_at: item.scheduled_at,
+          scheduled_ref: await registerSchedule(item),
+        })),
+      );
+    }
     if (self(await d.fetch({ path: "/me" })) !== expected)
       throw new Fault("account_changed");
     await d.checkpoint?.();

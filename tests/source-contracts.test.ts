@@ -106,7 +106,7 @@ it("rejects ambiguous recognized collections", () => {
 it("accepts only operation-specific receipt kinds", () => {
   const raw = { data: { entityUrn: "urn:li:activity:123" } };
   expect(receipt(raw, "message_send")).toBeUndefined();
-  expect(receipt(raw, "post_create")).toBe("urn:li:activity:123");
+  expect(receipt(raw, "post_schedule")).toBeUndefined();
 });
 it("evicts old cursor pages within a shared byte budget, not receipts", () => {
   const all = {

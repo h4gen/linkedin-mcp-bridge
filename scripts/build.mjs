@@ -35,7 +35,7 @@ await writeFile(
     {
       manifest_version: 3,
       name: "LinkedIn MCP Bridge" + (channel === "pilot" ? " BETA" : " Dev"),
-      version: "0.4.1",
+      version: "0.5.0",
       description:
         "Local MCP access to your connected LinkedIn tab. Messaging, profiles and feed.",
       minimum_chrome_version: "120",
