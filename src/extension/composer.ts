@@ -50,7 +50,14 @@ export async function composerOperation(
       ...document.querySelectorAll<HTMLElement>('dialog[open],[role="dialog"]'),
     ].filter(visible);
   const label = (e: Element) =>
-    clean(e.getAttribute("aria-label") || e.textContent || "");
+    clean(
+      e.getAttribute("aria-label") ||
+        e
+          .querySelector(':scope > [aria-label="Start a post"]')
+          ?.getAttribute("aria-label") ||
+        e.textContent ||
+        "",
+    );
   const controls = (root: ParentNode, re: RegExp) =>
     [
       ...root.querySelectorAll<HTMLElement>(

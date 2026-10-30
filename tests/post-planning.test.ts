@@ -61,6 +61,8 @@ function ui(initial = "") {
       c.querySelector("button")!.addEventListener("click", () => {
         saved = value;
         saves++;
+        doc.querySelector("#start")!.innerHTML =
+          '<div aria-label="Start a post">Draft: saved text</div>';
         const alert = doc.createElement("div");
         alert.setAttribute("role", "alert");
         alert.textContent = "Draft successfully saved.";
