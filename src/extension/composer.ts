@@ -206,10 +206,10 @@ export async function composerOperation(
     e.blur();
   };
   const openTiming = async (d: HTMLElement) => {
-    if (!find(d, /^(Scheduled|Schedule post|Beitrag planen)$/)) {
+    if (!find(d, /^(Scheduled(?: \(\d+\))?|Schedule post|Beitrag planen)$/)) {
       await click(d, /^(Expand content types|Weitere Inhaltstypen)$/);
     }
-    await click(d, /^(Scheduled|Schedule post|Beitrag planen)$/);
+    await click(d, /^(Scheduled(?: \(\d+\))?|Schedule post|Beitrag planen)$/);
     return await wait(() =>
       dialogs().find(
         (x) => !!x.querySelector('input[placeholder="mm/dd/yyyy"]'),
@@ -347,14 +347,8 @@ export async function composerOperation(
       await wait(() =>
         !confirm.isConnected || !visible(confirm) ? true : undefined,
       );
-      // Reopen the manager rather than treating a disappearing confirmation as success.
-      await click(list, /^(Dismiss|Close|Schließen)$/);
-      await new Promise((r) => setTimeout(r, 500));
-      const refreshed = await readList(await openList());
-      return {
-        verified: matching(refreshed, target).length === 0,
-        outcome: "schedule_cancelled",
-      };
+      // The engine verifies absence from a freshly loaded native manager.
+      return { verified: false, outcome: "schedule_cancelled" };
     }
     if (!["post_draft_create", "post_schedule"].includes(op))
       fail("unsupported_composer_operation");
@@ -478,21 +472,25 @@ export async function composerOperation(
       !(d.innerText ?? d.textContent ?? "").includes("Posting at " + stamp)
     )
       fail("schedule_confirmation_mismatch");
+    const previousAlerts = new Set(document.querySelectorAll('[role="alert"]'));
     await click(d, /^(Schedule|Planen)$/, true);
+    await wait(
+      () =>
+        [...document.querySelectorAll('[role="alert"]')].some(
+          (e) =>
+            !previousAlerts.has(e) &&
+            /Post scheduled\.|Beitrag.*geplant/i.test(e.textContent ?? ""),
+        )
+          ? true
+          : undefined,
+      "schedule_submission_unknown",
+    );
     await wait(
       () => (!activeComposer() ? true : undefined),
       "schedule_submission_unknown",
     );
-    const items = await readList(await openList());
-    const hits = matching(items, {
-      text_hash: await hash(clean(a.text)),
-      scheduled_at: wanted.toISOString(),
-    });
-    return {
-      verified: hits.length === 1,
-      outcome: "scheduled",
-      scheduled_item: hits.length === 1 ? publicItem(hits[0]) : undefined,
-    };
+    // The engine verifies exact text/time against a fresh document, not SDUI cache.
+    return { verified: false, outcome: "scheduled" };
   } catch (e) {
     return {
       bridge_error: e instanceof Error ? e.message : "composer_failed",

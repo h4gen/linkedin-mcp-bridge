@@ -484,6 +484,35 @@ export class Engine {
             );
         row.dispatch_state = "dispatched";
         await d.store.set("journal", journal);
+        if (op === "post_schedule" || op === "scheduled_post_cancel") {
+          const fresh = await d.dom(
+            "scheduled_posts_list",
+            {
+              account_urn: expected,
+              verified_actor: actor,
+              execution_deadline: deadline,
+            },
+            {},
+          );
+          if (fresh.complete !== true)
+            throw new Fault("scheduled_list_incomplete");
+          if (op === "post_schedule") {
+            const hits = fresh.items.filter(
+              (x: Args) =>
+                x.text_hash === row.text_hash &&
+                x.scheduled_at === row.scheduled_at,
+            );
+            result.verified = hits.length === 1;
+            result.scheduled_item = hits.length === 1 ? hits[0] : undefined;
+          } else {
+            result.verified = !fresh.items.some((x: Args) =>
+              target?.native_id
+                ? x.native_id === target.native_id
+                : x.text_hash === target?.text_hash &&
+                  x.scheduled_at === target?.scheduled_at,
+            );
+          }
+        }
         let verified = result?.verified === true;
         if (planningWrites.has(op)) {
           row.outcome = result.outcome;

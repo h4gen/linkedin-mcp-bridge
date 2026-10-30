@@ -128,6 +128,78 @@ const engine = new Engine({
     const id = await tabId();
     if (state.dom_session) await validateDomCursor(op, state);
     await chrome.tabs.update(id, { active: true });
+    if (
+      op === "scheduled_posts_list" ||
+      op === "scheduled_post_cancel" ||
+      (op === "post_schedule" && a.reconcile)
+    ) {
+      // SDUI retains stale schedule lists across closing/reopening its modal.
+      // Refresh only an empty editor/manager in our dedicated work tab.
+      const stamp = crypto.randomUUID();
+      const safe = await chrome.scripting.executeScript({
+        target: { tabId: id },
+        world: "ISOLATED",
+        func: (stamp: string) => {
+          const dialogs = [
+            ...document.querySelectorAll<HTMLElement>(
+              'dialog[open],[role="dialog"]',
+            ),
+          ].filter((e) => e.getClientRects().length);
+          if (
+            dialogs.some(
+              (d) =>
+                [
+                  ...d.querySelectorAll<HTMLElement>(
+                    '[contenteditable="true"]',
+                  ),
+                ].some((e) => (e.innerText ?? e.textContent ?? "").trim()) ||
+                d.querySelector("video,img[data-media]"),
+            )
+          )
+            return false;
+          (window as any).__liPlanningRefresh = stamp;
+          return true;
+        },
+        args: [stamp],
+      });
+      if (safe[0]?.result !== true)
+        throw new Fault(
+          "close_existing_composer_before_listing",
+          "close_existing_composer_before_listing",
+          { dispatch_state: "not_dispatched" },
+        );
+      if ((await chrome.tabs.get(id)).url === "https://www.linkedin.com/feed/")
+        await chrome.tabs.reload(id);
+      else
+        await chrome.tabs.update(id, { url: "https://www.linkedin.com/feed/" });
+      let ready = false;
+      for (let attempt = 0; attempt < 40; attempt++) {
+        await new Promise((r) => setTimeout(r, 250));
+        try {
+          const fresh = await chrome.scripting.executeScript({
+            target: { tabId: id },
+            world: "ISOLATED",
+            func: (stamp: string) =>
+              (window as any).__liPlanningRefresh !== stamp &&
+              location.pathname === "/feed/" &&
+              document.readyState !== "loading",
+            args: [stamp],
+          });
+          if (fresh[0]?.result) {
+            ready = true;
+            break;
+          }
+        } catch {
+          /* Navigation may temporarily destroy the old document. */
+        }
+      }
+      if (!ready)
+        throw new Fault(
+          "schedule_refresh_timeout",
+          "schedule_refresh_timeout",
+          { dispatch_state: "not_dispatched" },
+        );
+    }
     if (op === "conversation_delete") {
       const target = a.verified_target;
       if (!target || target.entityUrn !== a.conversation_urn)

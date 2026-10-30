@@ -323,6 +323,10 @@ it("plans only after exact time confirmation and verifies the scheduled entry", 
         d.querySelector("[contenteditable]")!.textContent = text;
         d.querySelector("button")!.addEventListener("click", () => {
           scheduled++;
+          const alert = f.doc.createElement("div");
+          alert.setAttribute("role", "alert");
+          alert.textContent = "Post scheduled.";
+          f.doc.body.append(alert);
           d.remove();
         });
         d.querySelectorAll("button")[1].addEventListener("click", () => {
@@ -340,11 +344,7 @@ it("plans only after exact time confirmation and verifies the scheduled entry", 
     { ...args, scheduled_at: wanted.toISOString() },
     {},
   );
-  expect(result).toMatchObject({
-    verified: true,
-    outcome: "scheduled",
-    scheduled_item: { text: args.text, scheduled_at: wanted.toISOString() },
-  });
+  expect(result).toMatchObject({ verified: false, outcome: "scheduled" });
   expect(scheduled).toBe(1);
   expect(f.published()).toBe(0);
 });
@@ -433,7 +433,7 @@ it("cancels only an exact native row via its newly opened menu, never Post now",
     {},
   );
   expect(result).toMatchObject({
-    verified: true,
+    verified: false,
     outcome: "schedule_cancelled",
   });
   expect(deleted).toBe(1);
@@ -447,4 +447,54 @@ it("reopens a stale empty SDUI editor without overwriting the persisted draft", 
   expect(f.saved()).toBe(args.text);
   expect(f.saves()).toBe(2);
   expect(f.published()).toBe(0);
+});
+it("requires fresh native schedule evidence after dispatch instead of trusting cached UI success", async () => {
+  const f = engineFixture();
+  const item = {
+    text_hash: hash("QA"),
+    scheduled_at: "2026-11-06T12:00:00.000Z",
+    native_id: "urn:li:share:123",
+  };
+  let exists = false;
+  const calls: string[] = [];
+  const deps = {
+    ...f.dependencies,
+    dom: async (op: string) => {
+      calls.push(op);
+      if (op === "post_schedule") {
+        exists = true;
+        return { verified: false, outcome: "scheduled" };
+      }
+      if (op === "scheduled_post_cancel") {
+        exists = false;
+        return { verified: false, outcome: "schedule_cancelled" };
+      }
+      return { complete: true, items: exists ? [item] : [] };
+    },
+  };
+  const e = new Engine(deps);
+  const scheduled = await e.run("post_schedule", {
+    account_urn: account,
+    text: "QA",
+    scheduled_at: item.scheduled_at,
+    idempotency_key: "fresh-schedule",
+  });
+  expect(scheduled).toMatchObject({
+    status: "confirmed",
+    outcome: "scheduled",
+  });
+  expect(calls).toEqual(["post_schedule", "scheduled_posts_list"]);
+  const cancelled = await e.run("scheduled_post_cancel", {
+    account_urn: account,
+    scheduled_ref: scheduled.scheduled_ref,
+    idempotency_key: "fresh-cancel",
+  });
+  expect(cancelled).toMatchObject({
+    status: "confirmed",
+    outcome: "schedule_cancelled",
+  });
+  expect(calls.slice(-2)).toEqual([
+    "scheduled_post_cancel",
+    "scheduled_posts_list",
+  ]);
 });
