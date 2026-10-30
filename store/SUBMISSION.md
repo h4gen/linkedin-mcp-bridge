@@ -6,7 +6,7 @@ Saved in the Chrome Web Store Developer Dashboard on 2026-10-30. Status: Draft. 
 - Assigned extension ID: `pibhcinkiadfplcaefllaeappkpnpfjm`.
 - Listing language: English; category: Productivity / Tools.
 - Distribution: free, public, all regions (applies after publication).
-- Saved: description, icon, two screenshots, both promo tiles, homepage/support links, permission justifications, privacy URL and reviewer setup instructions.
+- Saved: description, icon, two explainer graphics, both promo tiles, homepage/support links, permission justifications, privacy URL and reviewer setup instructions.
 - Declared data: personally identifiable information, personal communications, website content. No remote executable code.
 
 - Extension: build with `npm run package:store`; upload `dist/linkedin-extension.zip`.
@@ -15,7 +15,7 @@ Saved in the Chrome Web Store Developer Dashboard on 2026-10-30. Status: Draft. 
 - Repository and installation: https://github.com/h4gen/linkedin-mcp-bridge
 - Support: https://github.com/h4gen/linkedin-mcp-bridge/issues
 - Reviewer installation/test instructions: `store/reviewer.md`.
-- Actual popup screenshots: `store/screenshots/connection-1280x800.png` and `store/screenshots/data-controls-1280x800.png`.
+- Store gallery explainers: `store/explainers/upload/inbox-1280x800.png` and `store/explainers/upload/research-1280x800.png`. These are illustrated capability explanations, not literal UI captures.
 - Promotional art: `store/graphics-v2/upload/promo-small-440x280.png` and `promo-marquee-1400x560.png`.
 - Icon: `assets/icon128.png`.
 - Visibility: public. Platforms: macOS and native Windows. Separate Git-installed Node server required.

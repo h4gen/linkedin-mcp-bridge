@@ -4,8 +4,8 @@
   "privacy_policy_url": "https://github.com/h4gen/linkedin-mcp-bridge/blob/main/store/privacy.md",
   "store_extension_id": "pibhcinkiadfplcaefllaeappkpnpfjm",
   "screenshots": [
-    "store/screenshots/connection-1280x800.png",
-    "store/screenshots/data-controls-1280x800.png"
+    "store/explainers/upload/inbox-1280x800.png",
+    "store/explainers/upload/research-1280x800.png"
   ],
   "acceptance_manifest": "artifacts/acceptance-0.6.0.json",
   "platforms": [
