@@ -122,20 +122,30 @@ export async function composerOperation(
     if (!d) {
       const current = dialogs();
       if (current.length) {
-        if (
-          current.length !== 1 ||
-          !current[0].querySelector('[data-sdui-screen*="ShareSchedule"]')
-        )
-          fail("composer_ui_conflict");
-        await click(current[0], /^(Dismiss|Close|Schließen)$/);
-        await wait(() => (dialogs().length === 0 ? true : undefined));
+        if (current.length !== 1) fail("composer_ui_conflict");
+        if (current[0].querySelector('[data-sdui-screen$="ShareCompose"]')) {
+          d = await wait(activeComposer);
+        } else {
+          if (!current[0].querySelector('[data-sdui-screen*="ShareSchedule"]'))
+            fail("composer_ui_conflict");
+          await click(current[0], /^(Dismiss|Close|Schließen)$/);
+          await wait(() =>
+            dialogs().length === 0 || activeComposer() ? true : undefined,
+          );
+          d = activeComposer();
+        }
       }
-      await click(
-        document,
-        /^(Start a post|Beitrag beginnen|Beitrag erstellen)$/,
-      );
-      d = await wait(activeComposer);
+      if (!d) {
+        await click(
+          document,
+          /^(Start a post|Beitrag beginnen|Beitrag erstellen)$/,
+        );
+        d = await wait(activeComposer);
+      }
     }
+    // Let the native editor hydrate its saved content before inspecting or writing it.
+    await new Promise((r) => setTimeout(r, 500));
+    guard();
     actor(d);
     return d;
   };
@@ -290,7 +300,13 @@ export async function composerOperation(
       if (a.reconcile)
         return {
           verified:
-            op === "post_schedule" ? hits.length === 1 : hits.length === 0,
+            op === "post_schedule"
+              ? hits.length === 1
+              : !items.some((x) =>
+                  target.native_id
+                    ? x.native_id === target.native_id
+                    : matching([x], target).length > 0,
+                ),
           outcome: op === "post_schedule" ? "scheduled" : "schedule_cancelled",
           scheduled_item: hits[0] ? publicItem(hits[0]) : undefined,
         };
@@ -325,6 +341,7 @@ export async function composerOperation(
       );
       // Reopen the manager rather than treating a disappearing confirmation as success.
       await click(list, /^(Dismiss|Close|Schließen)$/);
+      await new Promise((r) => setTimeout(r, 500));
       const refreshed = await readList(await openList());
       return {
         verified: matching(refreshed, target).length === 0,
@@ -335,6 +352,14 @@ export async function composerOperation(
       fail("unsupported_composer_operation");
     if (a.reconcile && activeComposer())
       fail("draft_reconciliation_requires_closed_composer");
+    if (
+      !a.reconcile &&
+      /^Draft:|^Entwurf:/.test(
+        document.querySelector("#draft-text-replaceable-component")
+          ?.textContent ?? "",
+      )
+    )
+      fail("existing_draft_conflict");
     let d = await openComposer();
     const editor = editorIn(d)!;
     const current = editorText(editor);
