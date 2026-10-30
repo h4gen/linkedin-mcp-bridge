@@ -157,7 +157,10 @@ const engine = new Engine({
             )
           )
             return false;
-          (window as any).__liPlanningRefresh = stamp;
+          document.documentElement.setAttribute(
+            "data-li-planning-refresh",
+            stamp,
+          );
           return true;
         },
         args: [stamp],
@@ -186,7 +189,10 @@ const engine = new Engine({
             target: { tabId: id },
             world: "ISOLATED",
             func: (stamp: string) => ({
-              fresh: (window as any).__liPlanningRefresh !== stamp,
+              fresh:
+                document.documentElement.getAttribute(
+                  "data-li-planning-refresh",
+                ) !== stamp,
               path: location.pathname,
               state: document.readyState,
             }),
