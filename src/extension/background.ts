@@ -168,7 +168,11 @@ const engine = new Engine({
           "close_existing_composer_before_listing",
           { dispatch_state: "not_dispatched" },
         );
-      if ((await chrome.tabs.get(id)).url === "https://www.linkedin.com/feed/")
+      if (
+        /^https:\/\/www\.linkedin\.com\/(feed(?:\/|$)|sharing\/compose(?:\/|$))/.test(
+          (await chrome.tabs.get(id)).url ?? "",
+        )
+      )
         await chrome.tabs.reload(id);
       else
         await chrome.tabs.update(id, { url: "https://www.linkedin.com/feed/" });
@@ -177,11 +181,14 @@ const engine = new Engine({
         await new Promise((r) => setTimeout(r, 250));
         try {
           const fresh = await chrome.scripting.executeScript({
+            injectImmediately: true,
             target: { tabId: id },
             world: "ISOLATED",
             func: (stamp: string) =>
               (window as any).__liPlanningRefresh !== stamp &&
-              location.pathname === "/feed/" &&
+              /^\/(feed(?:\/|$)|sharing\/compose(?:\/|$))/.test(
+                location.pathname,
+              ) &&
               document.readyState !== "loading",
             args: [stamp],
           });
