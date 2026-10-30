@@ -146,7 +146,15 @@ export async function composerOperation(
         HTMLInputElement.prototype,
         "value",
       )!.set!.call(e, text);
-    else e.textContent = text;
+    else {
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(e);
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      if (!document.execCommand("insertText", false, text))
+        fail("composer_input_failed");
+    }
     e.dispatchEvent(
       new InputEvent("input", {
         bubbles: true,

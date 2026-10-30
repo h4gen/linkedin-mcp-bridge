@@ -39,6 +39,12 @@ function ui(initial = "") {
     published = 0,
     saves = 0;
   const doc = w.document;
+  doc.execCommand = vi.fn((_command, _ui, value) => {
+    const node = w.getSelection()?.getRangeAt(0).commonAncestorContainer;
+    if (!node) return false;
+    node.textContent = value ?? "";
+    return true;
+  });
   function open() {
     const d = doc.createElement("dialog");
     d.open = true;
