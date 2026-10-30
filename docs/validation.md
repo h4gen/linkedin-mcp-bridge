@@ -115,3 +115,17 @@ Live checks on 2026-10-30 used only marked disposable text and scheduling seven 
 Evidence: `artifacts/qa/post-planning-complete-0.5.0.json`, `artifacts/qa/schedule-acceptance-0.5.0.json`, and `artifacts/qa/schedule-cleanup-0.5.0.jpg`. Earlier diagnostic attempts are retained separately; uncertain results were inspected/reconciled rather than resent. The final adapter waits for fresh save notifications and hydrated rows, resolves `aria-labelledby`, and verifies schedule changes after a complete document replacement because SDUI caches its manager. A nonempty open composer prevents that refresh. No additional Chrome permissions are required.
 
 This is a local development extension, not a Chrome Web Store release. Native planning currently supports the observed English personal text composer; unsupported/truncated rows and ambiguous identities fail closed.
+
+## 0.6.0 Git distribution and Windows acceptance — 2026-10-30
+
+[CI run on canonical main](https://github.com/h4gen/linkedin-mcp-bridge/actions/runs/41042286131) passed on macOS and Windows: 101 automated tests, type checking, formatting, extension packaging, runtime fingerprint checks and a real Chromium/native-host round-trip using synthetic health responses. The browser smoke test loads the packaged MV3 extension but does not open LinkedIn. Native installation is repeated to check idempotence; Windows rejects requests with an incorrect local transport token.
+
+A fresh public GitHub checkout on macOS completed dependency installation, store-channel build, native registration, MCP configuration output and uninstall. No signed binary distribution is involved. Runtime fingerprints match between macOS and Windows.
+
+The installed development extension was reloaded to 0.6.0 and reconnected. Live checks passed for two inbox pages, two message-history pages with unchanged read state, bounded inbox search, profile reads, people/filter searches, both invitation views and receipt lookup. Feed and engagement checks passed after opening the work tab on the feed: 49 unique reactions and 3 comments over three pages each, plus DOM cursor invalidation. A leftover composer initially produced the explicit `open_feed_in_connected_tab` error; no silent fallback or wrong-page action occurred.
+
+Historical write acceptance below/above is retained as historical evidence. Automated tests cover all tool contracts; this release does not claim fresh live message, invitation, like, comment or conversation-deletion writes. Store materials are prepared locally only, as requested. Store submission and the real store extension ID remain pending.
+
+Before initial public publication, the original Git history was backed up locally and Google Ads account identifiers were redacted from the public history with user authorization. Research measurements and the report remain available; original unredacted metadata is not distributed.
+
+Native planning was also rechecked on 0.6.0: draft save/reopen and same-key receipt replay passed; the marked draft was discarded, a test post was scheduled seven days ahead, cancellation was confirmed and a fresh scheduled listing returned zero items. No immediate post, message, comment or invitation was dispatched during this release acceptance.
