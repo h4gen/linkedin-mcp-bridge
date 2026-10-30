@@ -59,6 +59,7 @@ export async function composerOperation(
     ].filter(
       (e) =>
         visible(e) &&
+        !e.closest('[role="alert"]') &&
         re.test(label(e)) &&
         !(e as HTMLButtonElement).disabled &&
         e.getAttribute("aria-disabled") !== "true",
@@ -135,6 +136,17 @@ export async function composerOperation(
         dialogs().find((x) => !!find(x, /^(Save as draft|Entwurf speichern)$/)),
       );
       await click(confirm, /^(Save as draft|Entwurf speichern)$/, true);
+      await wait(
+        () =>
+          [...document.querySelectorAll('[role="alert"]')].some((e) =>
+            /Draft successfully saved|Entwurf.*gespeichert/i.test(
+              e.textContent ?? "",
+            ),
+          )
+            ? true
+            : undefined,
+        "draft_save_unconfirmed",
+      );
     }
     await wait(() => (!activeComposer() ? true : undefined));
   };
@@ -325,8 +337,10 @@ export async function composerOperation(
     if (op === "post_draft_create") {
       await closeComposer(d, true);
       d = await openComposer();
-      const verified = editorText(editorIn(d)!) === clean(a.text);
-      if (!verified) fail("draft_verification_failed");
+      await wait(
+        () => (editorText(editorIn(d)!) === clean(a.text) ? true : undefined),
+        "draft_verification_failed",
+      );
       await closeComposer(d, true);
       return {
         verified: true,

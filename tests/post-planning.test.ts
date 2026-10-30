@@ -61,6 +61,10 @@ function ui(initial = "") {
       c.querySelector("button")!.addEventListener("click", () => {
         saved = value;
         saves++;
+        const alert = doc.createElement("div");
+        alert.setAttribute("role", "alert");
+        alert.textContent = "Draft successfully saved.";
+        doc.body.append(alert);
         c.remove();
         d.remove();
       });
