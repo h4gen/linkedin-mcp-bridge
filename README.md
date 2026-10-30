@@ -144,3 +144,7 @@ The pilot uses native host `com.hagen.linkedin_mcp_bridge.pilot` and a separate 
 Signing requires `BRIDGE_SIGN_IDENTITY` (Developer ID Application) and `BRIDGE_INSTALLER_IDENTITY` (Developer ID Installer); notarization additionally requires `BRIDGE_NOTARY_PROFILE`. The package command rejects the wrong identity type or a non-Accepted notarization response. Unsigned artifacts are explicitly development candidates, not distributable notarized releases.
 
 The PKG places the companion under `/Applications/LinkedIn MCP Bridge Pilot`. Run its Setup.command as the signed-in user to register that user's native host. For a ZIP installation, move the whole directory to a durable location first. Configure the local MCP client with its bundled node and cli.js paths. Updates replace the companion while Chrome is closed, then rerun Setup.command. The unpacked development setup remains available above.
+
+## Market research
+
+[Market need and capability study, 30 October 2026](docs/research/2026-10-30/linkedin-market-research.docx) — German report matching Google Ads demand and public user evidence to the current product. The [research sources](docs/research/2026-10-30/sources.json), [measurement requests](docs/research/2026-10-30/requests.json), and seven original normalized measurement responses in `docs/research/2026-10-30/data/` are retained for updates. Search values are coarse reported metrics, not exact market-size estimates.

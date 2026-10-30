@@ -1,0 +1,250 @@
+[
+  {
+    "id": "S01",
+    "title": "Google Ads Help zur Bedeutung historischer Keyworddaten",
+    "url": "https://support.google.com/google-ads/answer/3022575?hl=en",
+    "type": "Primärquelle",
+    "note": "Gerundete Werte, Close Variants, Wettbewerb als Werbetreibendenmaß.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S02",
+    "title": "LinkedIn kündigt Hiring Pro in Claude an",
+    "url": "https://news.linkedin.com/2026/making-it-easier-for-small-businesses-to-hire-on-linkedin",
+    "type": "Primärquelle",
+    "note": "21.10.2026; Stellenanzeige entwerfen, prüfen und veröffentlichen; kein allgemeiner Inbox-Connector.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S03",
+    "title": "OpenAI LinkedIn Plugin",
+    "url": "https://openai.com/business/plugins/linkedin/",
+    "type": "Primärquelle",
+    "note": "Profilidentifikation und Basisdaten; keine Inbox-Funktion auf dieser Produktseite aufgeführt.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S04",
+    "title": "LinkedIn API Zugangsprogramme",
+    "url": "https://learn.microsoft.com/en-us/linkedin/shared/authentication/getting-access",
+    "type": "Primärquelle",
+    "note": "Self-Service für Identität und w_member_social; viele weitere Programme genehmigungspflichtig.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S05",
+    "title": "LinkedIn Automated activity",
+    "url": "https://www.linkedin.com/help/linkedin/answer/a1340567/automated-activity-on-linkedin?lang=en",
+    "type": "Primärquelle",
+    "note": "LinkedIns erklärte Einschränkungen für Drittsoftware und Browserautomatisierung.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S06",
+    "title": "Claude lokale MCP Server",
+    "url": "https://support.claude.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop",
+    "type": "Primärquelle",
+    "note": "Lokale Desktop-Erweiterungen und MCPB-Pakete.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S07",
+    "title": "Claude Remote MCP Netzwerkmodell",
+    "url": "https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp",
+    "type": "Primärquelle",
+    "note": "Custom Connector wird aus Anthropic-Cloud erreicht; lokale Konfiguration ist separater Weg.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S08",
+    "title": "OpenAI Secure MCP Tunnel",
+    "url": "https://developers.openai.com/api/docs/guides/secure-mcp-tunnels",
+    "type": "Primärquelle",
+    "note": "Privater stdio/HTTP-Zugriff über Tunnel; Berechtigungen; kein Weg für öffentliche Plugin-Distribution.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S09",
+    "title": "ChatGPT Custom MCP",
+    "url": "https://help.openai.com/en/articles/12584461-connecting-custom-mcp-servers-in-chatgpt",
+    "type": "Primärquelle",
+    "note": "Nicht direkt auf lokale Server; Tunnel-Option; Plan- und Workspace-Abhängigkeiten.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S10",
+    "title": "Reduck LinkedIn Funktionsbeschreibung",
+    "url": "https://reduck.ai/use-cases/linkedin-mcp",
+    "type": "Anbieterangabe",
+    "note": "Hosted MCP mit Ausführung im eigenen Chrome, Suche, Profile, Inbox, Nachrichten; pauschale Aussage zum Fehlen offizieller Connectoren ist durch S02 überholt.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S11",
+    "title": "Reduck Preise",
+    "url": "https://reduck.ai/pricing",
+    "type": "Anbieterangabe",
+    "note": "Free bis 100 Scripts/Monat, Pro 20 USD/Monat; Mehrzweckprodukt.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S12",
+    "title": "inboxMCP LinkedIn Produktseite",
+    "url": "https://inbox-mcp.com/linkedin",
+    "type": "Anbieterangabe",
+    "note": "Inbox, Suche, Einladungen, steuerbare Senderechte; Sicherheitsversprechen nicht unabhängig bestätigt.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S13",
+    "title": "Unipile MCP Dokumentation",
+    "url": "https://developer.unipile.com/docs/mcp",
+    "type": "Anbieterangabe",
+    "note": "API-Werkzeuge für Coding Agents und ausführbare Aufrufe; mehrere LinkedIn-Produkte und Kanäle.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S14",
+    "title": "Unipile Preise",
+    "url": "https://www.unipile.com/pricing-api/",
+    "type": "Anbieterangabe",
+    "note": "Mindestens 49 EUR/Monat für bis zu 10 verbundene Accounts, Preise exklusive Umsatzsteuer.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S15",
+    "title": "Postel Claude LinkedIn Connector",
+    "url": "https://www.postel.app/connect-claude-to-linkedin",
+    "type": "Anbieterangabe",
+    "note": "Offizielle Publishing-API laut Anbieter; kein Inbox-/Personensuche-Produkt; veraltete No-official-connector-Aussage.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S16",
+    "title": "Linked API MCP",
+    "url": "https://linkedapi.io/mcp/overview",
+    "type": "Anbieterangabe",
+    "note": "Remote-MCP-Wettbewerb; beschreibt den engen Hiring-Pro-Scope.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S17",
+    "title": "stickerdaniel LinkedIn MCP Server",
+    "url": "https://github.com/stickerdaniel/linkedin-mcp-server",
+    "type": "Open-Source-Primärquelle",
+    "note": "Breiter Funktionsumfang, lokales/Docker-Setup und HTTP-Konfiguration; keine reine Read-only-Alternative.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S18",
+    "title": "stickerdaniel Releases",
+    "url": "https://github.com/stickerdaniel/linkedin-mcp-server/releases",
+    "type": "Open-Source-Primärquelle",
+    "note": "v4.28.0 vom 23.10.2026; Installations- und Session-Fixes, Nachrichtenfunktionen.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S19",
+    "title": "Dripify Preise",
+    "url": "https://dripify.com/pricing/",
+    "type": "Anbieterangabe",
+    "note": "59/79/99 USD pro Nutzer und Monat bei monatlicher Zahlung; Outreach-Produkt.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S20",
+    "title": "Buffer Preise",
+    "url": "https://buffer.com/pricing",
+    "type": "Anbieterangabe",
+    "note": "Kostenloser Plan mit 10 geplanten Posts je Kanal; Scheduling-Konkurrenz.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S21",
+    "title": "folk Integrations FAQ",
+    "url": "https://help.folk.app/en/articles/8170484-faq-sources-integrations",
+    "type": "Anbieterangabe",
+    "note": "folkX-Erweiterung; kein nativer automatischer LinkedIn-Sync laut FAQ.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S22",
+    "title": "Reddit Anfrage zum Nutzen eines lokalen LinkedIn MCP",
+    "url": "https://www.reddit.com/r/gtmengineering/comments/1tzavvm/built_a_linkedin_mcp_for_myself_wondering_if_this/",
+    "type": "Qualitativ und selektionsverzerrt",
+    "note": "Erstellerbericht und Antworten: warme Threads, Follow-ups, strukturierte CRM-Notizen; Eigeninteresse möglich.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S23",
+    "title": "Reddit LinkedIn DM Chaos",
+    "url": "https://www.reddit.com/r/SaaS/comments/1t07qga/anyone_else_drowning_in_linkedin_dm_chaos_or_is/",
+    "type": "Qualitativ und selektionsverzerrt",
+    "note": "Status, nächste Schritte, vergessene Follow-ups und manuelle Tabellenpflege; keine repräsentative Umfrage.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S24",
+    "title": "Reddit Claude Cowork Outreach",
+    "url": "https://www.reddit.com/r/ClaudeAI/comments/1rxq4cg/using_claude_cowork_task_to_automate_linkedin/",
+    "type": "Qualitativ und selektionsverzerrt",
+    "note": "Workflow-Selbstbericht, Setup-Fragen, Qualitätskritik; Leistungsbehauptungen nicht bestätigt.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S25",
+    "title": "Reddit Claude Outreach Diskussion Oktober",
+    "url": "https://www.reddit.com/r/LinkedInTips/comments/1x796xk/anybody_using_claude_or_similar_to_automate/",
+    "type": "Qualitativ und selektionsverzerrt",
+    "note": "16.10.2026; Automatisierungsinteresse und Sorge um Konto/Reputation; Werbeantworten vorhanden.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S26",
+    "title": "GitHub Issue 1150 zur Inbox-Paginierung",
+    "url": "https://github.com/stickerdaniel/linkedin-mcp-server/issues/1150",
+    "type": "Konkreter Nutzerbericht",
+    "note": "27.09.2026; berichteter verpasster Reply hinter ca. 20–27 Gesprächen; nicht selbst reproduziert.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S27",
+    "title": "GitHub Issue 1277 zur alten Nachrichtenhistorie",
+    "url": "https://github.com/stickerdaniel/linkedin-mcp-server/issues/1277",
+    "type": "Fehlerbericht mit begrenzter Bestätigung",
+    "note": "11.10.2026; fehlende ältere Nachrichten; Bericht nennt ausstehende unabhängige Live-Reproduktion und KI-generierten Prompt.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S28",
+    "title": "GitHub Issue 1195 zu Zeitzonen",
+    "url": "https://github.com/stickerdaniel/linkedin-mcp-server/issues/1195",
+    "type": "Konkreter Nutzerbericht",
+    "note": "01.10.2026; unklare Zeitzone in Nachrichtenzeiten und Tracker-Übertragung.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S29",
+    "title": "GitHub Diskussion 459 zum Docker-Setup",
+    "url": "https://github.com/stickerdaniel/linkedin-mcp-server/discussions/459",
+    "type": "Konkrete Supportdiskussion",
+    "note": "Reibung zwischen Containerbetrieb und interaktivem Login.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S30",
+    "title": "Anthropic Connectorverzeichnis",
+    "url": "https://claude.com/marketplace/connectors-plugins?submit=Search",
+    "type": "Primärquelle",
+    "note": "Hiring Pro als verifizierter Connector gelistet.",
+    "accessed": "2026-10-30"
+  },
+  {
+    "id": "S31",
+    "title": "Claude Desktop und Web Connectoren",
+    "url": "https://support.claude.com/en/articles/11725091-when-to-use-desktop-and-web-connectors",
+    "type": "Primärquelle",
+    "note": "Unterschiedliche Auslieferungswege; Cowork-Angaben zwischen Hilfeseiten nicht völlig einheitlich.",
+    "accessed": "2026-10-30"
+  }
+]

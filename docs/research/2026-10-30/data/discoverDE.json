@@ -1,0 +1,1503 @@
+{
+  "run_id": "2026-10-30T08-12-42-096Z-01392217",
+  "mode": "keyword_discovery",
+  "cache_hit": false,
+  "requested_scope": {
+    "account": {
+      "customer_id": "REDACTED_GOOGLE_ADS_ACCOUNT"
+    },
+    "locations": {
+      "targets": [
+        {
+          "name": "Germany",
+          "country_code": "DE",
+          "target_type": "COUNTRY",
+          "criterion_id": "2276"
+        }
+      ]
+    },
+    "language": {
+      "name": "German",
+      "code": "de"
+    },
+    "network": "GOOGLE",
+    "date_range": {
+      "preset": "last_12_months"
+    }
+  },
+  "resolved_scope": {
+    "account": {
+      "customer_id": "REDACTED_GOOGLE_ADS_ACCOUNT"
+    },
+    "locations": {
+      "targets": [
+        {
+          "name": "Germany",
+          "country_code": "DE",
+          "target_type": "COUNTRY",
+          "criterion_id": "2276"
+        }
+      ]
+    },
+    "language": {
+      "name": "German",
+      "code": "de"
+    },
+    "network": "GOOGLE",
+    "date_range": {
+      "preset": "last_12_months"
+    }
+  },
+  "source_url": "https://ads.google.com/aw/keywordplanner/home",
+  "stats": {
+    "submitted_seed_count": 8,
+    "result_count": 18,
+    "rows_with_volume": 17,
+    "aggregate_rows": 0,
+    "duplicate_rows": 0,
+    "malformed_rows": 0
+  },
+  "suggested_broadenings": [],
+  "results": [
+    {
+      "keyword": "linkedin mcp",
+      "currency": "EUR",
+      "avg_monthly_searches": 500,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": 900,
+      "competition": "LOW",
+      "competition_index": 0,
+      "top_of_page_bid_low": {
+        "amount": 1.383216,
+        "currency": "EUR"
+      },
+      "top_of_page_bid_high": {
+        "amount": 4.773163,
+        "currency": "EUR"
+      },
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 500
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 500
+        },
+        {
+          "month": "2026-02",
+          "searches": 500
+        },
+        {
+          "month": "2026-03",
+          "searches": 500
+        },
+        {
+          "month": "2026-04",
+          "searches": 500
+        },
+        {
+          "month": "2026-05",
+          "searches": 500
+        },
+        {
+          "month": "2026-06",
+          "searches": 500
+        },
+        {
+          "month": "2026-07",
+          "searches": 500
+        },
+        {
+          "month": "2026-08",
+          "searches": 500
+        },
+        {
+          "month": "2026-09",
+          "searches": 500
+        }
+      ],
+      "raw": {
+        "1": "linkedin mcp",
+        "1000": "500",
+        "1001": "1",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1011": "1383216",
+        "1012": "4773163",
+        "1014": "false",
+        "1021": "[\"500\",\"50\",\"50\",\"500\",\"500\",\"500\",\"500\",\"500\",\"500\",\"500\",\"500\",\"500\"]",
+        "1026": "true",
+        "1035": "0",
+        "1036": "0",
+        "1037": "9"
+      }
+    },
+    {
+      "keyword": "linkedin automatisierung",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": 0,
+      "competition": "MEDIUM",
+      "competition_index": 0,
+      "top_of_page_bid_low": {
+        "amount": 3.465228,
+        "currency": "EUR"
+      },
+      "top_of_page_bid_high": {
+        "amount": 6.442908,
+        "currency": "EUR"
+      },
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 50
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "linkedin automatisierung",
+        "1000": "50",
+        "1001": "2",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1011": "3465228",
+        "1012": "6442908",
+        "1014": "false",
+        "1021": "[\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\"]",
+        "1026": "true",
+        "1035": "0",
+        "1036": "0",
+        "1037": "0"
+      }
+    },
+    {
+      "keyword": "linkedin beiträge planen",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": -90,
+      "competition": "LOW",
+      "competition_index": 0,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 500
+        },
+        {
+          "month": "2025-12",
+          "searches": 500
+        },
+        {
+          "month": "2026-01",
+          "searches": 500
+        },
+        {
+          "month": "2026-02",
+          "searches": 500
+        },
+        {
+          "month": "2026-03",
+          "searches": 500
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "linkedin beiträge planen",
+        "1000": "50",
+        "1001": "1",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1021": "[\"50\",\"500\",\"500\",\"500\",\"500\",\"500\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\"]",
+        "1026": "true",
+        "1035": "0",
+        "1036": "0",
+        "1037": "-0.9"
+      }
+    },
+    {
+      "keyword": "linkedin kontakte exportieren",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": 0,
+      "competition": "LOW",
+      "competition_index": 0,
+      "top_of_page_bid_low": {
+        "amount": 2.187529,
+        "currency": "EUR"
+      },
+      "top_of_page_bid_high": {
+        "amount": 7.792086,
+        "currency": "EUR"
+      },
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 500
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 500
+        },
+        {
+          "month": "2026-04",
+          "searches": 500
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "linkedin kontakte exportieren",
+        "1000": "50",
+        "1001": "1",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1011": "2187529",
+        "1012": "7792086",
+        "1014": "false",
+        "1021": "[\"500\",\"50\",\"50\",\"50\",\"50\",\"500\",\"500\",\"50\",\"50\",\"50\",\"50\",\"50\"]",
+        "1026": "true",
+        "1035": "0",
+        "1036": "0",
+        "1037": "0"
+      }
+    },
+    {
+      "keyword": "linkedin kunden gewinnen",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": 0,
+      "competition": "HIGH",
+      "competition_index": 0,
+      "top_of_page_bid_low": {
+        "amount": 1.568318,
+        "currency": "EUR"
+      },
+      "top_of_page_bid_high": {
+        "amount": 10.032225,
+        "currency": "EUR"
+      },
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 50
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "linkedin kunden gewinnen",
+        "1000": "50",
+        "1001": "3",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1011": "1568318",
+        "1012": "10032225",
+        "1014": "false",
+        "1021": "[\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\"]",
+        "1026": "true",
+        "1035": "0",
+        "1036": "0",
+        "1037": "0"
+      }
+    },
+    {
+      "keyword": "linkedin beitrag planen",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": -90,
+      "competition": "LOW",
+      "competition_index": 0,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 500
+        },
+        {
+          "month": "2025-12",
+          "searches": 500
+        },
+        {
+          "month": "2026-01",
+          "searches": 500
+        },
+        {
+          "month": "2026-02",
+          "searches": 500
+        },
+        {
+          "month": "2026-03",
+          "searches": 500
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "linkedin beitrag planen",
+        "1000": "50",
+        "1001": "1",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1021": "[\"50\",\"500\",\"500\",\"500\",\"500\",\"500\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\"]",
+        "1035": "0",
+        "1036": "0",
+        "1037": "-0.9"
+      }
+    },
+    {
+      "keyword": "linkedin beiträge vorplanen",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": 0,
+      "competition": "LOW",
+      "competition_index": 0,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 50
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 0
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "linkedin beiträge vorplanen",
+        "1000": "50",
+        "1001": "1",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1021": "[\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"0\",\"50\",\"50\",\"50\",\"50\"]",
+        "1035": "0",
+        "1036": "0",
+        "1037": "0"
+      }
+    },
+    {
+      "keyword": "linkedin posts vorplanen",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": 0,
+      "competition": "LOW",
+      "competition_index": 0,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 50
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "linkedin posts vorplanen",
+        "1000": "50",
+        "1001": "1",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1021": "[\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\"]",
+        "1035": "0",
+        "1036": "0",
+        "1037": "0"
+      }
+    },
+    {
+      "keyword": "linkedin postings planen",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": -100,
+      "yoy_change_percent": -100,
+      "competition": null,
+      "competition_index": null,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 50
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 0
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 0
+        },
+        {
+          "month": "2026-09",
+          "searches": 0
+        }
+      ],
+      "raw": {
+        "1": "linkedin postings planen",
+        "1000": "50",
+        "1001": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1021": "[\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"0\",\"50\",\"0\",\"0\"]",
+        "1035": "-1",
+        "1036": "0",
+        "1037": "-1"
+      }
+    },
+    {
+      "keyword": "beiträge auf linkedin planen",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": -100,
+      "competition": null,
+      "competition_index": null,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 50
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 0
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 0
+        }
+      ],
+      "raw": {
+        "1": "beiträge auf linkedin planen",
+        "1000": "50",
+        "1001": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1021": "[\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"0\",\"50\",\"0\"]",
+        "1035": "0",
+        "1036": "0",
+        "1037": "-1"
+      }
+    },
+    {
+      "keyword": "beitrag planen linkedin",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": 0,
+      "competition": "LOW",
+      "competition_index": 0,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 50
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "beitrag planen linkedin",
+        "1000": "50",
+        "1001": "1",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1021": "[\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\"]",
+        "1035": "0",
+        "1036": "0",
+        "1037": "0"
+      }
+    },
+    {
+      "keyword": "linkedin posting planen",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": 0,
+      "competition": "LOW",
+      "competition_index": 0,
+      "top_of_page_bid_low": {
+        "amount": 1.176836,
+        "currency": "EUR"
+      },
+      "top_of_page_bid_high": {
+        "amount": 9.270784,
+        "currency": "EUR"
+      },
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 500
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "linkedin posting planen",
+        "1000": "50",
+        "1001": "1",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1011": "1176836",
+        "1012": "9270784",
+        "1014": "false",
+        "1021": "[\"50\",\"50\",\"50\",\"50\",\"50\",\"500\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\"]",
+        "1035": "0",
+        "1036": "0",
+        "1037": "0"
+      }
+    },
+    {
+      "keyword": "kontakte aus linkedin exportieren",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": 0,
+      "competition": "LOW",
+      "competition_index": 0,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 50
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "kontakte aus linkedin exportieren",
+        "1000": "50",
+        "1001": "1",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1021": "[\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\"]",
+        "1035": "0",
+        "1036": "0",
+        "1037": "0"
+      }
+    },
+    {
+      "keyword": "linkedin kontakte exportieren excel",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": 0,
+      "competition": "LOW",
+      "competition_index": 0,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 0
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 50
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "linkedin kontakte exportieren excel",
+        "1000": "50",
+        "1001": "1",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1021": "[\"0\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\"]",
+        "1035": "0",
+        "1036": "0",
+        "1037": "0"
+      }
+    },
+    {
+      "keyword": "linkedin kontakte importieren",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": 0,
+      "competition": "LOW",
+      "competition_index": 0,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 50
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "linkedin kontakte importieren",
+        "1000": "50",
+        "1001": "1",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1021": "[\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\"]",
+        "1035": "0",
+        "1036": "0",
+        "1037": "0"
+      }
+    },
+    {
+      "keyword": "linkedin mit claude verbinden",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": null,
+      "competition": "LOW",
+      "competition_index": 0,
+      "top_of_page_bid_low": {
+        "amount": 1.837877,
+        "currency": "EUR"
+      },
+      "top_of_page_bid_high": {
+        "amount": 4.023371,
+        "currency": "EUR"
+      },
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 0
+        },
+        {
+          "month": "2025-11",
+          "searches": 0
+        },
+        {
+          "month": "2025-12",
+          "searches": 0
+        },
+        {
+          "month": "2026-01",
+          "searches": 0
+        },
+        {
+          "month": "2026-02",
+          "searches": 0
+        },
+        {
+          "month": "2026-03",
+          "searches": 0
+        },
+        {
+          "month": "2026-04",
+          "searches": 0
+        },
+        {
+          "month": "2026-05",
+          "searches": 0
+        },
+        {
+          "month": "2026-06",
+          "searches": 0
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "linkedin mit claude verbinden",
+        "1000": "50",
+        "1001": "1",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1011": "1837877",
+        "1012": "4023371",
+        "1014": "false",
+        "1021": "[\"0\",\"0\",\"0\",\"0\",\"0\",\"0\",\"0\",\"0\",\"0\",\"50\",\"50\",\"50\"]",
+        "1026": "true",
+        "1035": "0",
+        "1036": "0",
+        "1037": "Infinity"
+      }
+    },
+    {
+      "keyword": "linkedin nachrichten automatisieren",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": 0,
+      "competition": "LOW",
+      "competition_index": 0,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 50
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "linkedin nachrichten automatisieren",
+        "1000": "50",
+        "1001": "1",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1021": "[\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\"]",
+        "1026": "true",
+        "1035": "0",
+        "1036": "0",
+        "1037": "0"
+      }
+    },
+    {
+      "keyword": "linkedin mit chatgpt verbinden",
+      "currency": "EUR",
+      "avg_monthly_searches": null,
+      "three_month_change_percent": null,
+      "yoy_change_percent": null,
+      "competition": null,
+      "competition_index": null,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [],
+      "raw": {
+        "1": "linkedin mit chatgpt verbinden",
+        "1001": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1026": "true",
+        "1036": "0"
+      }
+    }
+  ],
+  "artifacts": {
+    "raw_csv": [
+      "/Users/hagen/Library/Application Support/Browser Bridge/google-keyword-planner/runs/2026-10-30/2026-10-30T08-12-42-096Z-01392217/rpc-discovery-1793347962094.json"
+    ],
+    "normalized_jsonl": "/Users/hagen/Library/Application Support/Browser Bridge/google-keyword-planner/runs/2026-10-30/2026-10-30T08-12-42-096Z-01392217/results.jsonl",
+    "manifest": "/Users/hagen/Library/Application Support/Browser Bridge/google-keyword-planner/runs/2026-10-30/2026-10-30T08-12-42-096Z-01392217/manifest.json"
+  },
+  "draft_cleanup": {
+    "status": "not_created",
+    "plan_id": null
+  },
+  "timings": {
+    "total_ms": 815
+  },
+  "warnings": [
+    "source:authenticated_internal_rpc",
+    "scope_verified:outbound_rpc_fingerprint"
+  ]
+}

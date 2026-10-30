@@ -1,0 +1,1191 @@
+{
+  "title": "Marktbedarf und Produktfähigkeiten für LinkedIn AI Connectoren",
+  "subtitle": "Suchnachfrage Nutzeraufgaben Wettbewerb und Produktabgleich",
+  "date": "30. Oktober 2026",
+  "product": "LinkedIn MCP Bridge 0.5.0",
+  "baseline": "398095e",
+  "sections": [
+    {
+      "title": "1 Entscheidung und Marktthese",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "LinkedIn MCP Bridge adressiert einen nachweisbaren Suchbedarf. Der aussichtsreichste Einstieg ist ein persönlicher LinkedIn-Assistent für Menschen, die bereits mit lokalen AI-Agenten arbeiten: Gespräche einordnen, Antworten vorbereiten, Personen recherchieren und konkrete nächste Schritte ausführen. Die vorhandene Software passt dazu deutlich besser als zu einem vollautomatischen Vertriebssystem mit Kampagnen, CRM-Synchronisation und mehreren Accounts."
+        },
+        {
+          "type": "p",
+          "text": "Die Google-Ads-Messung zeigt explizites Interesse an „linkedin mcp“, „linkedin mcp server“, Claude-Connectoren und ChatGPT-Verbindungen. Sie belegt jedoch weder eine bestimmte Zahl zahlungsbereiter Käufer noch Product-Market-Fit. Die zurückgegebenen Suchwerte sind sehr grob, verwandte Begriffe überlappen und einzelne Long-Tail-Begriffe wurden erst im Kontrolllauf mit Messwerten geliefert. Die wirtschaftliche These bleibt deshalb eine zu prüfende Hypothese."
+        },
+        {
+          "type": "p",
+          "text": "Empfehlung: Den bestehenden Funktionsumfang als verlässlichen Zugang zu persönlichen LinkedIn-Workflows produktisieren. Zuerst Installation und drei wiederkehrende Aufgaben zuverlässig machen: Inbox priorisieren, warme Gespräche wieder aufnehmen und Personen vor einem Gespräch recherchieren. Native Textentwürfe und Planung sind eine passende Ergänzung. Ein breites Versprechen wie „Automate all of LinkedIn with ChatGPT“ würde heute mehrere nicht erfüllte Erwartungen erzeugen."
+        },
+        {
+          "type": "table",
+          "headers": [
+            "Entscheidung",
+            "Begründung",
+            "Status"
+          ],
+          "rows": [
+            [
+              "Lokale Agenten zuerst",
+              "Passt zur vorhandenen stdio-Architektur und zum aktuellen Installationsweg.",
+              "Empfehlung"
+            ],
+            [
+              "Inbox und bestehende Beziehungen als Kern",
+              "Hoher Fit mit den vorhandenen Reads, Identitätsprüfungen und Versandbelegen.",
+              "Starke Produkthypothese"
+            ],
+            [
+              "Content als ergänzender Workflow",
+              "Native Entwürfe und Scheduling vorhanden; eigenständiger Scheduler-Markt stark besetzt.",
+              "Sekundär"
+            ],
+            [
+              "ChatGPT Web separat erschließen",
+              "Direkter Anschluss fehlt; Secure MCP Tunnel ist eine aktuelle Prüfoption.",
+              "Produktlücke"
+            ],
+            [
+              "Kein pauschales Sicherheitsversprechen",
+              "Lokale Credentials und technische Limits sind keine LinkedIn-Genehmigung.",
+              "Verbindliche Aussagegrenze"
+            ]
+          ],
+          "widths": [
+            0.24,
+            0.53,
+            0.23
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Der Markt ist bereits besetzt. Reduck, inboxMCP, Unipile, Linked API und offene MCP-Projekte konkurrieren um Teile desselben Nutzens. Zudem existieren inzwischen offizielle, eng begrenzte LinkedIn-Angebote in Claude und ChatGPT. Die Differenzierung muss daher an konkreter Verlässlichkeit, Datenkontrolle, verständlicher Installation und wiederholtem Nutzwert hängen, nicht allein am Wort MCP. [S02, S03, S10, S12, S13, S16, S17]"
+        }
+      ]
+    },
+    {
+      "title": "2 Untersuchungsumfang und Belegqualität",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Stand dieser Studie ist der 30. Oktober 2026. Der Produktabgleich bezieht sich auf LinkedIn MCP Bridge 0.5.0 und den lokalen main-Commit 398095e. Untersucht wurden README, Tool-Schemas, Capability-Definitionen, Transport, Normalisierung und die historische Validierungsdokumentation. Verfügbare Funktionen, dokumentierte Live-Prüfungen und noch offene Veröffentlichungsvoraussetzungen werden getrennt behandelt."
+        },
+        {
+          "type": "p",
+          "text": "Die Nachfrage wurde direkt mit dem vorhandenen Google-Keyword-Planner-MCP-Server erhoben. Kein Google-Ads-Skill und kein manuelles Browserverfahren wurden zur Messung verwendet. Alle sieben Läufe waren frisch, ohne Cache-Treffer. Der Server berichtet authentifizierte interne Google-Ads-RPC-Aufrufe und eine Prüfung des ausgehenden Scope-Fingerprints. Obwohl das Werkzeug allgemein von CSV-Exporten spricht, wurden in diesen Läufen RPC-JSON-Artefakte geliefert. Diese Studie bezeichnet sie deshalb als MCP-Messdaten, nicht als unabhängig visuell geprüfte CSV-Exporte."
+        },
+        {
+          "type": "table",
+          "headers": [
+            "Messreihe",
+            "Umfang",
+            "Interpretation"
+          ],
+          "rows": [
+            [
+              "Historisch USA und Englisch",
+              "109 Seeds plus 25 gezielte Kontrollbegriffe",
+              "Primärer englischsprachiger Einstiegsmarkt"
+            ],
+            [
+              "Historisch Deutschland und Deutsch",
+              "123 Seeds einschließlich 14 deutscher Formulierungen",
+              "Deutsche Perspektive mit englischen Fachbegriffen"
+            ],
+            [
+              "Historisch weltweit und Englisch",
+              "109 Seeds",
+              "Zusätzliche Größenordnung; überlappt mit Ländern"
+            ],
+            [
+              "Discovery USA breit",
+              "662 Ergebniszeilen aus 10 Seeds",
+              "Breite angrenzender Suchbedürfnisse"
+            ],
+            [
+              "Discovery Deutschland",
+              "18 Ergebniszeilen aus 8 Seeds",
+              "Deutsche Varianten und engere Vorschläge"
+            ],
+            [
+              "Discovery USA Connector",
+              "7 Ergebniszeilen aus 6 Seeds",
+              "Kontrolle des unmittelbaren Connector-Themas"
+            ]
+          ],
+          "widths": [
+            0.32,
+            0.32,
+            0.36
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Insgesamt liegen 1.053 Zeilen, 779 unterschiedliche Keyword-Schreibweisen und 130 unterschiedliche historisch geprüfte Begriffe vor. Die Monatsreihen reichen von Oktober 2025 bis September 2026. Netzwerk ist GOOGLE. USA und global wurden mit Sprache Englisch, Deutschland mit Sprache Deutsch angefragt. Diese Spracheinstellung ist keine saubere Segmentierung nach Muttersprache oder Käufersprache. Aus dem globalen Englisch-Scope entsteht keine Schätzung des gesamten weltweiten Marktes."
+        },
+        {
+          "type": "p",
+          "text": "Die öffentliche Recherche umfasst Primärquellen der Plattformen, Anbieterunterlagen sowie gezielt ausgewählte Reddit-Diskussionen und GitHub-Problemmeldungen. Anbieterangaben zeigen angebotene Funktionen und Positionierung. Sie belegen keine unabhängige Wirksamkeit. Community-Beiträge zeigen konkrete Aufgaben und Einwände, sind aber selbstselektiert und teils werblich. Es wurden keine Kundeninterviews, repräsentative Befragung oder Zahlungsversuche durchgeführt."
+        },
+        {
+          "type": "p",
+          "text": "Lesart der Ergebnisse: Messbefund bezeichnet einen beobachteten Datenpunkt; Nutzerbericht eine öffentliche Aussage; Produktbefund eine im Repository sichtbare Eigenschaft; Empfehlung eine daraus abgeleitete Entscheidung. Diese vier Ebenen dürfen beim Weiterverwenden der Studie nicht verschmelzen."
+        }
+      ]
+    },
+    {
+      "title": "3 Was die Suchdaten tatsächlich zeigen",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Der unmittelbar passende Suchbegriff ist „linkedin mcp“. Google Ads liefert dafür den Wert 5.000 im USA-Scope, 500 in Deutschland und 5.000 im globalen Scope. „linkedin mcp server“ wird mit 500 in den USA, 50 in Deutschland und 5.000 weltweit gemeldet. Die Zahlen sind unveränderte Toolwerte, keine exakten gezählten monatlichen Personen. Ihr Nutzen liegt hier in einer groben Priorisierung."
+        },
+        {
+          "type": "keyword_highlights"
+        },
+        {
+          "type": "p",
+          "text": "Die breiteren Begriffe „linkedin api“, „linkedin post scheduler“ und „linkedin scheduled posts“ zeigen ebenfalls höhere gemeldete Werte. Ihr Produktfit ist sehr unterschiedlich: API-Suchende können Anzeigen-APIs, Jobs oder offizielle Integrationen meinen; bei geplanten Posts wird häufig nach einer vorhandenen LinkedIn-Funktion gesucht. Ein großer Keywordwert allein rechtfertigt daher weder eine Landingpage mit umfassendem Produktversprechen noch ein neues Feature."
+        },
+        {
+          "type": "p",
+          "text": "Der direkte Claude-Verbindungsbedarf ist sichtbar, aber sprachlich fragmentiert. Im Kontrolllauf liefern „claude linkedin“ und „chatgpt linkedin“ jeweils 500 in den USA, während die umgekehrten Formulierungen und spezifischere Connector-Phrasen teilweise andere oder fehlende Werte haben. Das kann unterschiedliche Intents, Close-Variant-Verarbeitung und Messartefakte verbinden. Es ist keine Grundlage, jeden Ausdruck als separate Nutzergruppe zu addieren."
+        },
+        {
+          "type": "p",
+          "text": "„linkedin inbox management“ liefert 50 im USA-Scope und HIGH bei Anzeigenwettbewerb. Das ist ein kleineres Suchsignal mit sehr gutem Produktbezug. Die qualitative Recherche beschreibt dabei häufig konkrete Situationen, ohne die Kategorie „Inbox Management“ zu benutzen. Das rechtfertigt einen Workflow-Test, aber keine nachträgliche Hochrechnung des Suchvolumens."
+        },
+        {
+          "type": "h2",
+          "text": "Messgrenzen mit konkreten Folgen"
+        },
+        {
+          "type": "p",
+          "text": "Alle positiven historischen Werte dieser Erhebung liegen in den Stufen 50, 500, 5.000 und 50.000. Google selbst beschreibt Suchvolumina als gerundet und mit nahen Varianten verbunden. Der lokale Parser übernimmt Feld 1000 direkt numerisch; eine dokumentierte Auflösung dieser Stufen in verlässliche Intervalle liegt hier nicht vor. Deshalb werden weder erfundene Bereichsgrenzen noch exakte Wachstumsraten aus diesen Zahlen berechnet. [S01]"
+        },
+        {
+          "type": "p",
+          "text": "Die US-Erstmessung lieferte beispielsweise für „linkedin ai agent“ keinen Messwert. Die fokussierte Discovery und die spätere historische Kontrolle lieferten 50. Ähnliche Ergänzungen gab es für „linkedin n8n“, „chatgpt linkedin connector“ und weitere Automatisierungsbegriffe. Im Vergleichsanhang stehen spätere historische Messwerte mit einem Stern; die Originalantworten bleiben erhalten. Fehlende Werte heißen „keine Metrik geliefert“, nicht „null Nachfrage“."
+        },
+        {
+          "type": "p",
+          "text": "Der Parser setzt die Währung im untersuchten Code fest auf EUR. Ohne unabhängige Währungsprüfung werden die Bid-Felder deshalb nicht zur CPC-, CAC- oder Zahlungsbereitschaftsrechnung verwendet. Auch der fast durchgehend nullwertige competition_index ist keine tragfähige Rangfolge. LOW/MEDIUM/HIGH beschreibt Anzeigenwettbewerb, keine organische SEO-Schwierigkeit. Ein fehlendes Metric-Warning und eine Nullzelle sind zudem nicht dasselbe; die Zeilenzählung wurde aus den tatsächlichen Ergebnissen berechnet."
+        }
+      ]
+    },
+    {
+      "title": "4 Suchintentionen und adressierbare Nachfrage",
+      "blocks": [
+        {
+          "type": "table",
+          "headers": [
+            "Cluster",
+            "Eigentliche Aufgabe",
+            "Passung zum Produkt"
+          ],
+          "rows": [
+            [
+              "MCP und Connector",
+              "LinkedIn-Daten im vorhandenen Agenten nutzbar machen",
+              "Direkt; lokale Clients heute, Webzugang offen"
+            ],
+            [
+              "Inbox und Follow-up",
+              "Wissen, wem ich was schulde und welches Gespräch weitergeht",
+              "Hoher Fit; dauerhafter Status und umfassende Suche fehlen"
+            ],
+            [
+              "Personensuche und Recherche",
+              "Die richtige Person finden und Kontext verstehen",
+              "Teilweise direkt; keine Sales-Navigator-Suche"
+            ],
+            [
+              "Outreach und Akquise",
+              "Passende Menschen erreichen und Antworten erhalten",
+              "Einzelaktionen vorhanden; Kampagnenplattform fehlt"
+            ],
+            [
+              "Content und Planung",
+              "Gedanken in veröffentlichbare Posts verwandeln",
+              "Textentwurf und native Planung; keine Medien oder Analytics"
+            ],
+            [
+              "CRM und Export",
+              "Kontaktdaten und Gesprächsergebnisse im Arbeitssystem halten",
+              "Agent kann orchestrieren; kein eingebauter Sync"
+            ],
+            [
+              "Jobs und Recruiting",
+              "Kandidaten oder Stellen finden und Prozesse abarbeiten",
+              "Nur allgemeine Personenrecherche; kein ATS-/Jobs-Produkt"
+            ],
+            [
+              "API und Scraping",
+              "Daten programmatisch sammeln oder in Software einbauen",
+              "Nur enger Teilbedarf; keine allgemeine LinkedIn-Daten-API"
+            ]
+          ],
+          "widths": [
+            0.25,
+            0.39,
+            0.36
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Für die Markteinführung sind drei Intentionen zu priorisieren: „Ich möchte LinkedIn mit meinem Agenten verbinden“, „Ich möchte meine Gespräche besser bearbeiten“ und „Ich möchte vor einem Kontakt den Kontext verstehen“. Diese lassen sich in einem zusammenhängenden Produkt zeigen. Die Discovery-Menge enthält dagegen viele API-, Anzeigen-, Salesforce-, Scheduler- und Markenvarianten. Sie vergrößert den Recherchehorizont, nicht automatisch den erreichbaren Markt."
+        },
+        {
+          "type": "p",
+          "text": "In Deutschland ist „linkedin mcp“ in dieser Erhebung der klarere generische Zugang als viele lange deutsche Anschlussformulierungen. Eine deutsche Erklärung kann deshalb englische Produktbegriffe beibehalten und konkrete Aufgaben auf Deutsch beschreiben. „LinkedIn mit Claude verbinden“ ist als erklärende Seite plausibel; die operative Demo muss eindeutig sagen, welcher Claude-Client gemeint ist."
+        },
+        {
+          "type": "p",
+          "text": "Die internationale Suchchance spricht für englische Kernseiten und eine gute deutsche Installations- und Datenschutzbeschreibung. Die vorliegenden Scopes reichen nicht aus, andere Länder gegeneinander zu priorisieren. Vor einem kostenintensiven Rollout wären mindestens UK, Kanada und Australien separat zu messen; ein globaler Wert liefert keine entsprechende Aufteilung."
+        },
+        {
+          "type": "p",
+          "text": "Nicht adressierbare oder nur indirekt passende Suchintents sind ausdrücklich auszuschließen: Advertising und Conversion API, automatische Bewerbungen, Job-Posting, Unternehmensseiten, große Profil-Datenbanken, vollständige Sales-Navigator-Funktionen und uneingeschränkter Massenversand. Inhalte zu diesen Begriffen dürfen Vergleich oder Abgrenzung liefern, aber keine vorhandene Fähigkeit suggerieren."
+        }
+      ]
+    },
+    {
+      "title": "5 Zielgruppen und Kaufanlässe",
+      "blocks": [
+        {
+          "type": "table",
+          "headers": [
+            "Zielgruppe",
+            "Auslöser und gewünschtes Ergebnis",
+            "Priorität"
+          ],
+          "rows": [
+            [
+              "Technische Gründer und Solo-Berater",
+              "Nutzen Claude Code/Codex; wollen wichtige Kontakte und Antworten nicht verlieren.",
+              "Erster Pilot"
+            ],
+            [
+              "GTM Engineers und technisch versierte Sales",
+              "Wollen LinkedIn mit CRM-Kontext verbinden und kleine Abläufe zusammensetzen.",
+              "Erster Pilot mit klarem Scope"
+            ],
+            [
+              "Recruiter mit einzelnen persönlichen Beziehungen",
+              "Vorbereitung, Nachfassen und Nachrichtenkontext.",
+              "Zweiter Pilot; kein Recruiter-Ersatz"
+            ],
+            [
+              "Creator und Thought Leader",
+              "Notizen in Textentwürfe und einen Wochenplan umwandeln.",
+              "Ergänzendes Segment"
+            ],
+            [
+              "Agenturen mit mehreren Kundenaccounts",
+              "Brauchen Mandanten, Freigaben, zentrale Administration und Zuverlässigkeit.",
+              "Aktuell geringer Fit"
+            ],
+            [
+              "Nichttechnische Web-Chat-Nutzer",
+              "Erwarten Login und einen Connector-Link ohne Terminal.",
+              "Große Zugangslücke"
+            ],
+            [
+              "Job-Suchende",
+              "Wollen Stellen, Bewerbungen und Recruiter-Kontakte automatisieren.",
+              "Nicht als Kernsegment"
+            ]
+          ],
+          "widths": [
+            0.3,
+            0.5,
+            0.2
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Der erste Käufer ist wahrscheinlich jemand, der bereits für einen AI-Assistenten bezahlt, regelmäßig LinkedIn nutzt und die Installation eines lokalen Tools akzeptiert. Das ist eine Segmenthypothese aus Produktanforderungen und öffentlichen Workflows, keine aus den Suchdaten ablesbare Demografie. Sie muss über beobachtete Nutzung bestätigt werden."
+        },
+        {
+          "type": "p",
+          "text": "Ein kaufrelevanter Moment entsteht beispielsweise, wenn ein Gründer nach einem Event viele begonnene Gespräche hat, ein Berater eine alte Anfrage wiederfindet oder ein GTM Engineer CRM-Daten vor einem LinkedIn-Reply einbeziehen will. Der Nutzen ist dann ein besser erledigter Arbeitsschritt. Eine reine Toolliste mit 27 Operationen erklärt diesen Nutzen kaum."
+        },
+        {
+          "type": "p",
+          "text": "Die Kosten des Nichtstuns bestehen aus wiederholtem Copy-and-paste, Kontextsuche, vergessenen Zusagen und unklaren Gesprächsständen. Die Alternativen reichen von manueller Inbox-Arbeit über Tabellen und CRM bis zu Browser-Agenten oder fertigen Outreach-Produkten. Für manche Nutzer ist manuell weiterzuarbeiten rational, wenn Installation, Kontorisiko oder unvollständige Daten den erwarteten Zeitgewinn aufzehren."
+        },
+        {
+          "type": "p",
+          "text": "Die Studie priorisiert deshalb geringe operative Hürden und nachweisbare Zuverlässigkeit vor maximaler Funktionsbreite. Die zentrale Pilotfrage lautet nicht nur, ob jemand den Connector interessant findet, sondern ob er denselben wertvollen Workflow in der zweiten und dritten Woche erneut ausführt."
+        }
+      ]
+    },
+    {
+      "title": "6 Pain Points aus öffentlichen Nutzerberichten",
+      "blocks": [
+        {
+          "type": "h2",
+          "text": "Gespräche haben keinen verlässlichen Arbeitsstatus"
+        },
+        {
+          "type": "p",
+          "text": "Eine Reddit-Diskussion beschreibt fehlende Übersicht über bereits gesendete Nachrichten, fällige Follow-ups und echte laufende Gespräche. Tabellen werden begonnen und anschließend nicht aktuell gehalten. Antworten verweisen auf Status, letzten Kontakt und nächste Aktion im CRM. Das ist ein konkretes Signal für Zustandsverwaltung; es ist keine repräsentative Aussage über alle LinkedIn-Nutzer. [S23]"
+        },
+        {
+          "type": "h2",
+          "text": "Der Agent kennt das Gespräch nicht"
+        },
+        {
+          "type": "p",
+          "text": "In einer Diskussion zu einem lokalen LinkedIn MCP werden warme ältere Threads, personalisierte Follow-ups, strukturierte CRM-Notizen und Wochenrückblicke als gewünschte Aufgaben genannt. Der ursprüngliche Beitrag stammt von einem Entwickler seines eigenen Werkzeugs und ist entsprechend zu gewichten. Die beschriebenen Aufgaben passen dennoch unmittelbar zu den Gesprächs- und Profilfunktionen des Repositories. [S22]"
+        },
+        {
+          "type": "h2",
+          "text": "Unvollständigkeit wird zu einem Geschäftsfehler"
+        },
+        {
+          "type": "p",
+          "text": "GitHub Issue 1150 berichtet, dass nach rund 20 bis 27 Gesprächen keine weiteren Ergebnisse geladen wurden und dadurch eine echte Antwort übersehen worden sei. Issue 1277 thematisiert abgeschnittene ältere Nachrichten und fordert eine konservative Vollständigkeitsanzeige; dort ist die unabhängige Live-Reproduktion noch ausstehend. Beide Berichte erklären, warum nachvollziehbare Abdeckung wichtiger sein kann als ein größeres nominales Limit. [S26, S27]"
+        },
+        {
+          "type": "h2",
+          "text": "Kontext und Identität können falsch sein"
+        },
+        {
+          "type": "p",
+          "text": "Wenn mehrere Personen ähnlich heißen, eine Quelle veraltet ist oder relative Zeiten ohne Zeitzone zurückkommen, kann der Agent die falsche Handlung empfehlen. Issue 1195 beschreibt einen solchen Zeitversatz beim Übertragen in einen Tracker. Für das Produkt folgt daraus: kanonische IDs, eindeutig zugeordnete Gesprächsteilnehmer, nachvollziehbare Quellen und maschinenlesbare Zeitangaben sind Teil des Nutzens. [S28]"
+        },
+        {
+          "type": "h2",
+          "text": "Die Automatisierung klingt nicht nach mir"
+        },
+        {
+          "type": "p",
+          "text": "Ein Cowork-Workflow für personalisierte Kontaktaufnahme löst gleichzeitig Interesse an Zielauswahl und Kritik an erkennbar generierten Nachrichten aus. Ein weiterer aktueller Thread fragt ausdrücklich nach Account-Sperren durch Claude-gesteuerte LinkedIn-Nutzung. Das zeigt einen Zielkonflikt zwischen Zeitersparnis, persönlicher Stimme und Reputationsrisiko. Die dort genannten Erfolgsraten oder Sicherheitsbehauptungen werden nicht als gemessene Ergebnisse übernommen. [S24, S25]"
+        },
+        {
+          "type": "h2",
+          "text": "Die Installation unterbricht den Nutzen"
+        },
+        {
+          "type": "p",
+          "text": "Eine öffentliche Docker-Supportdiskussion zeigt Reibung zwischen Containerbetrieb und interaktivem Login. Ein lokales Produkt kann eine existierende Chrome-Sitzung verwenden, muss aber weiterhin Extension, Native Host und MCP-Client verständlich verbinden. Die Referenz ist ein konkreter Supportfall, keine gemessene Häufigkeit. [S29]"
+        },
+        {
+          "type": "p",
+          "text": "Übergreifende Folgerung: Das ungelöste Problem ist häufig nicht das Generieren eines Textes. Es ist der sichere Übergang von aktuellem Gesprächskontext zu einer passenden, nachvollziehbaren nächsten Aktion. Genau hier können die bestehenden Identitäts- und Idempotenzprüfungen wirtschaftlich relevant werden."
+        }
+      ]
+    },
+    {
+      "title": "7 Welche Aufgaben Menschen automatisieren wollen",
+      "blocks": [
+        {
+          "type": "table",
+          "headers": [
+            "Workflow",
+            "Gewünschtes Resultat",
+            "Heutiger Produktfit"
+          ],
+          "rows": [
+            [
+              "Tägliche Inbox-Triage",
+              "Wichtige Antworten und Verpflichtungen mit Quellen auflisten",
+              "Gut in begrenztem, transparentem Umfang"
+            ],
+            [
+              "Warme Threads wieder aufnehmen",
+              "Relevante alte Gespräche und begründete Vorschläge finden",
+              "Teilweise; kein Volltextindex"
+            ],
+            [
+              "Antwort vorbereiten und versenden",
+              "Gesprächstreuen Text an eindeutig richtige Teilnehmer schicken",
+              "Gut; keine integrierte Review-Queue"
+            ],
+            [
+              "Meeting vorbereiten",
+              "Profil, letzte Nachricht und offene Themen zusammenfassen",
+              "Gut mit externem Kalenderkontext"
+            ],
+            [
+              "Kleine Zielgruppe recherchieren",
+              "Personen nach Rolle, Firma, Ort und Netzwerkgrad eingrenzen",
+              "Teilweise; Keyword- und Basisfilter"
+            ],
+            [
+              "Reaktionen in Gesprächskontext verwandeln",
+              "Interessante Interaktionen erkennen und manuell bewerten",
+              "Teilweise; sichtbare Ergebnisse bleiben unvollständig"
+            ],
+            [
+              "Einladungen verwalten",
+              "Eingehende und ausgehende Anfragen prüfen und bearbeiten",
+              "Implementiert; Acceptance je Build beachten"
+            ],
+            [
+              "Wochencontent planen",
+              "Textentwürfe speichern und zu festen Zeiten einplanen",
+              "Gut innerhalb des Text-/Composer-Scope"
+            ],
+            [
+              "CRM aktuell halten",
+              "Zusammenfassung, Status und nächsten Schritt übertragen",
+              "Externe Orchestrierung erforderlich"
+            ],
+            [
+              "Kontinuierliche Outreach-Sequenz",
+              "Nach Regeln, Ereignissen und Antworten automatisch fortsetzen",
+              "Nicht als Produktsystem vorhanden"
+            ],
+            [
+              "Mehrere Accounts betreuen",
+              "Mandanten, Rollen, Reviews und Abrechnung verwalten",
+              "Nicht vorhanden"
+            ],
+            [
+              "Erfolg messen",
+              "Antworten, Termine, Pipeline und Content-Wirkung zuordnen",
+              "Kein Analytics-Produkt vorhanden"
+            ]
+          ],
+          "widths": [
+            0.28,
+            0.4,
+            0.32
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Die erste Demo sollte einen echten Ablauf mit begrenztem Umfang zeigen: „Lies die letzten 20 Gespräche, ermittle die fünf wichtigsten offenen Punkte und zeige jeweils die zugrunde liegenden Nachrichten.“ Der Agent muss danach erklären, welche weiteren Seiten oder Historie fehlen. Eine Erfolgsdarstellung wie „Deine Inbox ist vollständig erledigt“ wäre ohne entsprechenden Nachweis falsch."
+        },
+        {
+          "type": "p",
+          "text": "Ein zweiter Ablauf kann eine autorisierte Antwort mit nachvollziehbarem Empfänger und anschließendem Ausführungsbeleg zeigen. Die vorhandene Software führt Writes direkt aus, sobald die Werkzeugvoraussetzungen erfüllt sind. Vorschläge für ein auswählbares Nur-Lesen- oder Review-Profil sind künftige Produktoptionen; sie beschreiben nicht den heutigen Zustand und sollen den bestehenden direkten Ausführungsmodus nicht rückwirkend umdefinieren."
+        },
+        {
+          "type": "p",
+          "text": "Ein dritter Ablauf verbindet Profilrecherche mit einer bereits vorhandenen Beziehung. Das ist enger und besser überprüfbar als ein Versprechen, automatisch beliebige Leads zu finden. Für vollständige Meeting-Vorbereitung, CRM-Einträge oder Kalenderänderungen braucht der Agent zusätzliche Datenquellen und Autorisierung; die Bridge selbst liefert diese Systeme nicht."
+        }
+      ]
+    },
+    {
+      "title": "8 Capability Studie des aktuellen Produkts",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Die Tool-Schemas definieren 27 Operationen. Davon sind elf Mutationen; Diagnose, Lesezugriff und Planung ergänzen sich zu sieben Funktionsbereichen. Ein älterer Absatz im README nennt noch 24 Operationen. Für diese Studie zählt der aktuelle Schema-Stand. Alle Operationen sind im Entwicklungskandidaten exponiert; das ist nicht gleichbedeutend mit vollständiger Live-Acceptance des aktuellen Builds."
+        },
+        {
+          "type": "table",
+          "headers": [
+            "Bereich und Operationen",
+            "Was vorhanden ist",
+            "Relevante Grenze"
+          ],
+          "rows": [
+            [
+              "Diagnose 2",
+              "health; operation_get",
+              "Acceptance und Verfügbarkeit getrennt; Belege statt pauschaler Erfolg"
+            ],
+            [
+              "Inbox 7",
+              "conversations_list/search/get; messages_list; message_send; conversation_update/delete",
+              "Suche in Teilnehmern, Titel und Vorschau pro Seite; kein globaler historischer Volltext"
+            ],
+            [
+              "Personen 2",
+              "people_search; profile_get",
+              "Kompakte Profile; keine garantierte vollständige Berufshistorie"
+            ],
+            [
+              "Einladungen 4",
+              "invitations_list; invitation_send/respond/withdraw",
+              "Konkrete Konto- und Zielbindung; kein Kampagnenmotor"
+            ],
+            [
+              "Feed und Interaktionen 5",
+              "feed_list; post_get/like/comment; comments_list",
+              "DOM-basierte, begrenzte und teils gerankte Sicht"
+            ],
+            [
+              "Planung 4",
+              "post_draft_create; post_schedule; scheduled_posts_list; scheduled_post_cancel",
+              "Persönliche Textposts; beobachteter englischer Composer"
+            ],
+            [
+              "Recherchehilfen 3",
+              "people_search_filters; reactions_list; post_resolve",
+              "Firma/Ort auflösen; keine Sales-Navigator-Abfragen"
+            ]
+          ],
+          "widths": [
+            0.24,
+            0.4,
+            0.36
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Der Server verwendet lokalen stdio-Transport und eine separate Chrome-MV3-Erweiterung. Die Kommunikation zum Browser läuft über Native Messaging und einen privaten Unix-Socket. Die LinkedIn-Sitzungscredentials bleiben im Browser. Es gibt keinen gehosteten Relay, keine eingebaute Inbox-Datenbank und keine Hintergrundindizierung. Das unterscheidet die Auslieferung von cloudbasierten Connectoren, begrenzt aber auch den problemlosen Zugriff aus Web-Chats."
+        },
+        {
+          "type": "p",
+          "text": "API-basierte Inbox- und Historienlesevorgänge sollen keine Konversation öffnen und keinen Lesestatus verändern. DOM-Lesevorgänge verwenden einen Arbeits-Tab, der in den Vordergrund geholt werden kann. Profilabfragen können einen Profilbesuch verursachen. Diese Unterschiede gehören in die Nutzererwartung: „Lesen“ bedeutet nicht für jede Oberfläche völlige Unsichtbarkeit."
+        },
+        {
+          "type": "p",
+          "text": "Das Dokument docs/validation.md enthält historische Live-Prüfungen von Inbox, Historie, Personenfiltern, Reaktionen, Kommentaren, Versand und nativer Planung. Für 0.5 sind dort 97 automatisierte Tests dokumentiert. Diese Studie hat keine Live-Mutationen ausgeführt und die Tests nicht als neue Acceptance wiederholt. Welche Funktionen im exakten aktuellen Build akzeptiert sind, muss aus dessen Build-Evidenz kommen."
+        },
+        {
+          "type": "p",
+          "text": "Die Bridge ist ein lokaler Entwicklungskandidat. Store-ID, Veröffentlichungsdetails, signierte und notarialisierte Distribution sowie vollständige Freigabeprüfungen bleiben gesonderte Voraussetzungen. Vorhandene Grafiken oder Paketdateien sind kein Nachweis einer Chrome-Web-Store-Veröffentlichung."
+        }
+      ]
+    },
+    {
+      "title": "9 Die wichtigsten Lücken zwischen Bedarf und Software",
+      "blocks": [
+        {
+          "type": "h2",
+          "text": "Der Anschluss an den gewünschten Client"
+        },
+        {
+          "type": "p",
+          "text": "„Mit Claude verbinden“ kann Claude Desktop, Claude Code oder claude.ai bedeuten. Ein lokaler stdio-Prozess ist für lokale MCP-Clients eine passende Grundlage. Für claude.ai fehlt dem Produkt ein erreichbarer Remote-Endpunkt. Anthropic beschreibt lokale Erweiterungen und cloudvermittelte Remote-Connectoren als unterschiedliche Wege. Aussagen zu Cowork sind zwischen aktuellen Hilfeseiten nicht völlig einheitlich; eine belastbare Vermarktung braucht deshalb einen Test pro konkretem Client. [S06, S07, S31]"
+        },
+        {
+          "type": "p",
+          "text": "ChatGPT kann lokale stdio-Server nicht unmittelbar starten. Aktuell dokumentiert OpenAI aber Secure MCP Tunnel, auch für private Server über stdio oder HTTP. Ein pauschales „ChatGPT geht nur mit öffentlich gehostetem Server“ wäre damit überholt. Für diese Bridge ist ein Tunnel noch keine implementierte oder getestete Integration. Für öffentliche Plugin-Distribution ist ein stabiler öffentlicher HTTPS-Endpunkt nötig; die private Tunneloption ersetzt ihn nicht. [S08, S09]"
+        },
+        {
+          "type": "h2",
+          "text": "Gesprächssuche ist noch kein Gedächtnis"
+        },
+        {
+          "type": "p",
+          "text": "conversations_search durchsucht pro geladener Seite Teilnehmer-, Titel- und Vorschauinformationen. Die Aufgabe „Finde jede Unterhaltung, in der wir vor sechs Monaten über Budget gesprochen haben“ ist damit nicht zuverlässig erfüllt. Ein Agent kann ausgewählte Historien nachladen; eine umfassende Suche erfordert jedoch bewusst begrenzte Scans oder eine separate, zustimmungsbasierte Indexierung. Letztere würde das heutige Produktversprechen ohne Inbox-Datenbank verändern und ist keine beiläufige Erweiterung."
+        },
+        {
+          "type": "h2",
+          "text": "Es fehlt ein dauerhafter Zustand für nächste Schritte"
+        },
+        {
+          "type": "p",
+          "text": "Das Produkt kennt LinkedIn-Zustände wie gelesen und archiviert. Es besitzt kein eigenes CRM mit Verantwortlichen, Fälligkeiten, Gesprächsphase oder erledigten Zusagen. Daher ist „Wer braucht heute ein Follow-up?“ nur soweit belastbar, wie aktuelle Nachrichten und externe Notizen diese Information hergeben. Der günstige nächste Schritt ist ein strukturiertes Ergebnis für ein vorhandenes CRM, nicht sofort ein vollständiges neues CRM."
+        },
+        {
+          "type": "h2",
+          "text": "Content und Outreach haben klare Grenzen"
+        },
+        {
+          "type": "p",
+          "text": "Planung unterstützt persönliche Textposts. Medien, Anhänge als Inhalt, Unternehmensseiten, direkte Sofortveröffentlichung und Performance-Analytics gehören nicht zum aktuellen Funktionsumfang. post_create wurde entfernt. Bei Outreach fehlen ein dauerhaftes Sequenzmodell, ereignisgesteuerte Wiederaufnahme, Stop-on-reply, zentrale Opt-outs und ein Kampagnen-Dashboard. Einzelne Sendetools dürfen nicht als vollständige Sequenzplattform vermarktet werden."
+        },
+        {
+          "type": "h2",
+          "text": "Installation und Vertrauen sind Produktarbeit"
+        },
+        {
+          "type": "p",
+          "text": "macOS, Chrome, Node und Native-Host-Bindung sind für den aktuellen technischen Nutzer tragbar, für viele Fachanwender aber eine Hürde. Der gebündelte Companion ist ein Ansatz; fertige, geprüfte Distribution und ein kurzer Diagnosepfad sind noch wichtig. Lokale Speicherung der Sitzung verhindert zudem nicht, dass gelesene Nachrichten an den gewählten AI-Client und dessen Modell gelangen. „Keine Credentials in der Cloud“ und „Keine Daten verlassen das Gerät“ sind unterschiedliche Aussagen."
+        }
+      ]
+    },
+    {
+      "title": "10 Wettbewerbsbild und Substitute",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Die Tabelle bewertet öffentlich dokumentierte Angebote zum Abrufdatum. Kein Wettbewerber wurde für diese Studie praktisch installiert oder mit einem LinkedIn-Konto getestet. „Angeboten“ bedeutet eine Herstellerbeschreibung, keine unabhängige Live-Validierung."
+        },
+        {
+          "type": "table",
+          "headers": [
+            "Angebot",
+            "Positionierung und Fähigkeiten",
+            "Folgerung für die Bridge"
+          ],
+          "rows": [
+            [
+              "Offizielles LinkedIn in ChatGPT [S03]",
+              "Personen finden, Basisrolle/Firma/Ort/Followerzahl und Profillink",
+              "Profil-Kurzbriefing allein ist schwache Differenzierung"
+            ],
+            [
+              "LinkedIn Hiring Pro in Claude [S02, S30]",
+              "Stellenanzeige entwerfen, prüfen, kostenlos veröffentlichen",
+              "Offizieller Connector existiert, aber mit engem Job-Scope"
+            ],
+            [
+              "Reduck [S10]",
+              "Remote MCP mit Ausführung im eigenen Chrome; Suche, Profile, Posts, Inbox und Nachrichten",
+              "Lokale Browser-Session ist keine exklusive Idee"
+            ],
+            [
+              "inboxMCP [S12]",
+              "Gehosteter Connector für Inbox, Personen und Kontaktaktionen; konfigurierbare Senderechte",
+              "Nahe Konkurrenz beim Endnutzer-Workflow"
+            ],
+            [
+              "Unipile [S13]",
+              "MCP/API für Produktentwickler, mehrere Kanäle und LinkedIn-Produkte",
+              "Stärker bei SaaS-Integration und Mehrkontenbedarf"
+            ],
+            [
+              "Linked API [S16]",
+              "Remote-MCP-Angebot für verschiedene Agenten",
+              "Zugänglichkeit und Dokumentation als Wettbewerbsdimension"
+            ],
+            [
+              "stickerdaniel [S17, S18]",
+              "Offenes Projekt mit Profilen, Jobs und Nachrichten; mehrere Installationswege",
+              "Keine pauschale Behauptung, Open Source könne nur lesen"
+            ],
+            [
+              "Postel [S15]",
+              "Text und Publishing-Workflow über offizielle API laut Anbieter; keine Inbox",
+              "Content-only braucht eine andere Nutzenargumentation"
+            ],
+            [
+              "Dripify [S19]",
+              "Fertige LinkedIn-/E-Mail-Sequenzen und vertriebliche Workflows",
+              "Substitut für Kampagnenkäufer"
+            ],
+            [
+              "Buffer und native Planung [S20]",
+              "Scheduling ist auch kostenlos verfügbar",
+              "Planung allein trägt kaum eine hohe Zahlungsbereitschaft"
+            ],
+            [
+              "folk plus folkX [S21]",
+              "Kontaktarbeit im CRM mit Browsererweiterung",
+              "Möglicher Ergänzungspfad für Gesprächsstatus"
+            ]
+          ],
+          "widths": [
+            0.25,
+            0.43,
+            0.32
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Wichtige Korrektur für Marketing und Vergleiche: Mehrere aktuelle Drittanbieter-Seiten behaupten noch, es gebe keinen offiziellen LinkedIn-Connector. Die LinkedIn-Ankündigung vom 21. Oktober und OpenAIs eigene Produktseite widerlegen diese pauschale Aussage. Richtig ist eine funktionsbezogene Abgrenzung: Die hier verifizierten offiziellen Angebote dokumentieren keine allgemeine persönliche Inbox mit den Schreib- und Lesefunktionen dieser Bridge. [S02, S03]"
+        },
+        {
+          "type": "p",
+          "text": "Die günstigste Konkurrenz ist weiterhin eine manuelle Arbeitsroutine oder ein bereits vorhandener allgemeiner Browser-Agent. Ein dediziertes Produkt gewinnt dagegen nur, wenn es wiederkehrende Aufgaben zuverlässiger, schneller oder nachvollziehbarer erledigt. Dass mehrere Wettbewerber ähnliche Funktionen anbieten, validiert eine Kategorie; es validiert nicht automatisch die Nachfrage nach einem weiteren Anbieter."
+        }
+      ]
+    },
+    {
+      "title": "11 Differenzierung die sich überprüfen lässt",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Die überzeugendste Positionierung lautet als Arbeitshypothese: „Dein lokaler LinkedIn-Zugang für AI-Agenten: Gespräche verstehen, passende Antworten vorbereiten und Aktionen nachvollziehen.“ Der Begriff lokal beschreibt die Bridge und den Browserzugang. Er darf nicht als pauschales Versprechen lokaler Modellverarbeitung gelesen werden."
+        },
+        {
+          "type": "table",
+          "headers": [
+            "Mögliche Stärke",
+            "Vorhandene Grundlage",
+            "Noch benötigter Beweis"
+          ],
+          "rows": [
+            [
+              "Richtiger Empfänger",
+              "Konto- und Teilnehmerprüfung vor Versand",
+              "Fehlzuordnung über typische reale Grenzfälle ausschließen"
+            ],
+            [
+              "Keine versehentliche Wiederholung",
+              "Idempotenzschlüssel und persistierte Receipts",
+              "Reproduzierbare Demo über Timeout und Neustart"
+            ],
+            [
+              "Ehrliche Abdeckung",
+              "Cursor und page_info mit partial/coverage",
+              "Workflow-Berichte nennen tatsächlich gelesenen Umfang"
+            ],
+            [
+              "Nutzung vorhandener Sitzung",
+              "Native Messaging statt gehosteter Sessionhaltung",
+              "Frische Installation und verständlicher Datenfluss"
+            ],
+            [
+              "Inbox lesen ohne Lesestatusänderung",
+              "API-Reader und dokumentierter Live-Check",
+              "Wiederholte Prüfung mit neuen LinkedIn-Varianten"
+            ],
+            [
+              "Native Planung",
+              "Entwurf, Scheduling und gezielte Stornierung",
+              "Stabilität bei aktualisierter Oberfläche und Sprache"
+            ]
+          ],
+          "widths": [
+            0.27,
+            0.37,
+            0.36
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Keine dieser technischen Eigenschaften ist allein ein dauerhafter Wettbewerbsvorsprung. Vergleichbare Projekte arbeiten bereits an Receipts, Session-Recovery und Installationsverbesserungen. Ein belastbarer Vorsprung wäre ein dokumentierter Qualitätsstandard über die gesamte Aufgabe: Ergebnisabdeckung, richtige Identität, überprüfbare Ausführung und nachvollziehbare Fehlerzustände. Die Studie behauptet keine gemessene Überlegenheit."
+        },
+        {
+          "type": "p",
+          "text": "Die Benutzerführung sollte zuerst den gewünschten Job anbieten. „Inbox für heute prüfen“ ist verständlicher als sieben isolierte Conversation-Tools. Die 27 Operationen können dabei als stabile Grundlage erhalten bleiben. Die zusätzliche Ebene wäre eine kleine Bibliothek dokumentierter Workflows mit Input, Lesebudget, Ausgabeformat und klarer Grenze."
+        },
+        {
+          "type": "p",
+          "text": "Weniger überzeugende Differenzierung wäre „sicher durch menschliches Timing“, „kein Ban möglich“ oder „der einzige LinkedIn-MCP“. Solche Aussagen sind durch die Quellen nicht gedeckt. Technische Zurückhaltung bei Fehlern ist ein reales Merkmal; eine Garantie für die Plattformreaktion ist es nicht. [S05]"
+        }
+      ]
+    },
+    {
+      "title": "12 Wirtschaftliche Hypothese und Preisrahmen",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Die Suchdaten erlauben keine seriöse TAM- oder Umsatzschätzung. Es fehlen insbesondere die Zahl kompatibler und erreichbarer Nutzer, wiederholte Nutzung, Umwandlung von Besuchern in Aktivierte, Zahlungsbereitschaft, Supportkosten und Abwanderung. Die Keywordzahlen werden deshalb nicht mit einer pauschalen Conversion multipliziert und als Marktumsatz ausgegeben."
+        },
+        {
+          "type": "table",
+          "headers": [
+            "Öffentlicher Preisanker",
+            "Stand beim Abruf",
+            "Was daraus folgt"
+          ],
+          "rows": [
+            [
+              "Reduck [S11]",
+              "Kostenlos bis 100 Scripts/Monat; Pro 20 USD/Monat",
+              "Direkter Druck durch breiteren Agentenzugang"
+            ],
+            [
+              "Dripify [S19]",
+              "59 / 79 / 99 USD je Nutzer/Monat bei monatlicher Zahlung",
+              "Höherer Preis für fertige Vertriebsabläufe"
+            ],
+            [
+              "Unipile [S14]",
+              "Minimum 49 EUR/Monat für bis zu 10 Accounts, exkl. USt.",
+              "Entwickler-/Mehrkontenprodukt; nicht direkt pro Person vergleichbar"
+            ],
+            [
+              "Buffer [S20]",
+              "Kostenloser Plan mit 10 geplanten Posts je Kanal",
+              "Ein reines Scheduling-Paket braucht zusätzlichen Nutzen"
+            ]
+          ],
+          "widths": [
+            0.25,
+            0.43,
+            0.32
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Empfohlener Preistest, ausdrücklich keine Marktpreisfeststellung: ein persönliches Paket mit zuverlässig installiertem Connector und drei Workflows bei 15, 25 oder 39 EUR pro Monat testen. Der Unterschied zwischen den Preiszellen sollte nicht durch gleichzeitig veränderte Features verfälscht werden. Ein Pilotpreis kann Support enthalten; anschließend muss sichtbar werden, ob dieser Aufwand dauerhaft finanzierbar ist."
+        },
+        {
+          "type": "p",
+          "text": "Ein technisch orientierter Käufer könnte eine kostenlose Grundfunktion oder offene Komponenten erwarten. Eine mögliche kommerzielle Leistung wäre gepflegte, signierte Distribution mit schneller Fehlerbehebung und verifizierten Workflows. Ein Einmalkauf passt schlecht zu einer Oberfläche, deren Änderungen laufende Wartung erzeugen, sofern Updates nicht gesondert finanziert werden. Das ist eine betriebswirtschaftliche Ableitung, kein bereits bestätigtes Kundenurteil."
+        },
+        {
+          "type": "p",
+          "text": "Für die Kalkulation sind drei Kostenblöcke getrennt zu erfassen: direkte Infrastruktur, laufende Adapter-/Release-Wartung und Support pro aktivem Nutzer. Zusätzlich zahlt der Nutzer gegebenenfalls bereits für AI-Client und LinkedIn-Abonnement. Eine lokale Architektur spart einen gehosteten Browserbetrieb, beseitigt aber weder Support noch Modellkosten."
+        },
+        {
+          "type": "p",
+          "text": "Eine brauchbare Entscheidungsformel ist: monatlicher Deckungsbeitrag pro aktivem Zahler = realisierter Preis minus variable Betriebs-, Zahlungs- und Supportkosten. Akquisitionsbudget lässt sich erst mit beobachteter bezahlter Bindung bestimmen. Die in Google Ads gelieferten Bid-Felder werden wegen der beschriebenen Währungs- und Auflösungsgrenzen dafür nicht verwendet."
+        }
+      ]
+    },
+    {
+      "title": "13 Produktprioritäten für einen überprüfbaren Pilot",
+      "blocks": [
+        {
+          "type": "table",
+          "headers": [
+            "Priorität",
+            "Konkretes Ergebnis",
+            "Abnahmekriterium als Vorschlag"
+          ],
+          "rows": [
+            [
+              "P0 Installation und Wahrheit der Claims",
+              "Ein dokumentierter Pfad pro unterstütztem Client",
+              "Frische Mac-Installation bis erstes korrektes Ergebnis ohne Entwicklerhilfe"
+            ],
+            [
+              "P0 Inbox-Triage als fertiger Ablauf",
+              "Priorisierte Threads mit Quellen und Abdeckungsangabe",
+              "Wichtige Antwort im Testset nicht still übergangen"
+            ],
+            [
+              "P0 Ausführung nachvollziehen",
+              "Empfänger, Status und Wiederholungsverhalten verständlich",
+              "Keine Dublette bei gleicher Aktion und gleichem Schlüssel"
+            ],
+            [
+              "P1 Beziehung und nächster Schritt",
+              "Strukturierte Notizen für vorhandenes CRM",
+              "Nachvollziehbare Zuordnung ohne erfundene Zusagen"
+            ],
+            [
+              "P1 Claude-Paket und Client-Matrix",
+              "Kürzerer, getesteter lokaler Installationsweg",
+              "Dokumentierter Test pro konkret beworbenem Client"
+            ],
+            [
+              "P1 ChatGPT Tunnel Machbarkeit",
+              "Privater Anschluss als getrenntes Experiment",
+              "Lesen, Konto-Scope, Widerruf und Fehlerweg verifiziert"
+            ],
+            [
+              "P2 Textplanung als ergänzender Job",
+              "Notizen zu nativen Entwürfen und Wochenplan",
+              "Keine Überschreibung fremder Entwürfe; Zeit stimmt"
+            ],
+            [
+              "Später breitere Suche und Index",
+              "Nur nach bestätigtem Bedarf",
+              "Explizites Datenmodell, Einwilligung und Löschpfad"
+            ],
+            [
+              "Zurückstellen Kampagnen und Teams",
+              "Keine versteckte Scope-Ausweitung",
+              "Erst bei nachgewiesener Nachfrage und tragfähigem Betrieb"
+            ]
+          ],
+          "widths": [
+            0.26,
+            0.39,
+            0.35
+          ]
+        },
+        {
+          "type": "p",
+          "text": "P0 meint nicht, dass sämtliche zugrunde liegenden Funktionen fehlen. Viele Voraussetzungen sind implementiert. Es geht um eine getestete, leicht installierbare und verständlich begrenzte Gesamterfahrung. Die Prüfung sollte den eigentlichen Job abnehmen, nicht nur bestätigen, dass ein einzelner Endpoint antwortet."
+        },
+        {
+          "type": "p",
+          "text": "Eine konfigurierbare Nur-Lesen-Option oder ein clientseitiges Review-Profil könnte eine zusätzliche Käufergruppe erschließen. Das ist gesondert zu validieren. Die aktuelle direkte Ausführung wurde im Produkt bewusst eingeführt und bleibt im Ist-Zustand korrekt beschrieben. Aus dieser Studie folgt kein Auftrag, sie zu entfernen oder eine zwingende Bestätigung vor jeder Aktion einzubauen."
+        },
+        {
+          "type": "p",
+          "text": "Ein dauerhaftes lokales Gesprächsarchiv sollte nicht als vermeintlich kleine Performance-Optimierung eingeführt werden. Es ändert Speicherung, Suchmöglichkeiten und Datenverantwortung. Ein zuerst testbarer Zwischenweg ist ein begrenzter, ausdrücklich vom Nutzer gestarteter Scan mit Coverage-Bericht und gezielten CRM-Notizen."
+        },
+        {
+          "type": "p",
+          "text": "Die Reihenfolge kann sich ändern, wenn die ersten Tests überwiegend an Web-Chat-Erwartungen scheitern. Dann ist Client-Kompatibilität der Engpass. Wenn Installierte hingegen selten wiederkommen, hilft ein weiterer Transport allein nicht; dann muss die Aufgabenwahl überprüft werden."
+        }
+      ]
+    },
+    {
+      "title": "14 Marktzugang und Inhalte",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Der erste Akquisitionsweg sollte eine konkrete Demo für lokale Agentennutzer sein. Eine englische Kernseite kann „LinkedIn MCP server“ adressieren und unmittelbar zeigen, wie Inbox und Gesprächskontext zusammenkommen. Separate Installationsseiten müssen Codex, Claude Code und einen tatsächlich getesteten Claude-Desktop-Pfad unterscheiden."
+        },
+        {
+          "type": "table",
+          "headers": [
+            "Seite oder Demo",
+            "Suchbedarf",
+            "Erlaubtes Produktversprechen"
+          ],
+          "rows": [
+            [
+              "LinkedIn MCP server",
+              "Explizite technische Integration",
+              "Lokale Bridge mit konkreter Capability-Matrix"
+            ],
+            [
+              "Connect LinkedIn to Claude",
+              "Connector- und Setup-Fragen",
+              "Client präzise nennen; lokale und Web-Wege erklären"
+            ],
+            [
+              "Connect LinkedIn to ChatGPT",
+              "Web-/App-Anschluss",
+              "Heute Machbarkeits- und Statusseite; keine fertige Integration behaupten"
+            ],
+            [
+              "LinkedIn inbox assistant",
+              "Gespräche und Antworten",
+              "Begrenzte Triage mit Quellen und Abdeckung"
+            ],
+            [
+              "LinkedIn follow-up workflow",
+              "Warme Kontakte weiterführen",
+              "Vorschläge aus gelesenem Kontext; kein automatisches CRM-Gedächtnis"
+            ],
+            [
+              "LinkedIn API versus MCP",
+              "Entwickler suchen passenden Zugriff",
+              "Offizielle APIs, Datenanbieter und Browser-Bridge sachlich unterscheiden"
+            ],
+            [
+              "LinkedIn text scheduling from AI",
+              "Content-Workflow",
+              "Persönliche Textposts; keine Medien-/Page-Funktion suggerieren"
+            ]
+          ],
+          "widths": [
+            0.31,
+            0.29,
+            0.4
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Inhalte sollten eine echte Aufgabenfolge zeigen: Input, Ergebnis, Grenzen und Nachweis. Beispiel: Ein Thread enthält eine verschobene Besprechung; der Agent findet die letzte relevante Nachricht, erstellt einen Entwurf mit Bezug darauf und gibt die Quelle an. Das erklärt Mehrwert präziser als eine generische Sammlung von AI-Prompts."
+        },
+        {
+          "type": "p",
+          "text": "Bei breiten API- und Automatisierungsbegriffen ist ein Teil des Traffics unpassend. Für spätere bezahlte Suchtests wären Anzeigen-API, Jobs/Auto-Apply, große Scraping-Exporte und Unternehmensseiten zunächst Ausschlusskandidaten. Der genaue Ausschluss muss anhand tatsächlicher Suchanfragen erfolgen. „Free“ pauschal auszuschließen wäre für ein Entwicklerprodukt voreilig."
+        },
+        {
+          "type": "p",
+          "text": "Für SEO liegt keine quantitative Schwierigkeitsschätzung vor. Die öffentliche Webrecherche zeigt konkurrierende Produkt-, Dokumentations- und GitHub-Seiten, aber keine neutral reproduzierte Rangliste der ersten zehn Google-Ergebnisse pro Land. Deshalb werden keine Ranking-Wahrscheinlichkeiten behauptet. Google-Ads-Wettbewerb ist hierfür kein Ersatz."
+        },
+        {
+          "type": "p",
+          "text": "Eine deutschsprachige Seite sollte Setup, Datenfluss und konkrete Arbeitsabläufe klar erklären. Eine pauschale Übersetzung jeder Long-Tail-Variante wäre weder durch die Discovery-Menge noch durch einen eigenständigen Nutzerjob begründet."
+        }
+      ]
+    },
+    {
+      "title": "15 Validierungsplan für die nächsten vier Wochen",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Der folgende Plan ist eine Empfehlung für spätere Produktvalidierung. Er wurde in dieser Recherche nicht ausgeführt und startet keine Kontakte, Anzeigen, Veröffentlichungen oder wiederkehrenden Aufgaben."
+        },
+        {
+          "type": "table",
+          "headers": [
+            "Phase",
+            "Versuch",
+            "Entscheidung"
+          ],
+          "rows": [
+            [
+              "Woche 1",
+              "Zwölf problemorientierte Gespräche: fünf technische Gründer/Berater, vier GTM-Nutzer, drei Recruiter oder Creator",
+              "Welche wiederkehrende Aufgabe ist wichtig genug, um Setup zu rechtfertigen?"
+            ],
+            [
+              "Woche 1 bis 2",
+              "Acht beobachtete Installationen mit drei fest definierten Aufgaben",
+              "Ist der Weg bis zum ersten Nutzen ohne Entwicklerhilfe tragfähig?"
+            ],
+            [
+              "Woche 2 bis 3",
+              "Vierzehn Tage begleitete Nutzung derselben Workflows",
+              "Kommen Nutzer aus eigener Motivation zurück?"
+            ],
+            [
+              "Woche 3",
+              "Reale, klar bepreiste Pilotangebote statt hypothetischer Preisfragen",
+              "Entsteht tatsächliche Zahlungsbereitschaft?"
+            ],
+            [
+              "Woche 4",
+              "Review von Fehlern, Bindung, Supportzeit und Ausstiegsgründen",
+              "Ausbauen, enger positionieren oder stoppen"
+            ]
+          ],
+          "widths": [
+            0.19,
+            0.53,
+            0.28
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Vorgeschlagene Lernschwellen: mindestens sechs von acht Installationen gelangen in höchstens 15 Minuten ohne Entwicklerübernahme zum ersten korrekten Ergebnis; mindestens fünf der acht nutzen in Woche zwei an mehreren Tagen einen Kernworkflow erneut; mindestens vier von acht nehmen ein konkretes bezahltes Pilotangebot an. Diese kleinen Stichproben sind Entscheidungsregeln für einen frühen Pilot, keine statistischen Marktbeweise."
+        },
+        {
+          "type": "p",
+          "text": "Pro Workflow zählen zuerst Korrektheit und Abdeckung: richtige Person, richtige Nachrichtenquelle, klarer gelesener Umfang, korrekt erkannter offener Punkt und nachvollziehbarer Versandstatus. Erst danach Zeitersparnis gegenüber dem bisherigen Ablauf messen. Ein schneller falscher Vorschlag ist kein Produktgewinn."
+        },
+        {
+          "type": "p",
+          "text": "Zu protokollieren sind Installationsdauer, erfolgreiche Aufgabe, Abbruchstelle, wiederholte Nutzung, manuelle Korrekturen, nötige Supportminuten und Zahlungsentscheidung. Da die aktuelle Software keine Telemetrie hat, lässt sich dies zunächst freiwillig über beobachtete Sessions und ein Pilotprotokoll erfassen. Verdeckte Nutzungsanalyse ist für den Test nicht erforderlich."
+        },
+        {
+          "type": "p",
+          "text": "Interviewfragen sollten auf das letzte konkrete Ereignis zielen: Welcher LinkedIn-Thread wurde zuletzt vergessen? Wie wurde das bemerkt? Wo steht die nächste Aktion heute? Welche Daten wurden in einen AI-Chat kopiert? Was würde eine Installation verhindern? Welchen bestehenden Dienst würde das Produkt ersetzen? So wird zwischen Interesse an AI und einem tatsächlichen Arbeitsproblem unterschieden."
+        },
+        {
+          "type": "p",
+          "text": "Stoppsignale sind wiederholte Fehlzuordnung, nicht erklärbare fehlende Nachrichten, hohe Konto-/Compliance-Bedenken in der Zielgruppe, dauerhaft hoher Wartungsbedarf oder keine Wiederverwendung nach erfolgreicher Installation. Viel Suchinteresse bei fehlender Wiederverwendung ist kein Grund, einfach mehr Features hinzuzufügen."
+        }
+      ]
+    },
+    {
+      "title": "16 Plattformgrenzen und belastbare Aussagen",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "LinkedIn erklärt in seiner aktuellen Hilfe, dass Drittsoftware und Erweiterungen, die LinkedIn scrapen oder Aktivitäten automatisieren, nicht erlaubt sind. Das ist für dieses Produkt ein struktureller Markt- und Distributionsfaktor. Nutzerkontrolle, lokale Ausführung, kleine Mengen oder ein Cooldown sind technische Eigenschaften; sie belegen keine Plattformfreigabe. Eine allgemeine Zusage „LinkedIn-konform“ lässt sich aus der untersuchten Architektur nicht ableiten. [S05]"
+        },
+        {
+          "type": "p",
+          "text": "Die offizielle API-Landschaft ist differenzierter als „LinkedIn hat keine API“. Die dokumentierten offenen Berechtigungen betreffen Identität und eigene soziale Aktionen; zahlreiche weitere Programme benötigen eine Genehmigung. Eine offizielle Publishing-Anbindung kann deshalb für Content einen anderen Produktpfad eröffnen als für persönliche Inbox und breite Personensuche. Ob das für diese Bridge wirtschaftlich sinnvoll ist, muss separat geprüft werden. [S04]"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "Aussage",
+            "Bewertung"
+          ],
+          "rows": [
+            [
+              "LinkedIn-Sitzungscredentials bleiben im Browser",
+              "Durch Architektur und README gestützt"
+            ],
+            [
+              "Keine gehostete Inbox-Datenbank der Bridge",
+              "Für den aktuellen Produktstand gestützt"
+            ],
+            [
+              "Keine Daten verlassen den Rechner",
+              "Nicht gestützt; Antworten gehen an den gewählten AI-Client"
+            ],
+            [
+              "Alle 27 Operationen sind verfügbar",
+              "Im Entwicklungskandidaten zutreffend; Availability hängt auch an Verbindung"
+            ],
+            [
+              "Alle 27 Operationen sind produktionsgetestet",
+              "Nicht aus Verfügbarkeit oder historischen Prüfungen ableitbar"
+            ],
+            [
+              "ChatGPT-Web-Integration ist fertig",
+              "Für dieses Repository falsch"
+            ],
+            [
+              "Eine private ChatGPT-Verbindung ist grundsätzlich unmöglich",
+              "Durch aktuelle Tunnel-Dokumentation widerlegt"
+            ],
+            [
+              "Offizielle LinkedIn-Connectoren gibt es nicht",
+              "Durch Hiring Pro und OpenAI-Produktseite widerlegt"
+            ],
+            [
+              "Ein menschliches Intervall verhindert Sperren",
+              "Nicht belegt"
+            ]
+          ],
+          "widths": [
+            0.48,
+            0.52
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Aus Sicht der Marktforschung sollte dieses Thema weder dramatisiert noch aus der Produktbeschreibung entfernt werden. Es beeinflusst, welche Kunden die Lösung überhaupt einsetzen wollen, welche Aussagen Vertrieb machen kann und wie viel Aufwand sich vor einer breiten Veröffentlichung lohnt. Eine konkrete Vertrags- oder Datenschutzprüfung für ein Geschäftsmodell ist durch diese Marktstudie nicht ersetzt."
+        }
+      ]
+    },
+    {
+      "title": "17 Wiederverwendbares Format für weitere Studien",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Dieses Research-Paket ist so aufgebaut, dass spätere Studien denselben Produktbezug behalten. Jede neue Ausgabe bekommt ein Datum, den analysierten kanonischen Commit, unveränderte Messantworten, ein Quellenregister und eine klare Trennung von Befund und Empfehlung. Die Struktur ist wiederverwendbar; es wurde keine automatische Wiederholung eingerichtet."
+        },
+        {
+          "type": "table",
+          "headers": [
+            "Baustein",
+            "Mindestinhalt"
+          ],
+          "rows": [
+            [
+              "Produktaufnahme",
+              "Ist-Funktionen, Limits, Transport, installierbare Plattformen, Acceptance und Release-Status"
+            ],
+            [
+              "Suchbedarf",
+              "Explizite Connector-Begriffe, Aufgabenbegriffe, Alternativen, deutsche Varianten und Ausschlussintents"
+            ],
+            [
+              "Messprotokoll",
+              "Datum, Länder, Sprache, Netzwerk, Zeitraum, Seeds, Run-ID, fehlende Werte und Abweichungen"
+            ],
+            [
+              "Nutzerbedürfnisse",
+              "Konkrete Aufgaben, Pain Points, bestehender Workaround, Quellenqualität und Gegenbelege"
+            ],
+            [
+              "Wettbewerb",
+              "Offizielle Wege, direkte Connectoren, Open Source, Workflow-SaaS und manuelle Substitute"
+            ],
+            [
+              "Capability Match",
+              "Heute möglich, nur durch externe Orchestrierung möglich, echte Lücke, außerhalb des Scope"
+            ],
+            [
+              "Wirtschaftlichkeit",
+              "Preisanker, eigene Preishypothesen, Kostenmodell und fehlende Belege"
+            ],
+            [
+              "Entscheidungen",
+              "Priorisierte Experimente mit Messgröße, Schwelle und Stoppsignal"
+            ]
+          ],
+          "widths": [
+            0.28,
+            0.72
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Für eine Folgeausgabe sollten dieselben 130 historischen Begriffe erneut gemessen und neue Suchbegriffe separat ergänzt werden. Historische Antworten niemals überschreiben. Ein fehlender Wert wird erneut kontrolliert, bevor ein negativer Nachfragebefund formuliert wird. Länder-Scope, Sprachscope, Messmodus und Datum müssen bei Vergleichen gleich bleiben."
+        },
+        {
+          "type": "p",
+          "text": "Die öffentliche Produktlandschaft ist besonders vor dem Schreiben von Vergleichsseiten zu aktualisieren. Diese Studie hat bereits zwei verbreitete, aber überholte Aussagen gefunden: das generelle Fehlen offizieller LinkedIn-Connectoren und die Behauptung, private ChatGPT-Verbindungen seien nur über öffentliche Hosting-Endpunkte möglich."
+        },
+        {
+          "type": "p",
+          "text": "Ein Research-Dokument sollte außerdem seine Hypothesen widerlegbar machen. Die lokale Inbox-These wäre beispielsweise schwächer, wenn Nutzer fast ausschließlich Webzugang verlangen oder trotz erfolgreichem Setup keinen wiederkehrenden Nutzen sehen. Diese Gegenhypothesen gehören in jede Aktualisierung."
+        }
+      ]
+    },
+    {
+      "title": "18 Offene Fragen und nächste Entscheidung",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Die vorhandene Evidenz rechtfertigt einen eng geführten Produktpilot, keine Prognose eines großen SaaS-Marktes. Explizite MCP-Suche, konkrete Gesprächsprobleme und passende technische Funktionen treffen auf einen bereits aktiven Wettbewerb. Der nächste Erkenntnisgewinn liegt bei Installation, Wiederverwendung und Zahlungsentscheidung."
+        },
+        {
+          "type": "p",
+          "text": "Die wichtigste offene Segmentfrage lautet: Sind lokale Agentennutzer eine ausreichend große, erreichbare und zahlungsbereite Zielgruppe, oder liegt der wertvollere Bedarf bei nichttechnischen Web-Chat-Nutzern? Die zweite Frage betrifft den Job: Wird primär Inbox-Arbeit gekauft, Recherche vor Kontakten oder Content-Planung? Suchbegriffe und Community-Beiträge können diese Entscheidung eingrenzen, aber nicht abschließend treffen."
+        },
+        {
+          "type": "p",
+          "text": "Die technische Schlüsselfrage ist, ob die heutige Bridge einen kleinen, klar beschriebenen Job über reale LinkedIn-Varianten zuverlässig genug erfüllt. Dafür sind die bestehenden Cursor-, Identitäts- und Receipt-Mechanismen gute Grundlagen. Der Nachweis muss jedoch auf aktuellen Builds und vollständigen Arbeitsabläufen beruhen."
+        },
+        {
+          "type": "p",
+          "text": "Empfohlene nächste Entscheidung: einen begrenzten Pilot für technische Gründer, Berater und GTM-Nutzer vorbereiten; Inbox-Triage und kontextbezogene Antworten als Kern festlegen; Installation und Client-Kompatibilität vor zusätzlichen Automatisierungsflächen prüfen. ChatGPT-Tunnel und dauerhafte Gesprächsnotizen als separate Experimente behandeln. Ein Kampagnen- oder Mehrkontenprodukt sollte erst aus nachgewiesener Nachfrage entstehen."
+        }
+      ]
+    }
+  ]
+}

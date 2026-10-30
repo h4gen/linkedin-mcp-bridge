@@ -1,0 +1,1649 @@
+{
+  "run_id": "2026-10-30T08-14-38-546Z-cdcf0e46",
+  "mode": "historical_volume",
+  "cache_hit": false,
+  "requested_scope": {
+    "account": {
+      "customer_id": "REDACTED_GOOGLE_ADS_ACCOUNT"
+    },
+    "locations": {
+      "targets": [
+        {
+          "name": "United States",
+          "country_code": "US",
+          "target_type": "COUNTRY",
+          "criterion_id": "2840"
+        }
+      ]
+    },
+    "language": {
+      "name": "English",
+      "code": "en"
+    },
+    "network": "GOOGLE",
+    "date_range": {
+      "preset": "last_12_months"
+    }
+  },
+  "resolved_scope": {
+    "account": {
+      "customer_id": "REDACTED_GOOGLE_ADS_ACCOUNT"
+    },
+    "locations": {
+      "targets": [
+        {
+          "name": "United States",
+          "country_code": "US",
+          "target_type": "COUNTRY",
+          "criterion_id": "2840"
+        }
+      ]
+    },
+    "language": {
+      "name": "English",
+      "code": "en"
+    },
+    "network": "GOOGLE",
+    "date_range": {
+      "preset": "last_12_months"
+    }
+  },
+  "source_url": "https://ads.google.com/aw/keywordplanner/home",
+  "stats": {
+    "submitted_seed_count": 25,
+    "result_count": 25,
+    "rows_with_volume": 15,
+    "aggregate_rows": 0,
+    "duplicate_rows": 0,
+    "malformed_rows": 0
+  },
+  "suggested_broadenings": [],
+  "results": [
+    {
+      "keyword": "linkedin ai agent",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": -90,
+      "competition": "MEDIUM",
+      "competition_index": 0,
+      "top_of_page_bid_low": {
+        "amount": 5.455726,
+        "currency": "EUR"
+      },
+      "top_of_page_bid_high": {
+        "amount": 23.482652,
+        "currency": "EUR"
+      },
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 500
+        },
+        {
+          "month": "2026-03",
+          "searches": 500
+        },
+        {
+          "month": "2026-04",
+          "searches": 500
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "linkedin ai agent",
+        "1000": "50",
+        "1001": "2",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1011": "5455726",
+        "1012": "23482652",
+        "1014": "false",
+        "1021": "[\"50\",\"50\",\"50\",\"50\",\"500\",\"500\",\"500\",\"50\",\"50\",\"50\",\"50\",\"50\"]",
+        "1026": "true",
+        "1035": "0",
+        "1036": "0",
+        "1037": "-0.9"
+      }
+    },
+    {
+      "keyword": "linkedin n8n",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": 0,
+      "competition": "LOW",
+      "competition_index": 0,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 50
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "linkedin n8n",
+        "1000": "50",
+        "1001": "1",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1021": "[\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\"]",
+        "1026": "true",
+        "1035": "0",
+        "1036": "0",
+        "1037": "0"
+      }
+    },
+    {
+      "keyword": "linkedin claude",
+      "currency": null,
+      "avg_monthly_searches": null,
+      "three_month_change_percent": null,
+      "yoy_change_percent": null,
+      "competition": null,
+      "competition_index": null,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": null,
+      "in_plan": null,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": null
+        },
+        {
+          "month": "2025-11",
+          "searches": null
+        },
+        {
+          "month": "2025-12",
+          "searches": null
+        },
+        {
+          "month": "2026-01",
+          "searches": null
+        },
+        {
+          "month": "2026-02",
+          "searches": null
+        },
+        {
+          "month": "2026-03",
+          "searches": null
+        },
+        {
+          "month": "2026-04",
+          "searches": null
+        },
+        {
+          "month": "2026-05",
+          "searches": null
+        },
+        {
+          "month": "2026-06",
+          "searches": null
+        },
+        {
+          "month": "2026-07",
+          "searches": null
+        },
+        {
+          "month": "2026-08",
+          "searches": null
+        },
+        {
+          "month": "2026-09",
+          "searches": null
+        }
+      ],
+      "raw": {
+        "status": "no_metrics_returned"
+      }
+    },
+    {
+      "keyword": "chatgpt linkedin connector",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": 0,
+      "competition": "LOW",
+      "competition_index": 0,
+      "top_of_page_bid_low": {
+        "amount": 9.647591,
+        "currency": "EUR"
+      },
+      "top_of_page_bid_high": {
+        "amount": 75.826421,
+        "currency": "EUR"
+      },
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 50
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "chatgpt linkedin connector",
+        "1000": "50",
+        "1001": "1",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1011": "9647591",
+        "1012": "75826421",
+        "1014": "false",
+        "1021": "[\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\"]",
+        "1026": "true",
+        "1035": "0",
+        "1036": "0",
+        "1037": "0"
+      }
+    },
+    {
+      "keyword": "linkedin inbox automation",
+      "currency": "EUR",
+      "avg_monthly_searches": null,
+      "three_month_change_percent": null,
+      "yoy_change_percent": null,
+      "competition": null,
+      "competition_index": null,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [],
+      "raw": {
+        "1": "linkedin inbox automation",
+        "1001": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1026": "true",
+        "1036": "0"
+      }
+    },
+    {
+      "keyword": "linkedin inbox ai",
+      "currency": "EUR",
+      "avg_monthly_searches": null,
+      "three_month_change_percent": null,
+      "yoy_change_percent": null,
+      "competition": null,
+      "competition_index": null,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [],
+      "raw": {
+        "1": "linkedin inbox ai",
+        "1001": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1026": "true",
+        "1036": "0"
+      }
+    },
+    {
+      "keyword": "linkedin ai reply",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": -100,
+      "yoy_change_percent": -100,
+      "competition": null,
+      "competition_index": null,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 0
+        },
+        {
+          "month": "2025-11",
+          "searches": 0
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 50
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 0
+        }
+      ],
+      "raw": {
+        "1": "linkedin ai reply",
+        "1000": "50",
+        "1001": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1021": "[\"0\",\"0\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"0\"]",
+        "1026": "true",
+        "1035": "-1",
+        "1036": "0",
+        "1037": "-1"
+      }
+    },
+    {
+      "keyword": "linkedin message search",
+      "currency": "EUR",
+      "avg_monthly_searches": null,
+      "three_month_change_percent": null,
+      "yoy_change_percent": null,
+      "competition": null,
+      "competition_index": null,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [],
+      "raw": {
+        "1": "linkedin message search",
+        "1001": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1026": "true",
+        "1036": "0"
+      }
+    },
+    {
+      "keyword": "linkedin conversation export",
+      "currency": "EUR",
+      "avg_monthly_searches": null,
+      "three_month_change_percent": null,
+      "yoy_change_percent": null,
+      "competition": null,
+      "competition_index": null,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [],
+      "raw": {
+        "1": "linkedin conversation export",
+        "1001": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1026": "true",
+        "1036": "0"
+      }
+    },
+    {
+      "keyword": "linkedin messages export",
+      "currency": "EUR",
+      "avg_monthly_searches": null,
+      "three_month_change_percent": null,
+      "yoy_change_percent": null,
+      "competition": null,
+      "competition_index": null,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [],
+      "raw": {
+        "1": "linkedin messages export",
+        "1001": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1026": "true",
+        "1036": "0"
+      }
+    },
+    {
+      "keyword": "linkedin follow up reminders",
+      "currency": "EUR",
+      "avg_monthly_searches": null,
+      "three_month_change_percent": null,
+      "yoy_change_percent": null,
+      "competition": null,
+      "competition_index": null,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [],
+      "raw": {
+        "1": "linkedin follow up reminders",
+        "1001": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1026": "true",
+        "1036": "0"
+      }
+    },
+    {
+      "keyword": "linkedin follow up automation",
+      "currency": "EUR",
+      "avg_monthly_searches": null,
+      "three_month_change_percent": null,
+      "yoy_change_percent": null,
+      "competition": null,
+      "competition_index": null,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [],
+      "raw": {
+        "1": "linkedin follow up automation",
+        "1001": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1026": "true",
+        "1036": "0"
+      }
+    },
+    {
+      "keyword": "linkedin relationship management",
+      "currency": "EUR",
+      "avg_monthly_searches": null,
+      "three_month_change_percent": null,
+      "yoy_change_percent": null,
+      "competition": null,
+      "competition_index": null,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [],
+      "raw": {
+        "1": "linkedin relationship management",
+        "1001": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1026": "true",
+        "1036": "0"
+      }
+    },
+    {
+      "keyword": "linkedin content automation",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": 0,
+      "competition": "HIGH",
+      "competition_index": 0,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 50
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "linkedin content automation",
+        "1000": "50",
+        "1001": "3",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1021": "[\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\"]",
+        "1026": "true",
+        "1035": "0",
+        "1036": "0",
+        "1037": "0"
+      }
+    },
+    {
+      "keyword": "linkedin comment automation",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": 0,
+      "competition": "HIGH",
+      "competition_index": 0,
+      "top_of_page_bid_low": {
+        "amount": 1.477162,
+        "currency": "EUR"
+      },
+      "top_of_page_bid_high": {
+        "amount": 15.998117,
+        "currency": "EUR"
+      },
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 50
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "linkedin comment automation",
+        "1000": "50",
+        "1001": "3",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1011": "1477162",
+        "1012": "15998117",
+        "1014": "false",
+        "1021": "[\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\"]",
+        "1026": "true",
+        "1035": "0",
+        "1036": "0",
+        "1037": "0"
+      }
+    },
+    {
+      "keyword": "linkedin engagement automation",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": null,
+      "yoy_change_percent": 0,
+      "competition": "MEDIUM",
+      "competition_index": 0,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 0
+        },
+        {
+          "month": "2026-01",
+          "searches": 0
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 50
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 0
+        },
+        {
+          "month": "2026-08",
+          "searches": 0
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "linkedin engagement automation",
+        "1000": "50",
+        "1001": "2",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1021": "[\"50\",\"50\",\"0\",\"0\",\"50\",\"50\",\"50\",\"50\",\"50\",\"0\",\"0\",\"50\"]",
+        "1026": "true",
+        "1035": "Infinity",
+        "1036": "0",
+        "1037": "0"
+      }
+    },
+    {
+      "keyword": "linkedin workflow automation",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": null,
+      "competition": "LOW",
+      "competition_index": 0,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 0
+        },
+        {
+          "month": "2025-11",
+          "searches": 0
+        },
+        {
+          "month": "2025-12",
+          "searches": 0
+        },
+        {
+          "month": "2026-01",
+          "searches": 0
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 50
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "linkedin workflow automation",
+        "1000": "50",
+        "1001": "1",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1021": "[\"0\",\"0\",\"0\",\"0\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\"]",
+        "1026": "true",
+        "1035": "0",
+        "1036": "0",
+        "1037": "Infinity"
+      }
+    },
+    {
+      "keyword": "mcp linkedin",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": 0,
+      "competition": "MEDIUM",
+      "competition_index": 0,
+      "top_of_page_bid_low": {
+        "amount": 2.623082,
+        "currency": "EUR"
+      },
+      "top_of_page_bid_high": {
+        "amount": 14.869486,
+        "currency": "EUR"
+      },
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 50
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "mcp linkedin",
+        "1000": "50",
+        "1001": "2",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1011": "2623082",
+        "1012": "14869486",
+        "1014": "false",
+        "1021": "[\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\"]",
+        "1026": "true",
+        "1035": "0",
+        "1036": "0",
+        "1037": "0"
+      }
+    },
+    {
+      "keyword": "claude linkedin",
+      "currency": "EUR",
+      "avg_monthly_searches": 500,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": 900,
+      "competition": "LOW",
+      "competition_index": 0,
+      "top_of_page_bid_low": {
+        "amount": 2.175457,
+        "currency": "EUR"
+      },
+      "top_of_page_bid_high": {
+        "amount": 11.077647,
+        "currency": "EUR"
+      },
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 500
+        },
+        {
+          "month": "2026-02",
+          "searches": 500
+        },
+        {
+          "month": "2026-03",
+          "searches": 500
+        },
+        {
+          "month": "2026-04",
+          "searches": 500
+        },
+        {
+          "month": "2026-05",
+          "searches": 500
+        },
+        {
+          "month": "2026-06",
+          "searches": 500
+        },
+        {
+          "month": "2026-07",
+          "searches": 500
+        },
+        {
+          "month": "2026-08",
+          "searches": 500
+        },
+        {
+          "month": "2026-09",
+          "searches": 500
+        }
+      ],
+      "raw": {
+        "1": "claude linkedin",
+        "1000": "500",
+        "1001": "1",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1011": "2175457",
+        "1012": "11077647",
+        "1014": "false",
+        "1021": "[\"50\",\"50\",\"50\",\"500\",\"500\",\"500\",\"500\",\"500\",\"500\",\"500\",\"500\",\"500\"]",
+        "1026": "true",
+        "1035": "0",
+        "1036": "0",
+        "1037": "9"
+      }
+    },
+    {
+      "keyword": "chatgpt linkedin",
+      "currency": "EUR",
+      "avg_monthly_searches": 500,
+      "three_month_change_percent": 900,
+      "yoy_change_percent": 0,
+      "competition": "LOW",
+      "competition_index": 0,
+      "top_of_page_bid_low": {
+        "amount": 4.753855,
+        "currency": "EUR"
+      },
+      "top_of_page_bid_high": {
+        "amount": 27.819605,
+        "currency": "EUR"
+      },
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 500
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 500
+        },
+        {
+          "month": "2026-03",
+          "searches": 500
+        },
+        {
+          "month": "2026-04",
+          "searches": 500
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 500
+        }
+      ],
+      "raw": {
+        "1": "chatgpt linkedin",
+        "1000": "500",
+        "1001": "1",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1011": "4753855",
+        "1012": "27819605",
+        "1014": "false",
+        "1021": "[\"500\",\"50\",\"50\",\"50\",\"500\",\"500\",\"500\",\"50\",\"50\",\"50\",\"50\",\"500\"]",
+        "1026": "true",
+        "1035": "9",
+        "1036": "0",
+        "1037": "0"
+      }
+    },
+    {
+      "keyword": "linkedin connector",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": 0,
+      "competition": "LOW",
+      "competition_index": 0,
+      "top_of_page_bid_low": {
+        "amount": 9.430536,
+        "currency": "EUR"
+      },
+      "top_of_page_bid_high": {
+        "amount": 29.395466,
+        "currency": "EUR"
+      },
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 50
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "linkedin connector",
+        "1000": "50",
+        "1001": "1",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1011": "9430536",
+        "1012": "29395466",
+        "1014": "false",
+        "1021": "[\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\"]",
+        "1026": "true",
+        "1035": "0",
+        "1036": "0",
+        "1037": "0"
+      }
+    },
+    {
+      "keyword": "linkedin automation ai",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": 0,
+      "competition": "MEDIUM",
+      "competition_index": 0,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 50
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "linkedin automation ai",
+        "1000": "50",
+        "1001": "2",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1021": "[\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\"]",
+        "1026": "true",
+        "1035": "0",
+        "1036": "0",
+        "1037": "0"
+      }
+    },
+    {
+      "keyword": "linkedin assistant",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": 0,
+      "competition": "LOW",
+      "competition_index": 0,
+      "top_of_page_bid_low": {
+        "amount": 4.78772,
+        "currency": "EUR"
+      },
+      "top_of_page_bid_high": {
+        "amount": 38.116314,
+        "currency": "EUR"
+      },
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 50
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "linkedin assistant",
+        "1000": "50",
+        "1001": "1",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1011": "4787720",
+        "1012": "38116314",
+        "1014": "false",
+        "1021": "[\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\"]",
+        "1026": "true",
+        "1035": "0",
+        "1036": "0",
+        "1037": "0"
+      }
+    },
+    {
+      "keyword": "linkedin sales agent",
+      "currency": "EUR",
+      "avg_monthly_searches": 50,
+      "three_month_change_percent": 0,
+      "yoy_change_percent": 0,
+      "competition": "MEDIUM",
+      "competition_index": 0,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [
+        {
+          "month": "2025-10",
+          "searches": 50
+        },
+        {
+          "month": "2025-11",
+          "searches": 50
+        },
+        {
+          "month": "2025-12",
+          "searches": 50
+        },
+        {
+          "month": "2026-01",
+          "searches": 50
+        },
+        {
+          "month": "2026-02",
+          "searches": 50
+        },
+        {
+          "month": "2026-03",
+          "searches": 50
+        },
+        {
+          "month": "2026-04",
+          "searches": 50
+        },
+        {
+          "month": "2026-05",
+          "searches": 50
+        },
+        {
+          "month": "2026-06",
+          "searches": 50
+        },
+        {
+          "month": "2026-07",
+          "searches": 50
+        },
+        {
+          "month": "2026-08",
+          "searches": 50
+        },
+        {
+          "month": "2026-09",
+          "searches": 50
+        }
+      ],
+      "raw": {
+        "1": "linkedin sales agent",
+        "1000": "50",
+        "1001": "2",
+        "1002": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1021": "[\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\",\"50\"]",
+        "1026": "true",
+        "1035": "0",
+        "1036": "0",
+        "1037": "0"
+      }
+    },
+    {
+      "keyword": "linkedin recruiting automation",
+      "currency": "EUR",
+      "avg_monthly_searches": null,
+      "three_month_change_percent": null,
+      "yoy_change_percent": null,
+      "competition": null,
+      "competition_index": null,
+      "top_of_page_bid_low": null,
+      "top_of_page_bid_high": null,
+      "ad_impression_share_percent": null,
+      "organic_impression_share_percent": null,
+      "organic_average_position": null,
+      "in_account": false,
+      "in_plan": false,
+      "monthly_searches": [],
+      "raw": {
+        "1": "linkedin recruiting automation",
+        "1001": "0",
+        "1005": "false",
+        "1009": "false",
+        "1014": "false",
+        "1026": "true",
+        "1036": "0"
+      }
+    }
+  ],
+  "artifacts": {
+    "raw_csv": [
+      "/Users/hagen/Library/Application Support/Browser Bridge/google-keyword-planner/runs/2026-10-30/2026-10-30T08-14-38-546Z-cdcf0e46/rpc-historical-1793348078542.json"
+    ],
+    "normalized_jsonl": "/Users/hagen/Library/Application Support/Browser Bridge/google-keyword-planner/runs/2026-10-30/2026-10-30T08-14-38-546Z-cdcf0e46/results.jsonl",
+    "manifest": "/Users/hagen/Library/Application Support/Browser Bridge/google-keyword-planner/runs/2026-10-30/2026-10-30T08-14-38-546Z-cdcf0e46/manifest.json"
+  },
+  "draft_cleanup": {
+    "status": "not_created",
+    "plan_id": null
+  },
+  "timings": {
+    "total_ms": 2934
+  },
+  "warnings": [
+    "source:authenticated_internal_rpc",
+    "scope_verified:outbound_rpc_fingerprint",
+    "exact_seed_metrics",
+    "historical_metrics_missing:1"
+  ]
+}
