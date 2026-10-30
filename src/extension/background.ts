@@ -229,6 +229,7 @@ const engine = new Engine({
           /* Navigation may temporarily destroy the old document. */
         }
       }
+      if (ready) await new Promise((r) => setTimeout(r, 1000));
       if (!ready)
         throw new Fault(
           "schedule_refresh_timeout",

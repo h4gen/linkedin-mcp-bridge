@@ -141,18 +141,33 @@ export async function composerOperation(
         }
       }
       if (!d) {
-        await click(
-          document,
-          /^(Start a post|Beitrag beginnen|Beitrag erstellen)$/,
-        );
-        d = await wait(activeComposer);
+        for (let attempt = 0; attempt < 2 && !d; attempt++) {
+          await click(
+            document,
+            /^(Start a post|Beitrag beginnen|Beitrag erstellen)$/,
+          );
+          try {
+            d = await wait(activeComposer, "composer_open_timeout");
+          } catch (e) {
+            // A fresh SDUI document may render its launcher before attaching handlers.
+            // Retry only opening an untouched editor; never retry a save/schedule click.
+            if (
+              attempt ||
+              dialogs().length ||
+              !(e instanceof Error) ||
+              e.message !== "composer_open_timeout"
+            )
+              throw e;
+          }
+        }
       }
     }
     // Let the native editor hydrate its saved content before inspecting or writing it.
     await new Promise((r) => setTimeout(r, 500));
     guard();
-    actor(d);
-    return d;
+    if (!d) fail("composer_open_timeout");
+    actor(d!);
+    return d!;
   };
   const closeComposer = async (d: HTMLElement, save: boolean) => {
     await click(d, /^(Dismiss|Close|Schließen)$/);
