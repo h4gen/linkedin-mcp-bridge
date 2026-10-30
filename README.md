@@ -27,7 +27,7 @@ npm run build:store
 node dist/cli.js install
 ```
 
-Until the Store ID is assigned, pass the ID explicitly: `node dist/cli.js install EXTENSION_ID`. The installer prints absolute paths and ready-to-use `mcpServers.linkedin` JSON. Configure your local client's stdio MCP server using that output. Do not guess executable paths. No elevated privileges or notarized package is needed. 5. Open LinkedIn in Chrome, open the extension, acknowledge the data flow and connect the tab. Then check:
+The assigned Store ID is `pibhcinkiadfplcaefllaeappkpnpfjm`; the store build uses it by default. The Store listing is currently a draft and is not yet publicly installable. To override the ID for testing, use `node dist/cli.js install EXTENSION_ID`. The installer prints absolute paths and ready-to-use `mcpServers.linkedin` JSON. Configure your local client's stdio MCP server using that output. Do not guess executable paths. No elevated privileges or notarized package is needed. 5. Open LinkedIn in Chrome, open the extension, acknowledge the data flow and connect the tab. Then check:
 
 ```sh
 node dist/cli.js doctor

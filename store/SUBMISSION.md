@@ -1,6 +1,13 @@
-# Local Chrome Web Store submission kit — 0.6.0
+# Chrome Web Store draft — 0.6.0
 
-Prepared locally only. No store entry was created and nothing was submitted.
+Saved in the Chrome Web Store Developer Dashboard on 2026-10-30. Status: Draft. Nothing submitted for review or published.
+
+- Draft: https://chrome.google.com/webstore/devconsole/ca8c63eb-664b-4353-ac7c-af776311ddff/pibhcinkiadfplcaefllaeappkpnpfjm/edit
+- Assigned extension ID: `pibhcinkiadfplcaefllaeappkpnpfjm`.
+- Listing language: English; category: Productivity / Tools.
+- Distribution: free, public, all regions (applies after publication).
+- Saved: description, icon, two screenshots, both promo tiles, homepage/support links, permission justifications, privacy URL and reviewer setup instructions.
+- Declared data: personally identifiable information, personal communications, website content. No remote executable code.
 
 - Extension: build with `npm run package:store`; upload `dist/linkedin-extension.zip`.
 - Listing copy and permission explanations: `store/listing.md`.
@@ -13,6 +20,6 @@ Prepared locally only. No store entry was created and nothing was submitted.
 - Icon: `assets/icon128.png`.
 - Visibility: public. Platforms: macOS and native Windows. Separate Git-installed Node server required.
 
-When an entry is created later, record its assigned ID in `store/release.json`, rebuild both server and extension, and verify the exact native-host binding. Before that, development installation requires an explicit extension ID. The ZIP does not install the local server.
+The assigned ID is recorded in `store/release.json` and used by store builds. Development installation still requires its own explicit extension ID. The ZIP does not install the local server. Assigning the Store ID changes the runtime fingerprint; previous live evidence is retained with its original fingerprint and is not relabeled. Fresh runtime-bound acceptance remains required before release.
 
 `npm run release:check` validates local build consistency. `npm run store:check` separately checks submission prerequisites and runtime-bound acceptance. Missing store ID or live acceptance must not be represented as successful store readiness. No website, notarized companion or hosted relay is required.
