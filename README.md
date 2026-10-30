@@ -1,4 +1,4 @@
-# LinkedIn MCP Bridge
+# LinkedIn MCP – AI Connector for Claude & Codex
 
 27 primitive LinkedIn tools for local AI agents: inbox and message history, people research, invitations, feed interactions, native text drafts and scheduling. The agent composes these tools; this project does not implement workflows, a CRM or an inbox index.
 

@@ -1,8 +1,8 @@
-# LinkedIn MCP Bridge
+# LinkedIn MCP – AI Connector for Claude & Codex
 
-Connect your LinkedIn inbox and professional research to a local MCP-compatible AI client on macOS or Windows.
+Connect LinkedIn to Claude Code, Codex and other local MCP-compatible AI clients. This Chrome extension works with a separately installed LinkedIn MCP server on macOS or Windows.
 
-Review conversations and message history, search your inbox, and manage read or archive status. Requested writes execute directly through the connected account without extension confirmation. Research people, feed posts, comments and reactions through bounded, paginated reads. LinkedIn can limit or hide results; this tool does not promise complete lead lists.
+Manage your LinkedIn inbox: read conversations and message history, search messages, send replies, and manage read or archive status. Create native text post drafts and schedule LinkedIn posts for later. Requested writes execute directly through the connected account without extension confirmation. Research people, feed posts, comments and reactions through bounded, paginated reads. LinkedIn can limit or hide results; this tool does not promise complete lead lists.
 
 Requires: macOS or native Windows, Chrome, a Git-installed local MCP bridge, a supported local MCP client, and your own signed-in LinkedIn session. This is not a direct connector for ChatGPT's website. Sales Navigator, attachment uploads and automated outreach campaigns are not included.
 

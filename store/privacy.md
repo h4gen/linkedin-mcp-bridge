@@ -1,4 +1,4 @@
-# Privacy notice — LinkedIn MCP Bridge
+# Privacy notice — LinkedIn MCP – AI Connector for Claude & Codex
 
 Project: https://github.com/h4gen/linkedin-mcp-bridge. Questions and support: https://github.com/h4gen/linkedin-mcp-bridge/issues.
 

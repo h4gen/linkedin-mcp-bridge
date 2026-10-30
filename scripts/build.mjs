@@ -42,10 +42,12 @@ await writeFile(
   JSON.stringify(
     {
       manifest_version: 3,
-      name: "LinkedIn MCP Bridge" + (channel === "pilot" ? "" : " Dev"),
+      name:
+        "LinkedIn MCP – AI Connector for Claude & Codex" +
+        (channel === "pilot" ? "" : " Dev"),
       version,
       description:
-        "Local MCP access to your connected LinkedIn tab. Messaging, profiles and feed.",
+        "Connect LinkedIn to Claude and Codex via a local MCP server. Manage your inbox, research people, draft and schedule posts.",
       minimum_chrome_version: "120",
       permissions: ["storage", "scripting", "nativeMessaging", "alarms"],
       host_permissions: ["https://www.linkedin.com/*"],
