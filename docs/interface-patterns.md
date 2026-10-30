@@ -37,3 +37,11 @@ The capability registry is shared by dispatch, tool listing and release checking
 ## 0.4.1 DOM execution and recovery
 
 DOM adapters distinguish `not_dispatched`, `dispatched`, and unknown transport outcomes. Only the actual mutation click starts dispatch; opening an owned menu or locating a target does not. New receipts include attempt counts and bounded content-free previous-attempt summaries. Explicit same-key retries revalidate failed-before-dispatch requests. The legacy recovery path is limited to missing conversation panes and invitation-control matching failures, with a read-only DOM preflight and fresh exact-source validation. It never resets the journal or retries other unknown outcomes. Account binding, payload fingerprints and the original seven-day retention window remain unchanged.
+
+## 0.5 native planning
+
+Use `post_draft_create(text, idempotency_key)` for a native draft, or `post_schedule(text, scheduled_at, idempotency_key)` for future publication. Both also require `account_urn`. Times require an explicit ISO timezone and whole minutes, between ten minutes and three months ahead. There is no immediate post-creation tool.
+
+`scheduled_posts_list(account_urn)` returns complete native rows with `scheduled_ref`, `text`, and `scheduled_at`, or a shape/coverage error. It reloads the bridge work tab to avoid cached SDUI counts and refuses to reload an open editor with text. `scheduled_post_cancel(account_urn, scheduled_ref, idempotency_key)` targets the exact account/native ID/text/time and verifies absence in a fresh document.
+
+Confirmed outcomes are `draft_saved`, `scheduled`, and `schedule_cancelled`. An unknown schedule outcome is reconciled by `operation_get` or same-key replay, never automatically dispatched again. A failed verification read after a mutation is still an unknown mutation outcome, even when the read itself failed before navigation.
