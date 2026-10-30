@@ -16,7 +16,8 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
-function ui(initial = "") {
+function ui(initial = "", staleAfterSave = false) {
+  let stale = false;
   const dom = new JSDOM('<button id="start">Start a post</button>', {
     url: "https://www.linkedin.com/feed/",
   });
@@ -50,10 +51,15 @@ function ui(initial = "") {
     d.open = true;
     d.innerHTML =
       '<div aria-label="Tester"></div><div contenteditable="true" role="textbox"></div><button>Post</button><button aria-label="Dismiss">Close</button>';
-    d.querySelector("[contenteditable]")!.textContent = saved;
+    d.querySelector("[contenteditable]")!.textContent = stale ? "" : saved;
+    stale = false;
     d.querySelector("button")!.addEventListener("click", () => published++);
     d.querySelector('[aria-label="Dismiss"]')!.addEventListener("click", () => {
       const value = d.querySelector("[contenteditable]")!.textContent!;
+      if (!value) {
+        d.remove();
+        return;
+      }
       const c = doc.createElement("dialog");
       c.open = true;
       c.innerHTML =
@@ -61,6 +67,7 @@ function ui(initial = "") {
       c.querySelector("button")!.addEventListener("click", () => {
         saved = value;
         saves++;
+        if (staleAfterSave && saves === 1) stale = true;
         doc.querySelector("#start")!.innerHTML =
           '<div aria-label="Start a post">Draft: saved text</div>';
         const alert = doc.createElement("div");
@@ -431,4 +438,13 @@ it("cancels only an exact native row via its newly opened menu, never Post now",
   });
   expect(deleted).toBe(1);
   expect(published).toBe(0);
+});
+
+it("reopens a stale empty SDUI editor without overwriting the persisted draft", async () => {
+  const f = ui("", true);
+  const result = await composerOperation("post_draft_create", args, {});
+  expect(result).toMatchObject({ verified: true, outcome: "draft_saved" });
+  expect(f.saved()).toBe(args.text);
+  expect(f.saves()).toBe(2);
+  expect(f.published()).toBe(0);
 });

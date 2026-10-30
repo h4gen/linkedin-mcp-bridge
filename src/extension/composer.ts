@@ -390,6 +390,12 @@ export async function composerOperation(
     if (op === "post_draft_create") {
       await closeComposer(d, true);
       d = await openComposer();
+      // SDUI may reuse an empty editor instance immediately after saving.
+      // Close only that empty instance, then reopen from the persisted draft.
+      if (!editorText(editorIn(d)!)) {
+        await closeComposer(d, false);
+        d = await openComposer();
+      }
       await wait(
         () => (editorText(editorIn(d)!) === clean(a.text) ? true : undefined),
         "draft_verification_failed",
