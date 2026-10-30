@@ -1,5 +1,7 @@
 # Chrome Web Store graphics
 
+Superseded: this concept was rejected. Use the capability-led promotional graphics in `../graphics-v2/` for the current delivery.
+
 English graphics for LinkedIn MCP Bridge BETA, created 2026-10-30.
 Open `index.html` for the full visual review. The ZIP contains only upload-ready PNGs.
 
