@@ -155,20 +155,35 @@ export async function composerOperation(
       const confirm = await wait(() =>
         dialogs().find((x) => !!find(x, /^(Save as draft|Entwurf speichern)$/)),
       );
+      const previousAlerts = new Set(
+        document.querySelectorAll('[role="alert"]'),
+      );
       await click(confirm, /^(Save as draft|Entwurf speichern)$/, true);
       await wait(
         () =>
-          [...document.querySelectorAll('[role="alert"]')].some((e) =>
-            /Draft successfully saved|Entwurf.*gespeichert/i.test(
-              e.textContent ?? "",
-            ),
+          [...document.querySelectorAll('[role="alert"]')].some(
+            (e) =>
+              !previousAlerts.has(e) &&
+              /Draft successfully saved|Entwurf.*gespeichert/i.test(
+                e.textContent ?? "",
+              ),
           )
             ? true
             : undefined,
         "draft_save_unconfirmed",
       );
     }
-    await wait(() => (!activeComposer() ? true : undefined));
+    await wait(() => (dialogs().length === 0 ? true : undefined));
+    if (save)
+      await wait(() => {
+        const launcher = document.querySelector(
+          "#draft-text-replaceable-component",
+        );
+        return !launcher ||
+          /^(Draft:|Entwurf:)/.test(launcher.textContent ?? "")
+          ? true
+          : undefined;
+      }, "draft_launcher_not_updated");
   };
   const fill = (e: HTMLElement, text: string) => {
     guard();
