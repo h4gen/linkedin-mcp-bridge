@@ -177,7 +177,10 @@ const engine = new Engine({
       let blankReady = false;
       for (let attempt = 0; attempt < 40; attempt++) {
         const current = await chrome.tabs.get(id);
-        if (current.url === "about:blank" && current.status === "complete") {
+        if (
+          (!current.url || current.url === "about:blank") &&
+          current.status === "complete"
+        ) {
           blankReady = true;
           break;
         }
