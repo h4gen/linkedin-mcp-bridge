@@ -1,9 +1,17 @@
+import { runtimeFingerprint } from "./runtime-fingerprint.mjs";
 import { acceptanceDefine } from "./build-acceptance.mjs";
 import { build } from "esbuild";
-import { mkdir, writeFile, chmod, rm, cp } from "node:fs/promises";
+import { mkdir, writeFile, chmod, rm, cp, readFile } from "node:fs/promises";
 const channel =
-  process.env.BRIDGE_CHANNEL === "pilot" ? "pilot" : "development";
+  process.env.BRIDGE_CHANNEL === "pilot" || process.argv.includes("--store")
+    ? "pilot"
+    : "development";
+const release = JSON.parse(await readFile("store/release.json", "utf8"));
+const version = JSON.parse(await readFile("package.json", "utf8")).version;
 const define = {
+  "process.env.BRIDGE_STORE_EXTENSION_ID": JSON.stringify(
+    release.store_extension_id || "",
+  ),
   "process.env.BRIDGE_CHANNEL": JSON.stringify(channel),
   "process.env.BRIDGE_ACCEPTANCE": await acceptanceDefine(),
 };
@@ -34,8 +42,8 @@ await writeFile(
   JSON.stringify(
     {
       manifest_version: 3,
-      name: "LinkedIn MCP Bridge" + (channel === "pilot" ? " BETA" : " Dev"),
-      version: "0.5.0",
+      name: "LinkedIn MCP Bridge" + (channel === "pilot" ? "" : " Dev"),
+      version,
       description:
         "Local MCP access to your connected LinkedIn tab. Messaging, profiles and feed.",
       minimum_chrome_version: "120",
@@ -60,3 +68,12 @@ for (const file of [
   "icon128.png",
 ])
   await cp("assets/" + file, "dist/extension/" + file);
+
+await writeFile(
+  "dist/build.json",
+  JSON.stringify(
+    { version, channel, fingerprint: await runtimeFingerprint() },
+    null,
+    2,
+  ) + "\n",
+);

@@ -1,20 +1,15 @@
 import { readFile, stat } from "node:fs/promises";
-import { execFileSync } from "node:child_process";
+import { runtimeFingerprint } from "./runtime-fingerprint.mjs";
 export async function acceptanceDefine() {
-  const revision = execFileSync("git", ["rev-parse", "HEAD"], {
-    encoding: "utf8",
-  }).trim();
+  const fingerprint = await runtimeFingerprint();
   const version = JSON.parse(await readFile("package.json", "utf8")).version;
-  const result = { revision, version, passed: [] };
+  const result = { fingerprint, version, passed: [] };
   try {
     const config = JSON.parse(await readFile("store/release.json", "utf8"));
     const proof = JSON.parse(
       await readFile(config.acceptance_manifest, "utf8"),
     );
-    const clean = !execFileSync("git", ["status", "--porcelain"], {
-      encoding: "utf8",
-    }).trim();
-    if (clean && proof.revision === revision && proof.version === version)
+    if (proof.fingerprint === fingerprint && proof.version === version)
       for (const [name, row] of Object.entries(proof.capabilities ?? {}))
         if (
           row.status === "passed" &&
@@ -23,7 +18,7 @@ export async function acceptanceDefine() {
         )
           result.passed.push(name);
   } catch {
-    /* No acceptance is asserted without valid local evidence. */
+    /* No acceptance without evidence matching executable source. */
   }
   return JSON.stringify(JSON.stringify(result));
 }

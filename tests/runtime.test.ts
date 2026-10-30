@@ -1,3 +1,4 @@
+import { platformPaths } from "../src/native/platform.js";
 import { it, expect } from "vitest";
 import vm from "node:vm";
 import fs from "node:fs/promises";
@@ -72,8 +73,21 @@ it("serves all typed tools through actual MCP stdio", async () => {
   }
 });
 it("installs isolated native manifest and round-trips a real native/socket frame", async () => {
-  const home = await fs.mkdtemp("/tmp/li-mcp-");
-  const env = { ...process.env, HOME: home };
+  const home = await fs.mkdtemp(
+    path.join(process.platform === "darwin" ? "/tmp" : os.tmpdir(), "li-mcp-"),
+  );
+  const env = {
+    ...process.env,
+    LINKEDIN_BRIDGE_HOME: home,
+    LOCALAPPDATA: path.join(home, "AppData", "Local"),
+  };
+  const paths = platformPaths(
+    process.platform,
+    home,
+    env.LOCALAPPDATA,
+    "com.hagen.linkedin_mcp_bridge",
+    false,
+  );
   let host: ReturnType<typeof spawn> | undefined;
   let client: net.Socket | undefined;
   try {
@@ -83,30 +97,50 @@ it("installs isolated native manifest and round-trips a real native/socket frame
       { env, stdio: ["ignore", "pipe", "pipe"] },
     );
     expect((await once(installer, "exit"))[0]).toBe(0);
-    const manifest = JSON.parse(
-      await fs.readFile(
-        path.join(
-          home,
-          "Library/Application Support/Google/Chrome/NativeMessagingHosts/com.hagen.linkedin_mcp_bridge.json",
-        ),
-        "utf8",
-      ),
+    const reinstall = spawn(
+      process.execPath,
+      ["dist/cli.js", "install", "a".repeat(32)],
+      { env, stdio: "ignore" },
     );
+    expect((await once(reinstall, "exit"))[0]).toBe(0);
+    const manifest = JSON.parse(await fs.readFile(paths.manifestPath, "utf8"));
     const launcher = await fs.readFile(manifest.path, "utf8");
-    expect(launcher).toContain("/dist/host.js");
+    expect(launcher).toContain(path.join("dist", "host.js"));
     host = spawn(process.execPath, ["dist/host.js"], {
       env,
       stdio: ["pipe", "pipe", "pipe"],
     });
-    const socket = path.join(
-      home,
-      "Library/Application Support/LinkedIn MCP Bridge/bridge.sock",
-    );
+    const socket = paths.socketPath;
     for (let i = 0; i < 100; i++) {
-      if (await fs.stat(socket).catch(() => false)) break;
+      if (process.platform === "win32") {
+        const ready = await new Promise<boolean>((resolve) => {
+          const probe = net.connect(socket);
+          probe.once("connect", () => {
+            probe.destroy();
+            resolve(true);
+          });
+          probe.once("error", () => resolve(false));
+        });
+        if (ready) break;
+      } else if (await fs.stat(socket).catch(() => false)) break;
       await new Promise((r) => setTimeout(r, 20));
     }
-    expect((await fs.stat(socket)).mode & 0o777).toBe(0o600);
+    if (process.platform !== "win32")
+      expect((await fs.stat(socket)).mode & 0o777).toBe(0o600);
+    if (process.platform === "win32") {
+      const unauthorized = net.connect(socket);
+      await once(unauthorized, "connect");
+      const closed = once(unauthorized, "close");
+      unauthorized.write(
+        JSON.stringify({
+          id: "bad-token",
+          op: "health",
+          args: {},
+          token: "wrong",
+        }) + "\n",
+      );
+      await closed;
+    }
     client = net.connect(socket);
     await once(client, "connect");
     const decoder = new NativeMessageDecoder();
@@ -116,7 +150,18 @@ it("installs isolated native manifest and round-trips a real native/socket frame
       }),
     );
     client.write(
-      JSON.stringify({ id: "caller-id", op: "health", args: {} }) + "\n",
+      JSON.stringify({
+        id: "caller-id",
+        op: "health",
+        args: {},
+        token:
+          process.platform === "win32"
+            ? await fs.readFile(
+                path.join(paths.root, "transport-token"),
+                "utf8",
+              )
+            : undefined,
+      }) + "\n",
     );
     const request = await nativeReply;
     expect(request.id).not.toBe("caller-id");
@@ -135,17 +180,33 @@ it("installs isolated native manifest and round-trips a real native/socket frame
       host.stdin?.end();
       if (host.exitCode === null) await once(host, "exit");
     }
+    const uninstall = spawn(process.execPath, ["dist/cli.js", "uninstall"], {
+      env,
+      stdio: "ignore",
+    });
+    await once(uninstall, "exit");
     await fs.rm(home, { recursive: true, force: true });
   }
 }, 10000);
 
 it("validates real MCP responses after tool discovery without losing output passthrough semantics", async () => {
-  const home = await fs.mkdtemp("/tmp/li-schema-");
-  const root = path.join(
-    home,
-    "Library/Application Support/LinkedIn MCP Bridge",
+  const home = await fs.mkdtemp(
+    path.join(
+      process.platform === "darwin" ? "/tmp" : os.tmpdir(),
+      "li-schema-",
+    ),
   );
+  const paths = platformPaths(
+    process.platform,
+    home,
+    path.join(home, "AppData", "Local"),
+    "com.hagen.linkedin_mcp_bridge",
+    false,
+  );
+  const root = paths.root;
   await fs.mkdir(root, { recursive: true });
+  if (process.platform === "win32")
+    await fs.writeFile(path.join(root, "transport-token"), "a".repeat(64));
   let rateLimited = false;
   const server = net.createServer((socket) => {
     let text = "";
@@ -182,7 +243,7 @@ it("validates real MCP responses after tool discovery without losing output pass
     });
   });
   await new Promise<void>((resolve) =>
-    server.listen(path.join(root, "bridge.sock"), resolve),
+    server.listen(paths.socketPath, resolve),
   );
   const client = new Client({ name: "schema-test", version: "1" });
   try {
@@ -196,7 +257,8 @@ it("validates real MCP responses after tool discovery without losing output pass
               (entry): entry is [string, string] => entry[1] !== undefined,
             ),
           ),
-          HOME: home,
+          LINKEDIN_BRIDGE_HOME: home,
+          LOCALAPPDATA: path.join(home, "AppData", "Local"),
         },
       }),
     );

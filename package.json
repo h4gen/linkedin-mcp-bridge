@@ -1,6 +1,6 @@
 {
   "name": "linkedin-mcp-bridge",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "bin": {
@@ -11,12 +11,14 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check": "npm run typecheck && npm test",
-    "package:companion": "node scripts/package-companion.mjs",
     "release:check": "node scripts/release-check.mjs",
-    "package": "npm run build && cd dist/extension && zip -qr ../linkedin-extension.zip .",
+    "package": "npm run build && node scripts/package-extension.mjs",
     "pretest": "npm run build",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\" \"scripts/*.mjs\" \"docs/*.md\" README.md",
-    "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\" \"scripts/*.mjs\" \"docs/*.md\" README.md"
+    "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\" \"scripts/*.mjs\" \"docs/*.md\" README.md",
+    "store:check": "node scripts/release-check.mjs --store",
+    "build:store": "node scripts/build.mjs --store",
+    "package:store": "npm run build:store && node scripts/package-extension.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.20.2",
@@ -27,7 +29,9 @@
     "@types/jsdom": "21.1.7",
     "@types/node": "^22.10.0",
     "esbuild": "^0.28.2",
+    "fflate": "^0.8.3",
     "jsdom": "26.1.0",
+    "playwright": "^1.64.1",
     "prettier": "3.6.2",
     "typescript": "^5.7.0",
     "vitest": "^5.0.5"

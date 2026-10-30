@@ -205,7 +205,7 @@ export const capabilities = Object.fromEntries(
     required: boolean;
   }
 >;
-const buildAcceptance: { revision?: string; passed?: string[] } = JSON.parse(
+const buildAcceptance: { fingerprint?: string; passed?: string[] } = JSON.parse(
   process.env.BRIDGE_ACCEPTANCE ?? "{}",
 );
 export function capabilityStatus(connected: boolean) {
@@ -216,7 +216,8 @@ export function capabilityStatus(connected: boolean) {
     acceptance: buildAcceptance.passed?.includes(name)
       ? "current_build_live_acceptance"
       : "current_build_live_acceptance_pending",
-    acceptance_revision: buildAcceptance.revision ?? null,
+    acceptance_revision: null,
+    acceptance_fingerprint: buildAcceptance.fingerprint ?? null,
     enabled: c.enabled,
     available: c.enabled && (connected || c.adapter === "local"),
     source: c.source ?? c.adapter,

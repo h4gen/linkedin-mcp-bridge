@@ -4,10 +4,11 @@ import net from "node:net";
 import fs from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { encodeNativeMessage, NativeMessageDecoder } from "./framing.js";
+import { prepareAccess, transportToken } from "./access.js";
 import { root, socketPath } from "./paths.js";
 import { parse, writes, type Operation } from "../core/contracts.js";
-await fs.mkdir(root, { recursive: true, mode: 0o700 });
-await fs.chmod(root, 0o700);
+await prepareAccess();
+const token = await transportToken();
 const lockPath = root + "/host.lock";
 try {
   const lock = await fs.open(lockPath, "wx", 0o600);
@@ -57,9 +58,10 @@ if (alive) {
   await fs.unlink(lockPath);
   process.exit(1);
 }
-await fs.unlink(socketPath).catch((e) => {
-  if (e.code !== "ENOENT") throw e;
-});
+if (process.platform !== "win32")
+  await fs.unlink(socketPath).catch((e) => {
+    if (e.code !== "ENOENT") throw e;
+  });
 const owners = new Map<
   string,
   { socket: net.Socket; client: net.Socket; timer: NodeJS.Timeout }
@@ -88,6 +90,9 @@ const server = net.createServer((socket) => {
           outstanding >= 8
         )
           throw Error("bad_request");
+        if (token && msg.token !== token)
+          throw Error("unauthorized_local_client");
+        delete msg.token;
         parse(msg.op, msg.args);
         const wireId = randomUUID();
         outstanding++;
@@ -150,7 +155,7 @@ await new Promise<void>((resolve, reject) => {
   server.once("error", reject);
   server.listen(socketPath, resolve);
 });
-await fs.chmod(socketPath, 0o600);
+if (process.platform !== "win32") await fs.chmod(socketPath, 0o600);
 const decoder = new NativeMessageDecoder();
 process.stdin.on("data", (chunk) => {
   try {
@@ -171,7 +176,7 @@ async function shutdown() {
   for (const { timer } of owners.values()) clearTimeout(timer);
   for (const c of clients) c.destroy();
   server.close();
-  await fs.unlink(socketPath).catch(() => {});
+  if (process.platform !== "win32") await fs.unlink(socketPath).catch(() => {});
   await fs.unlink(lockPath).catch(() => {});
   process.exit(0);
 }

@@ -1,61 +1,55 @@
 # LinkedIn MCP Bridge
 
-A separate macOS-first MCP server and Chrome MV3 extension. The local Node process communicates with the extension through Chrome Native Messaging and a private Unix socket. LinkedIn session credentials stay in the browser. No hosted relay, remote scripts, background inbox indexing or telemetry.
+27 primitive LinkedIn tools for local AI agents: inbox and message history, people research, invitations, feed interactions, native text drafts and scheduling. The agent composes these tools; this project does not implement workflows, a CRM or an inbox index.
 
-**Development candidate 0.5.0 — not submitted to the Chrome Web Store.** All 27 operations are available. Writes execute directly after account, target and idempotency checks, without extension confirmation. Inbox/history, filtered people search, feed identity resolution and paginated reaction/comment reads have live checks; see [validation](docs/validation.md). The pilot includes a separate bundled macOS companion and a release gate that fails until publishing prerequisites and acceptance are complete.
+**0.6.0 — Chrome Web Store publication pending.** Installation from Git supports macOS and native Windows with Google Chrome and Node.js 22+. Windows support must pass CI and Chrome installation acceptance before it is advertised as verified. Linux/WSL and direct web-chat connections are outside this release.
 
-## Install locally
+LinkedIn credentials stay in Chrome. Requested content goes to your selected MCP client and may go to its AI provider. No hosted relay or product telemetry. Writes execute directly after target and idempotency checks; there is no extension approval queue.
 
-Requires macOS, Node.js 22+ and Chrome 120+.
+## Install from Git (for agents)
+
+Repository: https://github.com/h4gen/linkedin-mcp-bridge
+
+1. Check `git --version`, `node --version` (22+) and `npm --version`. Use native Windows Node with native Windows Chrome, not WSL.
+2. Clone into a durable directory; do not delete or move it after setup:
 
 ```sh
+git clone https://github.com/h4gen/linkedin-mcp-bridge.git
+cd linkedin-mcp-bridge
 npm ci
-npm run check
+npm run build:store
 ```
 
-1. Open `chrome://extensions`, enable developer mode, choose **Load unpacked**, and select this repository's `dist/extension` directory.
-2. Copy the new extension's ID. Do not use the existing Browser Bridge extension ID.
-3. Register the native host with that exact ID:
+3. Install the Chrome Web Store extension once its link is published here. During development, use `chrome://extensions` → Developer mode → Load unpacked → `dist/extension`, then copy its ID.
+4. Register the native host as the current user:
 
 ```sh
-node dist/cli.js install YOUR_EXTENSION_ID
+node dist/cli.js install
 ```
 
-4. Open LinkedIn, sign in, and choose **Connect this tab** in the new extension popup. It binds to that tab and account. Keep the connected tab open.
-5. Check the complete connection:
+Until the Store ID is assigned, pass the ID explicitly: `node dist/cli.js install EXTENSION_ID`. The installer prints absolute paths and ready-to-use `mcpServers.linkedin` JSON. Configure your local client's stdio MCP server using that output. Do not guess executable paths. No elevated privileges or notarized package is needed. 5. Open LinkedIn in Chrome, open the extension, acknowledge the data flow and connect the tab. Then check:
 
 ```sh
 node dist/cli.js doctor
 ```
 
-Pause blocks new work. Connect again to resume. Disconnect removes the account binding and native connection; already dispatched writes cannot be recalled. A rate limit or access challenge imposes a persistent cooldown; resolve any challenge in LinkedIn itself.
+The server command is the printed absolute Node path; arguments are the printed absolute `dist/cli.js` path followed by `mcp`. For a TOML-configured client, put these same values under `[mcp_servers.linkedin]` as `command` and `args`.
 
-The host manifest is `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.hagen.linkedin_mcp_bridge.json`. Its launcher uses absolute paths to this checkout and the current Node executable. Keep both available; rerun `install` after moving the repository or replacing Node. Only one Chrome profile may own the host at a time. Existing Google Ads / Browser Bridge installations are untouched.
+One Chrome profile owns the connection at a time. Browser authentication is interactive; the agent must not bypass login. Keep the selected tab open. DOM tools may bring the dedicated work tab forward. Pause stops new work; reconnect to resume.
 
-## Configure an MCP client
+### Update and uninstall
 
-For a local stdio-compatible client, use the absolute paths reported by your shell:
+Stop the MCP connection, disconnect the extension, run `git pull --ff-only`, `npm ci`, `npm run build:store`, then `node dist/cli.js install`. Reconnect and run `doctor`. Extension and native host versions must match; retain the matching Git release when Chrome has not received the new extension yet.
 
-```json
-{
-  "mcpServers": {
-    "linkedin": {
-      "command": "/absolute/path/to/node",
-      "args": ["/absolute/path/to/linkedin-mcp-bridge/dist/cli.js", "mcp"]
-    }
-  }
-}
-```
+`node dist/cli.js uninstall` removes this installation's native registration and launcher. Remove the Chrome extension separately to clear browser storage. The checkout can then be removed.
 
-Codex's equivalent server configuration:
+For development, `npm run build` selects the development native host; use the generated extension with that same build. `npm run build:store` selects the separate store host. Never mix the two builds.
 
-```toml
-[mcp_servers.linkedin]
-command = "/absolute/path/to/node"
-args = ["/absolute/path/to/linkedin-mcp-bridge/dist/cli.js", "mcp"]
-```
+## Agent usage
 
-This is local stdio: it does not directly connect the ChatGPT or Claude websites. The authorized local installation also registered the `linkedin` server in Codex. The examples above document setup on another machine. [Official MCP configuration documentation](https://learn.chatgpt.com/docs/extend/mcp#configure-with-the-cli).
+Read MCP server instructions and `health` first. Use returned account and target IDs, inspect coverage and continue bounded pagination. For inbox prioritization, combine conversation pages with selected message histories. For contact context, combine profile reads with relevant conversations. These are examples of composition, not built-in workflows.
+
+`conversations_search` matches participant/title/preview, not message-body history. The agent can read histories ad hoc. Summaries, follow-up reasoning and notes belong to the agent or the user's existing systems.
 
 ## Tools
 
@@ -124,27 +118,18 @@ npm run package          # dist/linkedin-extension.zip
 
 Tests cover strict tool boundaries, native framing/fragmentation, actual MCP stdio registration, actual MV3 bundle startup, installer isolation, native/socket roundtrip, account and recipient mismatches, opaque cursor binding, mutation persistence and ambiguous outcomes. No live writes occur during tests.
 
-`dist/linkedin-extension.zip` is a local upload artifact. Draft store listing, privacy notice and reviewer instructions are in `store/`. Actual store ID, hosted operator/support URLs, screenshots and notarized artifacts remain release prerequisites checked by `npm run release:check`. The installer accepts that future exact store ID; it does not include a wildcard origin.
+`dist/linkedin-extension.zip` is the extension upload artifact. Store listing, privacy notice and reviewer instructions are in `store/`. `npm run release:check` validates the local build; `npm run store:check` separately checks the store ID, screenshots, privacy URL and runtime-bound acceptance. No signed companion is required.
 
 Remove the local host using `node dist/cli.js uninstall`. Remove the Chrome extension separately to erase its local data. Receipts contain payload hashes, target/account IDs, operation IDs, timestamps and statuses, not message bodies. Reads are transient MCP responses, not an inbox database. As with other local MCP tools, clients on the same OS account are trusted; other OS users cannot access the private socket directory.
 
-## Build the macOS pilot companion
+## Release checks
 
-```sh
-npm run package:companion -- /path/to/official/node STORE_EXTENSION_ID arm64
-npm run package:companion -- /path/to/official/x64/node STORE_EXTENSION_ID x64
-BRIDGE_CHANNEL=pilot npm run package
-npm run release:check
-```
+`npm run check` runs type checking and automated tests with simulated writes. CI runs on macOS and Windows. `npm run package` builds the development extension ZIP; `npm run package:store` builds the store-channel ZIP.
 
-Companion builds include runtime, bundled dependencies, licenses, Setup/Uninstall commands, ZIP and PKG installers with SHA-256 files. Supply `BRIDGE_NODE_LICENSE` pointing to the matching official Node LICENSE when the cached 22.22.0 license is unavailable. No build command installs the companion automatically.
+`npm run release:check` checks local build consistency. `npm run store:check` additionally requires a clean source tree, real store ID, public privacy URL, UI screenshots and runtime-bound capability/installation evidence. Passing automated tests does not claim live LinkedIn acceptance. The runtime fingerprint includes source, assets, dependencies and build scripts; documentation-only commits do not invalidate it.
 
-The pilot uses native host `com.hagen.linkedin_mcp_bridge.pilot` and a separate `LinkedIn MCP Bridge Pilot` data directory. A pilot ZIP must be paired with a pilot companion configured with its exact Chrome extension ID. Development builds retain the original host. Extension and companion versions/protocol must match.
-
-Signing requires `BRIDGE_SIGN_IDENTITY` (Developer ID Application) and `BRIDGE_INSTALLER_IDENTITY` (Developer ID Installer); notarization additionally requires `BRIDGE_NOTARY_PROFILE`. The package command rejects the wrong identity type or a non-Accepted notarization response. Unsigned artifacts are explicitly development candidates, not distributable notarized releases.
-
-The PKG places the companion under `/Applications/LinkedIn MCP Bridge Pilot`. Run its Setup.command as the signed-in user to register that user's native host. For a ZIP installation, move the whole directory to a durable location first. Configure the local MCP client with its bundled node and cli.js paths. Updates replace the companion while Chrome is closed, then rerun Setup.command. The unpacked development setup remains available above.
+See [validation](docs/validation.md) for historical live checks and current limitations. The release metadata deliberately reports missing external publication requirements rather than fabricating them.
 
 ## Market research
 
-[Market need and capability study, 30 October 2026](docs/research/2026-10-30/linkedin-market-research.docx) — German report matching Google Ads demand and public user evidence to the current product. The [research sources](docs/research/2026-10-30/sources.json), [measurement requests](docs/research/2026-10-30/requests.json), and seven original normalized measurement responses in `docs/research/2026-10-30/data/` are retained for updates. Search values are coarse reported metrics, not exact market-size estimates.
+[Market report, 30 October 2026](docs/research/2026-10-30/linkedin-market-research.docx) is historical research. The current product scope is primitive tools, Git installation and a public Chrome extension; report recommendations are not implementation requirements.

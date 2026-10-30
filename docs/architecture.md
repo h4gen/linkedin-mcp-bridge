@@ -3,7 +3,7 @@
 ```mermaid
 flowchart LR
   Client[MCP client] -->|stdio tools| Server[Node MCP server]
-  Server -->|private Unix socket| Host[Native Messaging host]
+  Server -->|local IPC| Host[Native Messaging host]
   Host -->|Chrome framed JSON| Extension[MV3 service worker]
   Extension --> Queue[Serialized account operations]
   Queue --> Journal[Local mutation receipts]
@@ -21,19 +21,17 @@ flowchart LR
 - `src/extension/page-fetch.ts`: browser authentication boundary and strict path allowlist.
 - `src/extension/dom.ts`: bounded reads and scoped UI mutations.
 - `src/native/`: framed native host, per-user socket, generated wire IDs and client transport.
-- `src/installer.ts`: independent macOS manifest and launcher.
+- `src/installer.ts`: per-user macOS/Windows registration and launcher.
 
 Pending receipt persistence happens before a write. An interrupted/pending receipt is replayed as unknown, never resent. Multiple MCP clients share one extension queue. A native host lock prevents two Chrome profiles from simultaneously owning the socket. Restarted sessions must still match the explicitly bound LinkedIn account before any operation.
 
-No cloud dependencies or runtime coupling to the existing Google Ads bridge or LinkedIn extractor. No canonical remote exists yet; this new repository's local `main` is its current integration branch. Store publication/deployment is not part of the local test build.
+No cloud runtime dependencies. Git installation supplies the local native host; the Chrome extension is distributed separately. Core operations do not own installation, workflows or CRM state.
 
-## Historical pilot 0.2 additions
+## Platform boundary
 
-Extension-owned session approvals bind the exact account/operation/payload hash/key and expire after 30 minutes. Only packaged popup/review page senders can decide them; no approval tool exists in MCP. Enabled mutations are message_send and conversation_update. The original unaccepted handlers remain present but cannot execute through the extension.
+`native/platform.ts` owns macOS/Windows paths and launcher syntax. macOS uses a private Unix socket. Windows uses a user-specific named pipe, with a random local token in a user-ACL-protected directory. The token is checked before dispatch and never forwarded to Chrome. Windows native-host registration is scoped to HKCU; neither installation requires administrator rights.
 
-GTM extraction uses copied owned-source parsers, scoped feed-card identity and owned reaction dialogs. Historical 0.2 jobs were removed in 0.3; direct cursor reads own the browser traversal state. Search normalization flattens actual SearchClusterViewModel entries before determining pagination. Public filter lookup is a fixed guest endpoint with credentials omitted.
-
-The companion build bundles Node-side dependencies and accepts a separately supplied official Node binary for arm64/x64. Pilot and development hosts are distinct. Wire requests include protocol and exact companion version. Chromium's native framing limits are asymmetric (1 MiB host-to-Chrome; 64 MiB reverse); the application further caps responses at 6 MiB of UTF-8 bytes. Socket streams decode UTF-8 across fragmented chunks.
+Builds expose the same 27 primitives with complete descriptions and common MCP server instructions. The runtime fingerprint binds acceptance to executable sources, dependencies, assets and build configuration rather than documentation commits. Store and development channels retain distinct native-host names.
 
 ## 0.3 adapter boundaries
 
@@ -45,7 +43,7 @@ A connection-generation change invalidates queued operations and guards journal 
 
 ## 0.4 direct writes
 
-All 24 operations are exposed in every build. The approval module, review UI, inbox permission and test-write build flag have been removed. Writes retain account/target checks, serialization, durable receipts and postconditions. Acceptance metadata informs release readiness only. Migration clears session drafts and the old inbox preference without replaying actions or deleting the mutation journal; it pauses the bound connection for reconnection. Local data clearing is available in the popup.
+All 27 operations are exposed in every build. The approval module, review UI, inbox permission and test-write build flag have been removed. Writes retain account/target checks, serialization, durable receipts and postconditions. Acceptance metadata informs release readiness only. Migration clears session drafts and the old inbox preference without replaying actions or deleting the mutation journal; it pauses the bound connection for reconnection. Local data clearing is available in the popup.
 
 ## 0.5 native post planning
 

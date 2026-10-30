@@ -23,11 +23,11 @@ async function action(action: string) {
     }
     const s = await chrome.runtime.sendMessage({ action: "status" });
     status.textContent = s.connection
-      ? `${s.connection.paused ? "Paused" : "Connected"} · ${s.connection.account ?? "Checking account"}\nCompanion: ${s.native ? "available" : "not connected"} · Version ${s.version}`
+      ? `${s.connection.paused ? "Paused" : "Connected"} · ${s.connection.account ?? "Checking account"}\nLocal MCP: ${s.native ? "available" : "not connected"} · Version ${s.version}`
       : "Not connected. Open LinkedIn and connect this tab.";
   } catch {
     status.textContent =
-      "Connection unavailable. Check that the companion is installed and LinkedIn is open.";
+      "Connection unavailable. Check that the MCP bridge is installed and LinkedIn is open.";
   }
 }
 for (const b of document.querySelectorAll<HTMLButtonElement>(

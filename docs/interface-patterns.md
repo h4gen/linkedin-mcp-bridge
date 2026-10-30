@@ -32,7 +32,7 @@ Read timeouts permit read retry; ambiguous writes require receipt inspection. Cu
 
 0.3 removes the three extraction job tools and introduces `conversations_get` and output schemas for every operation. Profile and invitation results are compact typed views. Temporary 0.2 cursors/drafts are cleared on migration; content-free send receipts are retained. Original write inputs and fingerprints remain compatible.
 
-The capability registry is shared by dispatch, tool listing and release checking. All 24 operations are exposed. Current-build live acceptance remains separate from availability and passing unit tests. Updating to 0.4 clears temporary session state and the obsolete inbox permission, pauses the connection for reconnection, and retains seven-day mutation receipts. Old drafts are never dispatched automatically.
+The capability registry is shared by dispatch, tool listing and release checking. All 27 operations are exposed. Current-build live acceptance remains separate from availability and passing unit tests. Updating to 0.4 clears temporary session state and the obsolete inbox permission, pauses the connection for reconnection, and retains seven-day mutation receipts. Old drafts are never dispatched automatically.
 
 ## 0.4.1 DOM execution and recovery
 

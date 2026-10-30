@@ -2,12 +2,16 @@ import { writes, type Operation } from "../core/contracts.js";
 import { StringDecoder } from "node:string_decoder";
 import net from "node:net";
 import { randomUUID } from "node:crypto";
+import { transportToken } from "./access.js";
 import { socketPath } from "./paths.js";
 export async function call(
   op: string,
   args: unknown,
   signal?: AbortSignal,
 ): Promise<any> {
+  const token = await transportToken().catch(() => {
+    throw Error("bridge_unavailable_open_extension");
+  });
   const outcome = writes.has(op as Operation) ? "_unknown_outcome" : "";
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
@@ -28,7 +32,7 @@ export async function call(
     const timer = setTimeout(() => finish(Error("timeout" + outcome)), 70000);
     signal?.addEventListener("abort", abort, { once: true });
     socket.once("connect", () =>
-      socket.write(JSON.stringify({ id, op, args }) + "\n"),
+      socket.write(JSON.stringify({ id, op, args, token }) + "\n"),
     );
     socket.on("data", (b) => {
       buf += textDecoder.write(b);

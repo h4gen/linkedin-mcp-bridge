@@ -1,13 +1,16 @@
 {
-  "version": "0.5.0",
-  "visibility": "unlisted",
-  "platform": "macOS",
-  "developer_name": null,
-  "support_email": null,
-  "homepage_url": null,
-  "privacy_policy_url": null,
+  "version": "0.6.0",
+  "visibility": "public",
+  "privacy_policy_url": "https://github.com/h4gen/linkedin-mcp-bridge/blob/main/store/privacy.md",
   "store_extension_id": null,
-  "screenshots": [],
-  "signed_companions": [],
-  "acceptance_manifest": "artifacts/acceptance-0.5.0.json"
+  "screenshots": [
+    "store/screenshots/connection-1280x800.png",
+    "store/screenshots/data-controls-1280x800.png"
+  ],
+  "acceptance_manifest": "artifacts/acceptance-0.6.0.json",
+  "platforms": [
+    "macOS",
+    "Windows"
+  ],
+  "repository_url": "https://github.com/h4gen/linkedin-mcp-bridge"
 }
