@@ -6,7 +6,7 @@ Saved in the Chrome Web Store Developer Dashboard on 2026-10-30. Status: Draft. 
 - Assigned extension ID: `pibhcinkiadfplcaefllaeappkpnpfjm`.
 - Listing language: English; category: Productivity / Tools.
 - Distribution: free, public, all regions (applies after publication).
-- Saved: description, icon, two explainer graphics, both promo tiles, homepage/support links, permission justifications, privacy URL and reviewer setup instructions.
+- Saved: description, icon, five explainer graphics, both promo tiles, homepage/support links, permission justifications, privacy URL and reviewer setup instructions.
 - Declared data: personally identifiable information, personal communications, website content. No remote executable code.
 
 - Extension: build with `npm run package:store`; upload `dist/linkedin-extension.zip`.

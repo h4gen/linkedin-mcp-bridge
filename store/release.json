@@ -5,7 +5,10 @@
   "store_extension_id": "pibhcinkiadfplcaefllaeappkpnpfjm",
   "screenshots": [
     "store/explainers/upload/inbox-1280x800.png",
-    "store/explainers/upload/research-1280x800.png"
+    "store/explainers/upload/research-1280x800.png",
+    "store/explainers/upload/people-1280x800.png",
+    "store/explainers/upload/feed-1280x800.png",
+    "store/explainers/upload/publishing-1280x800.png"
   ],
   "acceptance_manifest": "artifacts/acceptance-0.6.0.json",
   "platforms": [

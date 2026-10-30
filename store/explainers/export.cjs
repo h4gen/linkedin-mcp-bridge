@@ -1,7 +1,7 @@
 const sharp = require('sharp');
 const path = require('node:path');
 (async () => {
-  for (const name of ['inbox', 'research']) {
+  for (const name of ['inbox', 'research', 'people', 'feed', 'publishing']) {
     const target = path.join(__dirname, 'upload', `${name}-1280x800.png`);
     await sharp(path.join(__dirname, 'source', `${name}.png`)).resize(1280, 800, {fit:'contain', background:'#f6f3eb'}).removeAlpha().png().toFile(target);
     const m = await sharp(target).metadata();
