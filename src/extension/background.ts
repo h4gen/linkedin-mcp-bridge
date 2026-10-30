@@ -177,6 +177,7 @@ const engine = new Engine({
       else
         await chrome.tabs.update(id, { url: "https://www.linkedin.com/feed/" });
       let ready = false;
+      let navigationDiagnostic: unknown;
       for (let attempt = 0; attempt < 40; attempt++) {
         await new Promise((r) => setTimeout(r, 250));
         try {
@@ -184,19 +185,27 @@ const engine = new Engine({
             injectImmediately: true,
             target: { tabId: id },
             world: "ISOLATED",
-            func: (stamp: string) =>
-              (window as any).__liPlanningRefresh !== stamp &&
-              /^\/(feed(?:\/|$)|sharing\/compose(?:\/|$))/.test(
-                location.pathname,
-              ) &&
-              document.readyState !== "loading",
+            func: (stamp: string) => ({
+              fresh: (window as any).__liPlanningRefresh !== stamp,
+              path: location.pathname,
+              state: document.readyState,
+            }),
             args: [stamp],
           });
-          if (fresh[0]?.result) {
+          navigationDiagnostic = fresh[0]?.result;
+          if (
+            fresh[0]?.result?.fresh &&
+            /^\/(feed(?:\/|$)|sharing\/compose(?:\/|$))/.test(
+              fresh[0].result.path,
+            ) &&
+            fresh[0].result.state !== "loading"
+          ) {
             ready = true;
             break;
           }
-        } catch {
+        } catch (e) {
+          navigationDiagnostic =
+            e instanceof Error ? e.message : "navigation_interrupted";
           /* Navigation may temporarily destroy the old document. */
         }
       }
@@ -204,7 +213,10 @@ const engine = new Engine({
         throw new Fault(
           "schedule_refresh_timeout",
           "schedule_refresh_timeout",
-          { dispatch_state: "not_dispatched" },
+          {
+            dispatch_state: "not_dispatched",
+            navigation: navigationDiagnostic,
+          },
         );
     }
     if (op === "conversation_delete") {
