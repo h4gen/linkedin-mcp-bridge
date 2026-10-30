@@ -286,7 +286,12 @@ it("plans only after exact time confirmation and verifies the scheduled entry", 
   const configure = (d: Element) => {
     const a = f.doc.createElement("a");
     a.href = "#";
-    a.textContent = "Scheduled";
+    a.textContent = "1";
+    a.setAttribute("aria-labelledby", "schedule-label");
+    const title = f.doc.createElement("span");
+    title.id = "schedule-label";
+    title.textContent = "Scheduled (1)";
+    f.doc.body.append(title);
     d.append(a);
     a.addEventListener("click", (e) => {
       e.preventDefault();
@@ -497,4 +502,34 @@ it("requires fresh native schedule evidence after dispatch instead of trusting c
     "scheduled_post_cancel",
     "scheduled_posts_list",
   ]);
+});
+it("never marks a dispatched schedule retryable when its verification read fails before navigation", async () => {
+  const f = engineFixture();
+  let writes = 0;
+  const deps = {
+    ...f.dependencies,
+    dom: async (op: string, a: any) => {
+      if (a.reconcile) return { verified: false };
+      if (op === "post_schedule") {
+        writes++;
+        return { verified: false, outcome: "scheduled" };
+      }
+      throw new Fault("schedule_refresh_timeout", "failed", {
+        dispatch_state: "not_dispatched",
+      });
+    },
+  };
+  const input = {
+    account_urn: account,
+    text: "QA",
+    scheduled_at: "2026-11-06T12:00:00Z",
+    idempotency_key: "verify-failed",
+  };
+  expect((await new Engine(deps).run("post_schedule", input)).status).toBe(
+    "unknown_outcome",
+  );
+  expect((await new Engine(deps).run("post_schedule", input)).status).toBe(
+    "unknown_outcome",
+  );
+  expect(writes).toBe(1);
 });

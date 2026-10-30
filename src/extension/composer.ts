@@ -52,6 +52,11 @@ export async function composerOperation(
   const label = (e: Element) =>
     clean(
       e.getAttribute("aria-label") ||
+        (e.getAttribute("aria-labelledby") ?? "")
+          .split(/\s+/)
+          .map((id) => document.getElementById(id)?.textContent ?? "")
+          .join(" ")
+          .trim() ||
         e
           .querySelector(':scope > [aria-label="Start a post"]')
           ?.getAttribute("aria-label") ||

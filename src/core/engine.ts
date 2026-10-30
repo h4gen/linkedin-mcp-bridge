@@ -134,6 +134,19 @@ export class Engine {
     for (const [k, v] of Object.entries(journal) as [string, Args][])
       if (d.now() - v.created_at > 7 * 86400000) delete journal[k];
     await d.store.set("journal", journal);
+    // Early 0.5 development builds could label a post-dispatch refresh timeout
+    // as pre-dispatch. Conservatively reconcile those schedules; never resend.
+    for (const row of Object.values(journal) as Args[]) {
+      if (
+        row.operation === "post_schedule" &&
+        row.version === "0.5.0" &&
+        row.status === "failed_before_dispatch" &&
+        row.error === "schedule_refresh_timeout"
+      ) {
+        row.status = "unknown_outcome";
+        row.dispatch_state = "unknown";
+      }
+    }
     const key = await d.hash(`${expected}:${a.idempotency_key ?? ""}`);
     const scheduledTargets = (await d.store.get("scheduled-targets")) ?? {};
     for (const [ref, target] of Object.entries(scheduledTargets) as [
@@ -459,6 +472,7 @@ export class Engine {
       await d.checkpoint?.();
       await d.store.set("journal", journal); // durable before dispatch
       let dispatched = false;
+      let mutationReturned = false;
       try {
         check();
         if (self(await d.fetch({ path: "/me" })) !== expected)
@@ -482,6 +496,7 @@ export class Engine {
               },
               {},
             );
+        mutationReturned = true;
         row.dispatch_state = "dispatched";
         await d.store.set("journal", journal);
         if (op === "post_schedule" || op === "scheduled_post_cancel") {
@@ -588,6 +603,7 @@ export class Engine {
         }
       } catch (e) {
         if (
+          !mutationReturned &&
           e instanceof Fault &&
           e.details.dispatch_state === "not_dispatched" &&
           (planningWrites.has(op) ||

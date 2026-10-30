@@ -174,12 +174,21 @@ const engine = new Engine({
       // A same-site reload can be intercepted by LinkedIn's navigation layer.
       // Cross the empty document first so cached SDUI state cannot survive.
       await chrome.tabs.update(id, { url: "about:blank" });
-      for (let attempt = 0; attempt < 20; attempt++) {
+      let blankReady = false;
+      for (let attempt = 0; attempt < 40; attempt++) {
         const current = await chrome.tabs.get(id);
-        if (current.url === "about:blank" && current.status === "complete")
+        if (current.url === "about:blank" && current.status === "complete") {
+          blankReady = true;
           break;
-        await new Promise((r) => setTimeout(r, 100));
+        }
+        await new Promise((r) => setTimeout(r, 250));
       }
+      if (!blankReady)
+        throw new Fault(
+          "schedule_blank_navigation_timeout",
+          "schedule_blank_navigation_timeout",
+          { dispatch_state: "not_dispatched" },
+        );
       await chrome.tabs.update(id, { url: "https://www.linkedin.com/feed/" });
       let ready = false;
       let navigationDiagnostic: unknown;
