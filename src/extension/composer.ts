@@ -174,16 +174,9 @@ export async function composerOperation(
       );
     }
     await wait(() => (dialogs().length === 0 ? true : undefined));
-    if (save)
-      await wait(() => {
-        const launcher = document.querySelector(
-          "#draft-text-replaceable-component",
-        );
-        return !launcher ||
-          /^(Draft:|Entwurf:)/.test(launcher.textContent ?? "")
-          ? true
-          : undefined;
-      }, "draft_launcher_not_updated");
+    // The feed launcher can remain stale until another feed refresh. Wait for
+    // the completed save transition, then verify by reopening the native draft.
+    if (save) await new Promise((r) => setTimeout(r, 500));
   };
   const fill = (e: HTMLElement, text: string) => {
     guard();
