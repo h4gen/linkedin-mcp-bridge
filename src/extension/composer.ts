@@ -18,7 +18,7 @@ export async function composerOperation(
   const guard = () => {
     if (
       location.hostname !== "www.linkedin.com" ||
-      !location.pathname.startsWith("/feed")
+      !/^\/(feed(?:\/|$)|sharing\/compose(?:\/|$))/.test(location.pathname)
     )
       fail("open_feed_in_connected_tab");
     if (

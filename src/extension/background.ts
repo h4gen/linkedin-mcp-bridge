@@ -157,8 +157,8 @@ const engine = new Engine({
         "scheduled_posts_list",
         "scheduled_post_cancel",
       ].includes(op) &&
-      !(await chrome.tabs.get(id)).url?.startsWith(
-        "https://www.linkedin.com/feed/",
+      !/^https:\/\/www\.linkedin\.com\/(feed(?:\/|$)|sharing\/compose(?:\/|$))/.test(
+        (await chrome.tabs.get(id)).url ?? "",
       )
     )
       await chrome.tabs.update(id, { url: "https://www.linkedin.com/feed/" });
