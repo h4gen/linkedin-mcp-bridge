@@ -245,9 +245,23 @@ export async function composerOperation(
     if (!countMatch) fail("scheduled_list_shape_changed");
     const count = Number(countMatch![1]);
     if (count === 0) return [];
-    const rows = [
-      ...d.querySelectorAll<HTMLElement>('[id^="ScheduledPostRowSlot_"]'),
-    ];
+    const rows = await wait(() => {
+      const mounted = [
+        ...d.querySelectorAll<HTMLElement>('[id^="ScheduledPostRowSlot_"]'),
+      ];
+      if (
+        mounted.length !== count ||
+        mounted.some(
+          (row) =>
+            !row.querySelector('[role="listitem"] p')?.textContent?.trim() ||
+            ![...row.querySelectorAll("p")].some((p) =>
+              /^Posting .+ at .+[AP]M$/.test(p.textContent ?? ""),
+            ),
+        )
+      )
+        return undefined;
+      return mounted;
+    }, "scheduled_list_incomplete");
     const items: Record<string, any>[] = [];
     for (const row of rows) {
       const nativeId = row.id.match(
