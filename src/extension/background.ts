@@ -171,14 +171,16 @@ const engine = new Engine({
           "close_existing_composer_before_listing",
           { dispatch_state: "not_dispatched" },
         );
-      if (
-        /^https:\/\/www\.linkedin\.com\/(feed(?:\/|$)|sharing\/compose(?:\/|$))/.test(
-          (await chrome.tabs.get(id)).url ?? "",
-        )
-      )
-        await chrome.tabs.reload(id);
-      else
-        await chrome.tabs.update(id, { url: "https://www.linkedin.com/feed/" });
+      // A same-site reload can be intercepted by LinkedIn's navigation layer.
+      // Cross the empty document first so cached SDUI state cannot survive.
+      await chrome.tabs.update(id, { url: "about:blank" });
+      for (let attempt = 0; attempt < 20; attempt++) {
+        const current = await chrome.tabs.get(id);
+        if (current.url === "about:blank" && current.status === "complete")
+          break;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      await chrome.tabs.update(id, { url: "https://www.linkedin.com/feed/" });
       let ready = false;
       let navigationDiagnostic: unknown;
       for (let attempt = 0; attempt < 40; attempt++) {
