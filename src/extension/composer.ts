@@ -55,13 +55,16 @@ export async function composerOperation(
         e
           .querySelector(':scope > [aria-label="Start a post"]')
           ?.getAttribute("aria-label") ||
+        e
+          .querySelector(':scope > svg[aria-label="More options"]')
+          ?.getAttribute("aria-label") ||
         e.textContent ||
         "",
     );
   const controls = (root: ParentNode, re: RegExp) =>
     [
       ...root.querySelectorAll<HTMLElement>(
-        'button,a[href],[role="button"],[role="menuitemradio"]',
+        'button,a[href],[role="button"],[role="menuitem"],[role="menuitemradio"]',
       ),
     ].filter(
       (e) =>
@@ -219,38 +222,38 @@ export async function composerOperation(
     if (!countMatch) fail("scheduled_list_shape_changed");
     const count = Number(countMatch![1]);
     if (count === 0) return [];
-    // Native row identity when exposed, otherwise exact visible text/time fingerprint.
     const rows = [
-      ...d.querySelectorAll<HTMLElement>(
-        '[data-scheduled-post], [data-urn], [data-id], li, [role="listitem"]',
-      ),
-    ].filter(
-      (e) =>
-        !!e.querySelector(
-          'button[aria-label*="Delete"],button[aria-label*="More"],[data-scheduled-text]',
-        ),
-    );
-    const minimal = rows.filter(
-      (e) => !rows.some((other) => other !== e && e.contains(other)),
-    );
+      ...d.querySelectorAll<HTMLElement>('[id^="ScheduledPostRowSlot_"]'),
+    ];
     const items: Record<string, any>[] = [];
-    for (const row of minimal) {
-      const textNode = row.querySelector<HTMLElement>(
-        "[data-scheduled-text],.scheduled-post-content",
+    for (const row of rows) {
+      const nativeId = row.id.match(
+        /^ScheduledPostRowSlot_(urn:li:share:\d+)_/,
+      )?.[1];
+      const body = row.querySelector<HTMLElement>('[role="listitem"]');
+      if (!nativeId || !body || body.querySelector("button"))
+        fail("scheduled_row_shape_changed");
+      const text = clean(
+        [...body!.querySelectorAll("p")]
+          .map((p) => p.innerText ?? p.textContent ?? "")
+          .join("\n"),
       );
-      const timeNode = row.querySelector("time,[data-scheduled-at]");
-      const text = clean(textNode?.innerText ?? textNode?.textContent ?? "");
-      const rawTime =
-        timeNode?.getAttribute("datetime") ??
-        timeNode?.getAttribute("data-scheduled-at");
-      const timestamp = Date.parse(rawTime ?? "");
+      const dates = [...row.querySelectorAll("p")].filter(
+        (p) => !body!.contains(p) && /^Posting /.test(p.textContent ?? ""),
+      );
+      if (dates.length !== 1) fail("scheduled_row_shape_changed");
+      const display = clean(dates[0].textContent ?? "");
+      const match = display.match(
+        /^Posting (?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), ([A-Z][a-z]{2} \d{1,2}, \d{4}) at (\d{1,2}:\d{2} [AP]M)$/,
+      );
+      const timestamp = match ? Date.parse(match[1] + " " + match[2]) : NaN;
       if (!text || !Number.isFinite(timestamp))
         fail("scheduled_row_shape_changed");
       items.push({
         text,
         text_hash: await hash(text),
         scheduled_at: new Date(timestamp).toISOString(),
-        native_id: row.getAttribute("data-urn") ?? row.getAttribute("data-id"),
+        native_id: nativeId,
         element: row,
       });
     }
@@ -264,7 +267,8 @@ export async function composerOperation(
     items.filter(
       (x) =>
         x.text_hash === target.text_hash &&
-        x.scheduled_at === target.scheduled_at,
+        x.scheduled_at === target.scheduled_at &&
+        (!target.native_id || x.native_id === target.native_id),
     );
   const publicItem = ({ element: _element, ...item }: Record<string, any>) =>
     item;
@@ -292,21 +296,30 @@ export async function composerOperation(
         };
       if (hits.length !== 1) fail("scheduled_target_not_found");
       const row = hits[0].element as HTMLElement;
-      if (!find(row, /^(Delete|Delete scheduled post|Löschen)$/))
-        await click(row, /^(More|More options|Weitere Optionen)$/);
-      const scope = find(row, /^(Delete|Delete scheduled post|Löschen)$/)
-        ? row
-        : list;
-      await click(scope, /^(Delete|Delete scheduled post|Löschen)$/);
+      const priorMenus = new Set(
+        [...document.querySelectorAll('[role="menu"]')].filter(visible),
+      );
+      const priorDialogs = new Set(dialogs());
+      await click(row, /^(More options|Weitere Optionen)$/);
+      const menu = await wait(() => {
+        const hits = [
+          ...document.querySelectorAll<HTMLElement>('[role="menu"]'),
+        ].filter((e) => visible(e) && !priorMenus.has(e));
+        if (hits.length > 1) fail("scheduled_menu_ambiguous");
+        return hits[0];
+      });
+      await click(menu, /^(Delete post|Beitrag löschen)$/);
       const confirm = await wait(() =>
         dialogs().find(
           (x) =>
-            /Delete scheduled post|Geplanten Beitrag löschen/i.test(
-              x.innerText ?? x.textContent ?? "",
-            ) && !!find(x, /^(Delete|Löschen)$/),
+            !priorDialogs.has(x) &&
+            /Delete this post\?|Diesen Beitrag löschen/i.test(
+              x.textContent ?? "",
+            ) &&
+            !!find(x, /^(Delete Post|Löschen)$/),
         ),
       );
-      await click(confirm, /^(Delete|Löschen)$/, true);
+      await click(confirm, /^(Delete Post|Löschen)$/, true);
       await wait(() =>
         !confirm.isConnected || !visible(confirm) ? true : undefined,
       );

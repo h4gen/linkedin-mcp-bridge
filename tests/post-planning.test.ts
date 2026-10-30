@@ -296,10 +296,17 @@ it("plans only after exact time confirmation and verifies the scheduled entry", 
         d.innerHTML =
           '<div data-sdui-screen="com.linkedin.sdui.flagshipnav.sharing.ShareSchedulePostList"><a>Scheduled (' +
           scheduled +
-          ')</a><div data-scheduled-post><p data-scheduled-text></p><time datetime="' +
-          wanted.toISOString() +
-          '"></time><button>Delete</button></div></div>';
-        d.querySelector("[data-scheduled-text]")!.textContent = args.text;
+          ')</a><div id="ScheduledPostRowSlot_urn:li:share:123_gen6"><p>Posting ' +
+          new Intl.DateTimeFormat("en-US", {
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          }).format(wanted) +
+          " at " +
+          timeText +
+          '</p><div role="listitem"><h2>Feed post</h2><p></p></div></div></div>';
+        d.querySelector('[role="listitem"] p')!.textContent = args.text;
       });
       d.querySelector("button")!.addEventListener("click", () => {
         d.innerHTML =
@@ -347,4 +354,81 @@ it("does not mistake an open unsaved composer for a persisted draft", async () =
     bridge_error: "draft_reconciliation_requires_closed_composer",
   });
   expect(f.saves()).toBe(0);
+});
+it("cancels only an exact native row via its newly opened menu, never Post now", async () => {
+  const f = ui();
+  let deleted = 0,
+    published = 0;
+  const d = f.doc.createElement("dialog");
+  d.open = true;
+  const render = () => {
+    d.innerHTML =
+      '<button aria-label="Dismiss">Close</button><div data-sdui-screen="com.linkedin.sdui.flagshipnav.sharing.ShareSchedulePostList"><a>Scheduled (' +
+      (deleted ? 0 : 1) +
+      ")</a>" +
+      (!deleted
+        ? '<div id="ScheduledPostRowSlot_urn:li:share:123_gen6"><p>Posting Fri, Nov 6, 2026 at 3:57 AM</p><div role="button"><svg aria-label="More options"></svg></div><div role="listitem"><h2>Feed post</h2><p>QA</p></div></div>'
+        : "") +
+      "</div>";
+    d.querySelector("button")!.addEventListener("click", () => d.remove());
+    if (!deleted)
+      d.querySelector('[role="button"]')!.addEventListener("click", () => {
+        const menu = f.doc.createElement("div");
+        menu.setAttribute("role", "menu");
+        menu.innerHTML =
+          '<div role="menuitem">Post now</div><div role="menuitem">Delete post</div>';
+        f.doc.body.append(menu);
+        menu.children[0].addEventListener("click", () => published++);
+        menu.children[1].addEventListener("click", () => {
+          menu.remove();
+          const confirm = f.doc.createElement("dialog");
+          confirm.open = true;
+          confirm.innerHTML =
+            "<h2>Delete this post?</h2><button>Delete Post</button>";
+          f.doc.body.append(confirm);
+          confirm.querySelector("button")!.addEventListener("click", () => {
+            deleted++;
+            confirm.remove();
+            render();
+          });
+        });
+      });
+  };
+  render();
+  f.doc.body.append(d);
+  // A fresh manager is reached via the normal composer/timing navigation.
+  f.doc.querySelector("#start")!.addEventListener("click", () => {
+    const composer = f.doc.querySelector("dialog")!;
+    const link = f.doc.createElement("a");
+    link.href = "#";
+    link.textContent = "Scheduled";
+    composer.append(link);
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      composer.innerHTML =
+        '<input placeholder="mm/dd/yyyy"><a href="#">Scheduled (0)</a>';
+      composer.querySelector("a")!.addEventListener("click", (e) => {
+        e.preventDefault();
+        composer.remove();
+        render();
+        f.doc.body.append(d);
+      });
+    });
+  });
+  const target = {
+    text_hash: hash("QA"),
+    scheduled_at: new Date("Nov 6, 2026 3:57 AM").toISOString(),
+    native_id: "urn:li:share:123",
+  };
+  const result = await composerOperation(
+    "scheduled_post_cancel",
+    { ...args, verified_target: target },
+    {},
+  );
+  expect(result).toMatchObject({
+    verified: true,
+    outcome: "schedule_cancelled",
+  });
+  expect(deleted).toBe(1);
+  expect(published).toBe(0);
 });
