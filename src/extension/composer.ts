@@ -314,7 +314,10 @@ export async function composerOperation(
     if (current) fail("existing_draft_conflict");
     if (d.querySelector('img[data-media],video,[data-sdui-screen*="Media"]'))
       fail("unsupported_composer_attachment");
+    // ProseMirror and the host UI commit editor transactions asynchronously.
+    // Do not dismiss the editor in the same event-loop turn as input.
     fill(editor, a.text);
+    await new Promise((r) => setTimeout(r, 500));
     await wait(
       () => (editorText(editor) === clean(a.text) ? true : undefined),
       "composer_text_mismatch",
