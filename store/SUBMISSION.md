@@ -1,10 +1,10 @@
-# Chrome Web Store draft — 0.7.0
+# Chrome Web Store draft — 0.7.1
 
-The existing listing remains a Draft. On 2026-10-31 the dashboard showed package 0.6.0, the existing listing and all five explainers. The cumulative 0.7.0 Store ZIP was built locally and selected for upload; Google then required a renewed personal passkey sign-in. Until that sign-in and the resulting package version are verified, the portal update is unconfirmed. Nothing was submitted for review or published.
+The 0.7.1 package is prepared locally only. No portal upload, submission or publication was performed in this repair increment. The last verified portal state remains the 0.6.0 draft; the previous 0.7.0 upload was unconfirmed after Google requested renewed sign-in. The existing listing and five explainers remain unchanged.
 
-Local 0.7.0 package: `artifacts/store-0.7.0/linkedin-extension.zip`, SHA-256 `96dd8c30746953f7dbd83f5fa6d7658ed0593b05a999d7958d0f8fc38f1c3f9d`. Its pilot-channel build metadata and `store-check.json` are alongside it. Runtime fingerprint: `52da5d75629b8af52d99be94397f9b7a0060d91ebe68c343cd1a4a54637d199c`.
+Local package: `artifacts/store-0.7.1/linkedin-extension.zip`, SHA-256 `5da2854c2f0f99b63d1b3ea0b69792a63657092807886a806bd647fd8aa19fb9`. Pilot-channel build metadata and `store-check.json` are alongside it. Runtime fingerprint: `e426d1d858b43ef34703c9c49618929191f34cfd06af780441ecc382d6230a78`.
 
-The Store check passes assets, package, metadata and both platform installation prerequisites, but still blocks submission for eleven missing final-runtime write capability proofs. All 21 read/diagnostic capabilities have current live evidence. See `docs/validation.md` for exact scope and the separate pending recipient reply/invitation acceptance.
+All 21 read/diagnostic capabilities and macOS/Windows installation prerequisites have current matching-runtime evidence. Submission remains blocked by eleven missing current-runtime write capability proofs; this increment intentionally performs no live writes. Historical dispatch proofs retain their original fingerprints. See `docs/validation.md` and `docs/repairs-0.7.1.md` for the exact repair and acceptance scope.
 
 - Draft: https://chrome.google.com/webstore/devconsole/ca8c63eb-664b-4353-ac7c-af776311ddff/pibhcinkiadfplcaefllaeappkpnpfjm/edit
 - Assigned extension ID: `pibhcinkiadfplcaefllaeappkpnpfjm`.
@@ -34,7 +34,7 @@ Store title: LinkedIn MCP – AI Connector for Claude & Codex. The 2026-10-30 ma
 
 ## Current execution and acceptance contract
 
-Version 0.7.0 exposes 32 composable primitives. Writes execute directly with account checks, exact target validation, idempotency and persisted operation receipts. There is no extension approval queue or review page. Unknown dispatched writes are never automatically repeated. Messaging uses the dedicated messaging API with exact conversation identities, not the feed chat overlay. Post creation supports native drafts and scheduling; there is no immediate publish tool.
+Version 0.7.1 exposes 32 composable primitives. Writes execute directly with account checks, exact target validation, idempotency and persisted operation receipts. There is no extension approval queue or review page. Unknown dispatched writes are never automatically repeated. Messaging uses the dedicated messaging API with exact conversation identities, not the feed chat overlay. Post creation supports native drafts and scheduling; there is no immediate publish tool.
 
 Public-facing acceptance content must be meaningful and specific to its actual context, as required by the repository's `AGENTS.md`. Authorized temporary comments and likes must be removed or reversed after verification. Private evidence stays in ignored local artifacts.
 
