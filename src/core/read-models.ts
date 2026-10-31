@@ -1,3 +1,4 @@
+import { profileReference } from "./profile-identity.js";
 import { Fault, type Args } from "./contracts.js";
 export const asText = (v: any): string =>
   typeof v === "string" ? v : typeof v?.text === "string" ? v.text : "";
@@ -37,52 +38,18 @@ export async function textWindow(
 export function personRef(p: Args): Args {
   p = p && typeof p === "object" ? p : {};
   const member = p.participantType?.member ?? p.member ?? p;
-  const raw = p.hostIdentityUrn ?? member.dashEntityUrn ?? member.entityUrn;
-  const urn =
-    typeof raw === "string" &&
-    /^urn:li:(fsd_profile|fs_miniProfile):[\w-]+$/.test(raw)
-      ? raw.replace("fs_miniProfile", "fsd_profile")
-      : null;
-  let identifier =
-    member.publicIdentifier ??
-    member.public_identifier ??
-    [
-      member.profile_url,
-      member.profileUrl,
-      p.profile_url,
-      p.profileUrl,
-    ].flatMap((value) =>
-      typeof value === "string"
-        ? [
-            value.match(
-              /^https:\/\/www\.linkedin\.com\/in\/([^/?#]+)\/?(?:[?#].*)?$/,
-            )?.[1],
-          ].filter(Boolean)
-        : [],
-    )[0] ??
-    null;
-  if (typeof identifier !== "string") identifier = null;
-  if (identifier) {
-    try {
-      identifier = decodeURIComponent(identifier);
-      if (!/^[\p{L}\p{M}\p{N}_-]{1,150}$/u.test(identifier)) identifier = null;
-    } catch {
-      identifier = null;
-    }
-  }
+  const ref = profileReference(p);
   return {
-    entityUrn: urn,
+    entityUrn: ref.entityUrn,
     name:
       asText(member.name).trim() ||
       [member.firstName, member.lastName]
         .map((value) => asText(value).trim())
         .filter(Boolean)
         .join(" "),
-    public_identifier: identifier,
-    profile_url: identifier
-      ? `https://www.linkedin.com/in/${encodeURIComponent(identifier)}/`
-      : null,
-    identity_status: urn || identifier ? "resolved" : "unresolved",
+    public_identifier: ref.public_identifier,
+    profile_url: ref.profile_url,
+    identity_status: ref.identity_status,
   };
 }
 export function participantRefs(row: Args): Args[] {

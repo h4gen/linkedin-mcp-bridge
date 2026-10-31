@@ -1,3 +1,4 @@
+import { rememberIdentity } from "./profile-identity.js";
 import {
   conversationView,
   postView,
@@ -356,16 +357,7 @@ export class Engine {
           // Fresh exact-conversation identities remain usable after a worker/browser restart.
           for (const person of references)
             if (person.entityUrn && person.name) {
-              const old = await d.store.get("identity:" + person.entityUrn);
-              await d.store.set("identity:" + person.entityUrn, {
-                ...old,
-                ...Object.fromEntries(
-                  Object.entries(person).filter(
-                    ([, v]) => v !== null && v !== "",
-                  ),
-                ),
-                urn: person.entityUrn,
-              });
+              await rememberIdentity(d.store, person);
             }
           if (
             participants.some((x: any) => typeof x !== "string") ||
@@ -725,10 +717,7 @@ export class Engine {
         person?.entityUrn?.startsWith("urn:li:fsd_profile:") &&
         person.profile_url
       )
-        await d.store.set("identity:" + person.entityUrn, {
-          ...person,
-          urn: person.entityUrn,
-        });
+        await rememberIdentity(d.store, person);
     }
     if (op === "scheduled_posts_list") {
       result.items = await Promise.all(

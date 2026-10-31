@@ -1,3 +1,8 @@
+import {
+  profileReference,
+  profileUrn,
+  publicIdentifier,
+} from "./profile-identity.js";
 import { newestFirst, exactPeer, personRef } from "./read-models.js";
 import { Args, Fault, Operation } from "./contracts.js";
 import { collection, normalize, restli } from "./normalize.js";
@@ -209,52 +214,70 @@ export async function readApi(
   if (op === "conversations_get")
     return { conversation: await getConversation(a, fetch) };
   if (op === "profile_get") {
-    let identifier: string | undefined;
-    try {
-      identifier = a.public_identifier
-        ? decodeURIComponent(a.public_identifier)
-        : undefined;
-      if (identifier && !/^[\p{L}\p{M}\p{N}_-]{1,150}$/u.test(identifier))
-        throw new Fault("invalid_profile_identifier");
-    } catch {
+    const expectedUrn = profileUrn(a.profile_urn);
+    const memberId = expectedUrn?.split(":").at(-1);
+    const identifier = publicIdentifier(a.public_identifier, memberId);
+    if (a.public_identifier && !identifier && !expectedUrn)
       throw new Fault("invalid_profile_identifier");
+    // The public schema accepts exactly one identity. Internally the original
+    // URN may accompany a cached slug used only as a bounded lookup hint.
+    const locators = [
+      ...new Set([identifier, memberId].filter((v): v is string => !!v)),
+    ];
+    if (!locators.length) throw new Fault("invalid_profile_identifier");
+    for (let index = 0; index < locators.length; index++) {
+      let rawProfile;
+      try {
+        rawProfile = await fetch({
+          path:
+            "/identity/dash/profiles?" +
+            new URLSearchParams({
+              q: "memberIdentity",
+              memberIdentity: locators[index],
+              decorationId:
+                "com.linkedin.voyager.dash.deco.identity.profile.WebTopCardCore-19",
+            }),
+        });
+      } catch (error) {
+        if (
+          error instanceof Fault &&
+          error.code === "linkedin_http_404" &&
+          index + 1 < locators.length
+        )
+          continue;
+        throw error;
+      }
+      const normalized = normalize(rawProfile);
+      const matchesProfile = (x: Args) =>
+        expectedUrn
+          ? profileReference(x, true).entityUrn === expectedUrn
+          : x.publicIdentifier === identifier;
+      const matches = normalized.entities.filter(matchesProfile);
+      const candidates = matches.length
+        ? matches
+        : collection(rawProfile).items.filter(matchesProfile);
+      if (!candidates.length && index + 1 < locators.length) continue;
+      if (candidates.length !== 1) throw new Fault("profile_not_unique");
+      const p = candidates[0],
+        ref = profileReference(p, true);
+      if (
+        !ref.entityUrn ||
+        !publicIdentifier(p.publicIdentifier, ref.member_id, true)
+      )
+        throw new Fault("profile_shape_changed");
+      return {
+        profile: {
+          entityUrn: ref.entityUrn,
+          name: personRef(p).name,
+          headline: p.headline ?? p.occupation ?? null,
+          profile_url: ref.profile_url,
+          public_identifier: ref.public_identifier,
+          location:
+            p.geoLocation?.geo?.defaultLocalizedName ?? p.locationName ?? null,
+        },
+      };
     }
-    const rawProfile = await fetch({
-      path:
-        "/identity/dash/profiles?" +
-        new URLSearchParams({
-          q: "memberIdentity",
-          memberIdentity: identifier ?? a.profile_urn?.split(":").at(-1),
-          decorationId:
-            "com.linkedin.voyager.dash.deco.identity.profile.WebTopCardCore-19",
-        }),
-    });
-    const normalized = normalize(rawProfile);
-    const matchesProfile = (x: Args) =>
-      identifier
-        ? x.publicIdentifier === identifier
-        : x.entityUrn?.replace("fs_miniProfile", "fsd_profile") ===
-          a.profile_urn;
-    const matches = normalized.entities.filter(matchesProfile);
-    const candidates = matches.length
-      ? matches
-      : collection(rawProfile).items.filter(matchesProfile);
-    if (candidates.length !== 1) throw new Fault("profile_not_unique");
-    const p = candidates[0];
-    return {
-      profile: {
-        entityUrn: p.entityUrn ?? null,
-        name: personRef(p).name,
-        headline: p.headline ?? p.occupation ?? null,
-        profile_url:
-          "https://www.linkedin.com/in/" +
-          encodeURIComponent(p.publicIdentifier) +
-          "/",
-        public_identifier: p.publicIdentifier,
-        location:
-          p.geoLocation?.geo?.defaultLocalizedName ?? p.locationName ?? null,
-      },
-    };
+    throw new Fault("profile_not_unique");
   }
   if (op === "conversations_list")
     raw = await fetch(

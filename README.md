@@ -2,7 +2,7 @@
 
 32 primitive LinkedIn tools for local AI agents: inbox and message history, people research, invitations, feed interactions, native text drafts and scheduling. The agent composes these tools; this project does not implement workflows, a CRM or an inbox index.
 
-**0.7.1 — Chrome Web Store draft; submission acceptance pending.** Installation from Git supports macOS and native Windows with Google Chrome and Node.js 22+. Both platforms pass CI, including native registration, process round-trips and an isolated Chromium/native-messaging smoke test. Live LinkedIn checks were performed on macOS. Linux/WSL and direct web-chat connections are outside this release.
+**0.7.2 — Chrome Web Store draft; submission acceptance pending.** Installation from Git supports macOS and native Windows with Google Chrome and Node.js 22+. Both platforms pass CI, including native registration, process round-trips and an isolated Chromium/native-messaging smoke test. Live LinkedIn checks were performed on macOS. Linux/WSL and direct web-chat connections are outside this release.
 
 LinkedIn credentials stay in Chrome. Requested content goes to your selected MCP client and may go to its AI provider. No hosted relay or product telemetry. Writes execute directly after target and idempotency checks; there is no extension approval queue.
 
@@ -139,3 +139,5 @@ See [validation](docs/validation.md) for historical live checks and current limi
 Connection recovery is automatic after work-tab loss, worker restarts and brief native-host interruptions. Chrome must be running; an expired LinkedIn login or a changed account still needs attention. `doctor` exits nonzero when the connection is unusable. Health reports the specific session/tab error; transport failures report `native_host_unavailable`. A dispatched write is never replayed automatically after a disconnect.
 
 Read-primitive repair contracts and compatibility notes: [0.7.1 repairs](docs/repairs-0.7.1.md).
+
+Inbox-to-profile identity repair: [0.7.2 contracts and migration](docs/repairs-0.7.2.md).

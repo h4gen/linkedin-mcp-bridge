@@ -1,4 +1,8 @@
 import {
+  rememberIdentity,
+  profileReference,
+} from "../core/profile-identity.js";
+import {
   scanRelationshipInvitations,
   resolveRelationship,
 } from "../core/relationships.js";
@@ -148,20 +152,7 @@ async function fetchRequest(r: Request, check = () => {}) {
   const identities = normalize(result.data).entities;
   for (const p of identities) {
     const person = personRef(p);
-    const urn = person.entityUrn;
-    const name = person.name;
-    if (typeof urn === "string" && /^urn:li:fsd_profile:/.test(urn) && name)
-      await store.set("identity:" + urn, {
-        ...(await store.get("identity:" + urn)),
-        urn,
-        name,
-        ...(person.profile_url
-          ? {
-              profile_url: person.profile_url,
-              public_identifier: person.public_identifier,
-            }
-          : {}),
-      });
+    if (person.entityUrn && person.name) await rememberIdentity(store, person);
   }
   return result.data;
 }
@@ -291,15 +282,18 @@ const engine = new Engine({
         : undefined;
       const identifier =
         a.public_identifier ??
-        cached?.public_identifier ??
-        cached?.profile_url?.match(/\/in\/([^/?#]+)/)?.[1];
+        profileReference(
+          cached ?? {},
+          cached?.identity_source === "profile_verified",
+        ).public_identifier;
 
       const basic = (
         await readApi(
           "profile_get",
-          identifier
-            ? { public_identifier: identifier }
-            : { profile_urn: a.profile_urn },
+          {
+            profile_urn: a.profile_urn,
+            public_identifier: identifier ?? undefined,
+          },
           {},
           (r) => fetchRequest(r, check),
         )
@@ -359,10 +353,11 @@ const engine = new Engine({
       }
       if (!extra || extra.bridge_error)
         throw new Fault(extra?.bridge_error ?? "profile_shape_changed");
-      await store.set("identity:" + basic.entityUrn, {
-        ...basic,
-        posts_url: extra.posts_url,
-      });
+      await rememberIdentity(
+        store,
+        { ...basic, posts_url: extra.posts_url },
+        "profile_verified",
+      );
       if (op === "profile_get") {
         const all: Record<string, any> = {
           basic: { status: "available" },
@@ -1046,6 +1041,14 @@ const initialized = (async () => {
     await chrome.storage.local.remove("allowInboxChanges");
     // Schema migration is independent of release version; compatible updates keep the binding.
     await store.set("schemaVersion", 2);
+  }
+  if ((await store.get("identitySchemaVersion")) !== 1) {
+    const data = await chrome.storage.session.get(null);
+    const keys = Object.keys(data).filter(
+      (k) => k.startsWith("identity:") || k.startsWith("cursor:"),
+    );
+    if (keys.length) await chrome.storage.session.remove(keys);
+    await store.set("identitySchemaVersion", 1);
   }
   if (await store.get("connection")) connectHost();
 })();

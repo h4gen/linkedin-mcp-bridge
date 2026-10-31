@@ -58,7 +58,14 @@ it("invalidates an old traversal when another DOM primitive starts", async () =>
     ).error,
   ).toMatchObject({ code: "cursor_invalidated" });
 });
-async function harness() {
+async function harness(
+  options: {
+    local?: any;
+    session?: any;
+    fetch?: (request: any) => any;
+    page?: (url: string) => string;
+  } = {},
+) {
   const dom = new JSDOM("<main></main>", {
     url: "https://www.linkedin.com/feed/",
     runScripts: "outside-only",
@@ -90,8 +97,9 @@ async function harness() {
     schemaVersion: 2,
     connection: { tabId: 10, account, paused: false },
     workTabId: 10,
+    ...options.local,
   };
-  const session: any = {};
+  const session: any = options.session ?? {};
   const area = (data: any) => ({
     // Chrome storage does not preserve object property insertion order.
     get: async (k: string | null) =>
@@ -170,6 +178,8 @@ async function harness() {
         if (opts.url) {
           dom.reconfigure({ url: opts.url });
           if (opts.url.includes("/search/")) searchPage();
+          else if (options.page)
+            w.document.body.innerHTML = options.page(opts.url);
         }
         return { ...tab };
       },
@@ -195,7 +205,9 @@ async function harness() {
                 data:
                   opts.args[0].path === "/me"
                     ? { data: { miniProfile: { entityUrn: account } } }
-                    : { data: { elements: [] }, included: apiEntities },
+                    : options.fetch
+                      ? await options.fetch(opts.args[0])
+                      : { data: { elements: [] }, included: apiEntities },
               },
             },
           ];
@@ -256,6 +268,7 @@ async function harness() {
   return {
     w,
     session,
+    local,
     setApiEntities: (value: any[]) => {
       apiEntities = value;
     },
@@ -434,4 +447,205 @@ it("preserves known profile references when messaging supplies only text-object 
     profile_url: "https://www.linkedin.com/in/example/",
     public_identifier: "example",
   });
+});
+
+const identityMember = "ACoOpaqueMemberFixture1234567890";
+const identityUrn = "urn:li:fsd_profile:" + identityMember;
+const identityConversation = "urn:li:msg_conversation:identity";
+function identitySource() {
+  const participant = {
+    hostIdentityUrn: identityUrn,
+    participantType: {
+      member: {
+        firstName: { text: "Alex" },
+        lastName: { text: "Example" },
+        profileUrl: "https://www.linkedin.com/in/" + identityMember + "/",
+      },
+    },
+  };
+  const conversation = {
+    entityUrn: identityConversation,
+    participants: [{ hostIdentityUrn: account }, participant],
+  };
+  const person = {
+    entityUrn: identityUrn,
+    ...participant.participantType.member,
+  };
+  const profile = {
+    entityUrn: identityUrn,
+    publicIdentifier: "alex-example",
+    firstName: "Alex",
+    lastName: "Example",
+  };
+  return {
+    fetch: (r: any) => {
+      if (r.path.startsWith("/identity/dash/profiles"))
+        return { data: { elements: [profile] }, included: [profile] };
+      if (r.path.includes("messengerMessages"))
+        return {
+          data: {
+            elements: [
+              {
+                entityUrn: "urn:li:msg_message:identity",
+                sender: participant,
+                body: { text: "A meaningful reply" },
+                deliveredAt: 100,
+              },
+            ],
+          },
+          included: [conversation, person],
+        };
+      if (r.path.includes("messengerConversations"))
+        return { data: { elements: [conversation] }, included: [person] };
+      return { data: { elements: [] } };
+    },
+    page: (url: string) =>
+      url.includes("/recent-activity/")
+        ? "<main>" + card(1) + "</main>"
+        : '<main><section><h2>Alex Example</h2><p>• 1st</p><a href="/in/alex-example/overlay/contact-info/">Contact info</a></section><a href="/in/alex-example/recent-activity/all/">Show all posts</a></main>',
+  };
+}
+it("keeps URN profile resolution independent of repeated Inbox reads in the built runtime", async () => {
+  const h = await harness(identitySource());
+  const inbox = () =>
+    h.request("conversations_get", { conversation_urn: identityConversation });
+  const profile = () =>
+    h.request("profile_get", { profile_urn: identityUrn, sections: ["basic"] });
+  const relationship = () =>
+    h.request("relationship_get", { profile_urn: identityUrn });
+  expect((await inbox()).error).toBeUndefined();
+  expect((await profile()).error).toBeUndefined();
+  expect((await relationship()).result?.status).toBe("connected");
+  expect(
+    (
+      await h.request("profile_get", {
+        public_identifier: "alex-example",
+        sections: ["basic"],
+      })
+    ).error,
+  ).toBeUndefined();
+  expect((await relationship()).result?.status).toBe("connected");
+  expect((await inbox()).error).toBeUndefined();
+  expect((await profile()).error).toBeUndefined();
+  expect((await relationship()).result?.status).toBe("connected");
+  expect(h.session["identity:" + identityUrn]).toMatchObject({
+    public_identifier: "alex-example",
+  });
+});
+
+it("preserves verified identity across every Inbox projection and worker restart", async () => {
+  const source = identitySource();
+  let h = await harness(source);
+  expect(
+    (
+      await h.request("profile_get", {
+        public_identifier: "alex-example",
+        sections: ["basic"],
+      })
+    ).error,
+  ).toBeUndefined();
+  for (const [op, args] of [
+    ["conversations_list", { limit: 20 }],
+    ["conversations_find", { profile_urn: identityUrn }],
+    ["conversations_get", { conversation_urn: identityConversation }],
+    ["messages_list", { conversation_urn: identityConversation }],
+    [
+      "message_get",
+      {
+        conversation_urn: identityConversation,
+        message_urn: "urn:li:msg_message:identity",
+      },
+    ],
+  ] as const) {
+    expect((await h.request(op, args)).error).toBeUndefined();
+    expect(h.session["identity:" + identityUrn]).toMatchObject({
+      public_identifier: "alex-example",
+      identity_source: "profile_verified",
+    });
+    expect(
+      (await h.request("relationship_get", { profile_urn: identityUrn })).result
+        ?.status,
+    ).toBe("connected");
+  }
+  h = await harness({ ...source, local: h.local, session: h.session });
+  expect(
+    (
+      await h.request("conversations_get", {
+        conversation_urn: identityConversation,
+      })
+    ).error,
+  ).toBeUndefined();
+  expect(
+    (await h.request("relationship_get", { profile_urn: identityUrn })).result
+      ?.status,
+  ).toBe("connected");
+});
+it.each([false, true])(
+  "migrates poisoned identities and cached projections while retaining connection/pause/receipts: %s",
+  async (paused) => {
+    const session: any = {
+      ["identity:" + identityUrn]: {
+        urn: identityUrn,
+        public_identifier: identityMember,
+      },
+      "cursor:old": {
+        response: { participants: [{ public_identifier: identityMember }] },
+      },
+      "post-url:urn:li:activity:1":
+        "https://www.linkedin.com/feed/update/urn:li:activity:1/",
+    };
+    const connection = { tabId: 10, account, paused };
+    const journal = {
+      old: { idempotency_key: "old-key", status: "confirmed" },
+    };
+    const h = await harness({
+      ...identitySource(),
+      session,
+      local: { connection, journal, scheduledPosts: { saved: "retained" } },
+    });
+    expect(h.session["identity:" + identityUrn]).toBeUndefined();
+    expect(h.session["cursor:old"]).toBeUndefined();
+    expect(h.local).toMatchObject({
+      connection,
+      journal,
+      scheduledPosts: { saved: "retained" },
+      identitySchemaVersion: 1,
+    });
+    expect(h.session["post-url:urn:li:activity:1"]).toBeTruthy();
+    if (!paused)
+      expect(
+        (
+          await h.request("profile_get", {
+            profile_urn: identityUrn,
+            sections: ["basic"],
+          })
+        ).error,
+      ).toBeUndefined();
+    h.session["cursor:new"] = { response: { items: [] } };
+    const restarted = await harness({
+      ...identitySource(),
+      local: h.local,
+      session: h.session,
+    });
+    expect(restarted.session["cursor:new"]).toEqual({
+      response: { items: [] },
+    });
+  },
+);
+
+it("keeps author-post lookup usable after an Inbox identity refresh", async () => {
+  const h = await harness(identitySource());
+  expect(
+    (
+      await h.request("conversations_get", {
+        conversation_urn: identityConversation,
+      })
+    ).error,
+  ).toBeUndefined();
+  const result = await h.request("profile_posts_list", {
+    profile_urn: identityUrn,
+    limit: 1,
+  });
+  expect(result.error).toBeUndefined();
+  expect(result.result.items).toHaveLength(1);
 });
