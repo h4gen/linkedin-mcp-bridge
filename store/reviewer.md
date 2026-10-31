@@ -4,13 +4,14 @@ Public Chrome extension with a separate Git-installed MCP server for macOS and n
 
 1. Install the extension and Git-based server as above, then run `node dist/cli.js doctor`. Use your own account. No credentials are included.
 2. Sign in to your own LinkedIn account. Open the extension on that tab, read the data-flow disclosure, acknowledge it and connect. The extension creates a dedicated LinkedIn work tab and brings it forward for UI actions. No account credentials are supplied in the package.
-3. Call linkedin_health and verify account, version and companion connectivity. Read conversations and message history using their returned IDs and cursors. History reads must not silently mark a conversation as read.
+3. Call linkedin_health and verify account, version and local native-host connectivity. Read conversations and message history using their returned IDs and cursors. History reads must not silently mark a conversation as read.
 4. Request a message to an expressly consenting test contact with a unique idempotency key. It executes directly without extension review. Inspect its receipt and LinkedIn UI.
 5. Replay the same key and verify there is still only one message. Never resend a receipt marked unknown_outcome with a new key.
 6. Test inbox read/archive operations on a named test conversation and restore its original state. These execute directly too.
 7. Search people with explicit supported filters, inspect a post, and page reactions/comments. Incomplete scans must be labeled partial. No Sales Navigator or bulk outreach functionality is present.
 8. Repeat a consumed cursor and verify an identical page. Navigate or interact with the work tab, then verify the old DOM cursor is rejected explicitly.
-9. Pause/disconnect, close the LinkedIn tab, and restart Chrome. Calls must fail clearly rather than attach to another account or tab.
+9. With the connection enabled, close only the dedicated work tab and make another read. The extension must recover without a Connect click. An extension worker/native-host restart must preserve the account binding and operation receipts. Chrome must already be running; the server does not launch a closed browser.
+10. Explicitly pause/disconnect, close the LinkedIn tab, and restart Chrome. Calls must fail clearly, preserve that deliberate choice and never attach to another account.
 
 All executable adapters are bundled. No arbitrary URL, selector, JavaScript or native command is accepted over MCP.
 

@@ -4,6 +4,34 @@ import fs from "node:fs/promises";
 import { VERSION, PROTOCOL } from "../src/version.js";
 const account = "urn:li:fsd_profile:me";
 afterEach(() => vi.useRealTimers());
+it("opens the feed for a fresh feed reader after another primitive changed the work route", async () => {
+  const h = await harness();
+  h.tabs.get(10).url =
+    "https://www.linkedin.com/feed/update/urn:li:activity:123/";
+  const original = h.chrome.scripting.executeScript.getMockImplementation()!;
+  h.chrome.scripting.executeScript.mockImplementation(async (opts: any) => {
+    if (opts.func.name === "domOperation")
+      return [
+        {
+          result: {
+            items: [],
+            partial: true,
+            reason: "bounded_visible_results",
+          },
+        },
+      ];
+    return original(opts);
+  });
+  const result = await h.request("feed_list", {
+    account_urn: account,
+    limit: 2,
+  });
+  expect(result.error).toBeUndefined();
+  expect(result.result.items).toEqual([]);
+  expect(h.chrome.tabs.update).toHaveBeenCalledWith(10, {
+    url: "https://www.linkedin.com/feed/",
+  });
+});
 async function harness(
   options: {
     missing?: boolean;

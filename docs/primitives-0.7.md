@@ -45,6 +45,8 @@ Read-only browser checks established:
 - SDUI comments use `replaceableComment_urn:li:comment:(ugcPost:…,…)` component keys. The permalink post and comment rows share a `pagedCommentsContainer`; comments and reply editors can be siblings. Flat replies do not, by themselves, prove their parent.
 - The native reply permalink exposes distinct parent/reply identifiers. Live acceptance confirmed their match to the submitted reply; unit tests reject exchanged IDs, mismatched posts, foreign hosts and missing parent parameters.
 - The user-supplied short post URL resolves to a feed-update activity page; the original content can have a different ugcPost identity than the repost activity URL. Resolution uses the page's scoped source identity.
+- Search cards can expose a native share/ugcPost ID without a usable link. Resolution obtains the card's own fresh Copy link toast before returning a navigable reference. Native `/posts/...-share-...` and `ugcPost` links are retained, while links quoted inside the post text cannot establish the enclosing card's identity.
+- SDUI reaction counters can live in a nested listitem under the permalink's main region. The reader accepts the native counter only when its link identifies that exact post, excludes comment counters and other cards, and retains bounded partial coverage.
 
 Tests contain synthetic/anonymized equivalents of these structures. Private message bodies, live account identifiers and browser payloads are not checked into the repository. Live evidence remains in ignored local artifacts.
 

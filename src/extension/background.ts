@@ -414,6 +414,9 @@ const engine = new Engine({
         throw new Fault("profile_posts_location_unresolved");
       await navigate(extra.posts_url);
     }
+    if (op === "feed_list" && !state.dom_session) {
+      await navigate("https://www.linkedin.com/feed/");
+    }
     if (op === "posts_search" && !state.dom_session) {
       await navigate(
         "https://www.linkedin.com/search/results/content/?keywords=" +
