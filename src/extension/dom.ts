@@ -140,12 +140,21 @@ export async function domOperation(
     };
     const postData = (e: Element) => {
       const entityUrn = identity(e);
-      const text =
-        e
-          .querySelector(
-            '.feed-shared-update-v2__commentary,.feed-shared-inline-show-more-text__text-view,.feed-shared-update-v2__description,.update-components-text,[data-test-id="main-feed-post-content"],[data-testid="expandable-text-box"]',
-          )
-          ?.textContent?.trim() ?? "";
+      const content = e.querySelector(
+        '.feed-shared-update-v2__commentary,.feed-shared-inline-show-more-text__text-view,.feed-shared-update-v2__description,.update-components-text,[data-test-id="main-feed-post-content"],[data-testid="expandable-text-box"]',
+      );
+      const clone = content?.cloneNode(true) as Element | undefined;
+      clone
+        ?.querySelectorAll(
+          'button,[role="button"],[aria-hidden="true"],script,style',
+        )
+        .forEach((n) => n.remove());
+      clone?.querySelectorAll("br").forEach((n) => n.replaceWith("\n"));
+      clone?.querySelectorAll("p,div,li").forEach((n) => n.append("\n"));
+      const text = (clone?.textContent ?? "")
+        .replace(/[ \t]+\n/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
       const menuLabel =
         e
           .querySelector('button[aria-label^="Open control menu for post by "]')
@@ -623,6 +632,10 @@ export async function domOperation(
           ),
         ].filter(visible);
       let fields = fieldsIn(scope);
+      if (!parent && fields.length === 0 && root !== post) {
+        scope = root;
+        fields = fieldsIn(root).filter((e) => !e.closest(selector));
+      }
       if (
         parent &&
         fields.length === 0 &&

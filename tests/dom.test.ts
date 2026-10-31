@@ -28,6 +28,58 @@ it("reads modern SDUI cards without legacy class names", async () => {
   );
   expect(detail.text).toBe("A useful post");
 });
+
+it("preserves post paragraphs and excludes expansion controls from text and revision", async () => {
+  page(
+    '<div data-urn="urn:li:activity:123"><div data-testid="expandable-text-box"><p>First<br>Second</p><p>Third</p><button>… more</button></div></div>',
+  );
+  const result = await domOperation("feed_list", { limit: 1 }, {});
+  expect(result.items[0].text).toBe("First\nSecond\nThird");
+  expect(result.items[0].text_truncated).toBe(true);
+});
+
+it("treats conflicting directional invitations and connected evidence as unknown", async () => {
+  const { relationshipStatus } = await import(
+    "../src/extension/profile-state.js"
+  );
+  expect(relationshipStatus("outgoing_pending", ["incoming_pending"])).toBe(
+    "unknown",
+  );
+  expect(relationshipStatus("connected", ["outgoing_pending"])).toBe("unknown");
+  expect(relationshipStatus("unknown", ["incoming_pending"])).toBe(
+    "incoming_pending",
+  );
+  expect(relationshipStatus("not_connected", [])).toBe("not_connected");
+  expect(relationshipStatus("unknown", [])).toBe("unknown");
+});
+
+it("uses the scoped SDUI root editor outside the post card", async () => {
+  const dom = page(
+    '<div componentkey="pagedCommentsContainer"><div data-urn="urn:li:activity:123"><button>Comment</button></div><div><div role="textbox" contenteditable="true"></div><button>Post</button></div></div>',
+  );
+  dom.window.Element.prototype.getClientRects = () => [{}] as any;
+  for (const name of ["HTMLTextAreaElement", "HTMLInputElement", "InputEvent"])
+    vi.stubGlobal(name, (dom.window as any)[name]);
+  document.querySelectorAll("button")[1].addEventListener("click", () => {
+    const child = document.createElement("article");
+    child.className = "comments-comment-entity";
+    child.setAttribute("data-id", "urn:li:comment:created");
+    child.innerHTML =
+      '<a href="/in/me/">Me</a><div class="comments-comment-entity__content">Test root</div>';
+    document.querySelector("[componentkey]")!.append(child);
+  });
+  const result = await domOperation(
+    "post_comment",
+    {
+      post_urn: "urn:li:activity:123",
+      text: "Test root",
+      verified_actor: { profile_url: "https://www.linkedin.com/in/me/" },
+    },
+    {},
+  );
+  expect(result.verified).toBe(true);
+  expect(result.receipt_id).toBe("urn:li:comment:created");
+});
 it("retains readable SDUI posts with a local scan key when LinkedIn omits their URN", async () => {
   page(
     '<div role="listitem"><button aria-label="Open control menu for post by Example"></button><div data-testid="expandable-text-box">No visible permalink</div></div>',

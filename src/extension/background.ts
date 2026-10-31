@@ -9,7 +9,7 @@ import { Fault } from "../core/contracts.js";
 import { self, normalize } from "../core/normalize.js";
 import { pageFetch } from "./page-fetch.js";
 import { extractionOperation } from "./extraction.js";
-import { firstDegreeConnection } from "./profile-state.js";
+import { firstDegreeConnection, relationshipStatus } from "./profile-state.js";
 import { domOperation } from "./dom.js";
 import type { Request } from "../core/api.js";
 import { VERSION, PROTOCOL, NATIVE_HOST as HOST } from "../version.js";
@@ -368,10 +368,7 @@ const engine = new Engine({
               value,
             })),
           );
-          rel.status =
-            rel.status === "connected" || pending.length > 1
-              ? "unknown"
-              : pending[0];
+          rel.status = relationshipStatus(rel.status, pending);
         }
         return rel;
       }

@@ -1,5 +1,15 @@
 // A postcondition reader, never a relationship mutation. Identity comes from
 // the exact invitation source row, not a display-name match.
+export function relationshipStatus(topCard: string, invitations: string[]) {
+  const positive = new Set(
+    [topCard, ...invitations].filter(
+      (v) => v !== "unknown" && v !== "not_connected",
+    ),
+  );
+  if (positive.size > 1) return "unknown";
+  return [...positive][0] ?? topCard;
+}
+
 export function firstDegreeConnection(
   expectedUrl: string,
   expectedUrn: string,
