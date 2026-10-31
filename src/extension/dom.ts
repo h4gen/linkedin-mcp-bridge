@@ -696,32 +696,118 @@ export async function domOperation(
         fail("cancelled");
       mutationStarted = true;
       submits[0].click();
-      await wait();
-      const candidates = [...root.querySelectorAll(selector)].filter((e) => {
-        const id = sourceId(e);
-        const body = e.querySelector(
-          '.comments-comment-item__main-content,.comments-comment-entity__content,[data-testid="expandable-text-box"]',
-        );
-        return (
-          id &&
-          !beforeIds.has(id) &&
-          body?.textContent?.trim() === a.text &&
-          !!a.verified_actor?.profile_url &&
-          [...e.querySelectorAll<HTMLAnchorElement>('a[href*="/in/"]')].some(
-            (link) =>
-              link.href.split(/[?#]/)[0].replace(/\/$/, "") ===
-              a.verified_actor.profile_url.replace(/\/$/, ""),
-          )
-        );
-      });
+      const findReplies = () =>
+        [
+          ...(
+            card().closest('[componentkey*="pagedCommentsContainer"]') ?? card()
+          ).querySelectorAll(selector),
+        ].filter((e) => {
+          const id = sourceId(e);
+          const body = e.querySelector(
+            '.comments-comment-item__main-content,.comments-comment-entity__content,[data-testid="expandable-text-box"]',
+          );
+          return (
+            id &&
+            !beforeIds.has(id) &&
+            body?.textContent?.trim() === a.text &&
+            !!a.verified_actor?.profile_url &&
+            [...e.querySelectorAll<HTMLAnchorElement>('a[href*="/in/"]')].some(
+              (link) =>
+                link.href.split(/[?#]/)[0].replace(/\/$/, "") ===
+                a.verified_actor.profile_url.replace(/\/$/, ""),
+            )
+          );
+        });
+      let candidates: Element[] = [];
+      for (let n = 0; n < 8; n++) {
+        await wait();
+        candidates = findReplies();
+        if (
+          candidates.length ||
+          (a.execution_deadline && Date.now() >= a.execution_deadline)
+        )
+          break;
+      }
       const reply = candidates.length === 1 ? candidates[0] : undefined;
       const verifiedParent = reply
         ? sourceId(reply.parentElement?.closest(selector) ?? null)
         : null;
+      let verificationUrl: string | undefined;
+      if (reply && parent && !verifiedParent) {
+        // Flat SDUI replies expose parent/child identity only via their native
+        // copied permalink. Observe a fresh toast, never clipboard/global state.
+        try {
+          const menuButton = [
+            ...reply.querySelectorAll<HTMLButtonElement>(
+              'button[aria-label^="View more options for "]',
+            ),
+          ];
+          if (menuButton.length === 1) {
+            const menusBefore = new Set([
+              ...document.querySelectorAll('[role="menu"]'),
+            ]);
+            const linksBefore = new Set([
+              ...document.querySelectorAll('[role="alert"] a[href]'),
+            ]);
+            menuButton[0].click();
+            for (let n = 0; n < 4 && !verificationUrl; n++) {
+              await wait();
+              const menus = [
+                ...document.querySelectorAll('[role="menu"]'),
+              ].filter(
+                (m) => visible(m) && (reply.contains(m) || !menusBefore.has(m)),
+              );
+              if (menus.length !== 1) continue;
+              const copy = matchingControls(
+                menus[0],
+                /^(Copy link to comment|Link zum Kommentar kopieren)$/i,
+              );
+              if (copy.length !== 1) break;
+              copy[0].click();
+              for (let i = 0; i < 6; i++) {
+                await wait();
+                const links = [
+                  ...document.querySelectorAll<HTMLAnchorElement>(
+                    '[role="alert"] a[href]',
+                  ),
+                ].filter(
+                  (link) =>
+                    !linksBefore.has(link) &&
+                    /^(View comment|Kommentar ansehen)$/.test(
+                      link.textContent?.trim() ?? "",
+                    ),
+                );
+                if (links.length !== 1) continue;
+                let url = new URL(links[0].href);
+                if (
+                  url.origin === "https://www.linkedin.com" &&
+                  url.pathname === "/safety/go/"
+                )
+                  url = new URL(url.searchParams.get("url") ?? "");
+                if (
+                  url.origin === "https://lnkd.in" &&
+                  /^\/p\/[\w-]+$/.test(url.pathname)
+                )
+                  verificationUrl = url.href;
+                break;
+              }
+              break;
+            }
+            if (
+              menuButton[0].isConnected &&
+              menuButton[0].getAttribute("aria-expanded") === "true"
+            )
+              menuButton[0].click();
+          }
+        } catch {
+          /* An observed reply without parent proof stays unknown. */
+        }
+      }
       return {
         verified:
           !!reply && (!parent || verifiedParent === a.parent_comment_id),
         receipt_id: reply ? sourceId(reply) : undefined,
+        ...(verificationUrl ? { verification_url: verificationUrl } : {}),
         post_urn: a.post_urn,
         ...(parent
           ? {

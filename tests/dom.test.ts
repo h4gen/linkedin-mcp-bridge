@@ -53,7 +53,7 @@ it("treats conflicting directional invitations and connected evidence as unknown
   expect(relationshipStatus("unknown", [])).toBe("unknown");
 });
 
-it("uses the scoped SDUI root editor outside the post card", async () => {
+it("uses the scoped SDUI root editor and waits for delayed source confirmation", async () => {
   const dom = page(
     '<div componentkey="pagedCommentsContainer"><div data-urn="urn:li:activity:123"><button>Comment</button></div><div><div role="textbox" contenteditable="true"></div><button>Post</button></div></div>',
   );
@@ -66,7 +66,10 @@ it("uses the scoped SDUI root editor outside the post card", async () => {
     child.setAttribute("data-id", "urn:li:comment:created");
     child.innerHTML =
       '<a href="/in/me/">Me</a><div class="comments-comment-entity__content">Test root</div>';
-    document.querySelector("[componentkey]")!.append(child);
+    setTimeout(
+      () => document.querySelector("[componentkey]")!.append(child),
+      1200,
+    );
   });
   const result = await domOperation(
     "post_comment",

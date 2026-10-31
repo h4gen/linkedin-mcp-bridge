@@ -11,6 +11,7 @@ import { pageFetch } from "./page-fetch.js";
 import { extractionOperation } from "./extraction.js";
 import { firstDegreeConnection, relationshipStatus } from "./profile-state.js";
 import { domOperation } from "./dom.js";
+import { replyPermalink, visibleCommentProof } from "./comment-proof.js";
 import type { Request } from "../core/api.js";
 import { VERSION, PROTOCOL, NATIVE_HOST as HOST } from "../version.js";
 const area = (k: string) =>
@@ -699,6 +700,45 @@ const engine = new Engine({
         { dispatch_state: result[0].result.dispatch_state },
       );
     let value = result[0].result;
+    if (
+      op === "post_comment" &&
+      a.parent_comment_id &&
+      value.verification_url &&
+      value.receipt_id
+    ) {
+      // Verification can navigate, but must never repeat the submitted mutation.
+      try {
+        const observed = new URL(value.verification_url);
+        if (
+          observed.origin === "https://lnkd.in" &&
+          /^\/p\/[\w-]+$/.test(observed.pathname)
+        ) {
+          await navigate(observed.href, false, true);
+          const finalUrl = (await chrome.tabs.get(id)).url!;
+          if (replyPermalink(finalUrl, a.parent_comment_id, value.receipt_id)) {
+            for (let n = 0; n < 8; n++) {
+              const proof = await chrome.scripting.executeScript({
+                injectImmediately: true,
+                target: { tabId: id },
+                world: "ISOLATED",
+                func: visibleCommentProof,
+                args: [value.receipt_id, a.text, a.verified_actor.profile_url],
+              });
+              if (proof[0]?.result === true) {
+                value.verified = true;
+                value.parent_comment_id = a.parent_comment_id;
+                value.parent_relation = "known";
+                break;
+              }
+              await new Promise((r) => setTimeout(r, 500));
+            }
+          }
+        }
+      } catch {
+        /* Keep the observed receipt and unknown outcome; never resend. */
+      }
+      delete value.verification_url;
+    }
     if (op === "post_resolve" && value.resolve_url) {
       const observed = new URL(value.resolve_url);
       if (

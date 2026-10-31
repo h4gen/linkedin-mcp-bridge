@@ -431,7 +431,7 @@ export class Engine {
       if (
         (planningWrites.has(op) || op === "post_comment") &&
         d.identity &&
-        !actor?.name
+        (!actor?.name || (op === "post_comment" && !actor?.profile_url))
       )
         throw new Fault("actor_identity_unavailable");
       if (d.identity && op === "invitation_send") {
