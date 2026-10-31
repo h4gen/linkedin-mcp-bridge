@@ -245,20 +245,35 @@ it("returns missing scan targets as serializable errors across executeScript", a
   });
 });
 
-it("resolves a native share permalink from the scoped detail card, not the address alone", async () => {
-  const url = "https://www.linkedin.com/posts/example_topic-share-123-abcd/";
+it.each(["share", "ugcPost"])(
+  "resolves a native %s permalink from the scoped detail card, not the address alone",
+  async (kind) => {
+    const url = `https://www.linkedin.com/posts/example_topic-${kind}-123-abcd/`;
+    page(
+      `<div componentkey="pagedCommentsContainer"><div role="listitem"><button aria-label="Open control menu for post by Example"></button><div data-testid="expandable-text-box">Verified text</div><a href="${url}">Send</a></div></div>`,
+    );
+    const result = await domOperation(
+      "post_resolve",
+      {
+        url,
+        expected_author: "Example",
+        expected_text_prefix: "Verified text",
+      },
+      {},
+    );
+    expect(result.entityUrn).toBe(`urn:li:${kind}:123`);
+    document.querySelector("a")!.remove();
+    const scan = await domOperation("feed_list", { limit: 1 }, {});
+    expect(scan.items[0].entityUrn).toBeNull();
+  },
+);
+
+it("does not resolve a post to a different post quoted inside its text", async () => {
   page(
-    `<div componentkey="pagedCommentsContainer"><div role="listitem"><button aria-label="Open control menu for post by Example"></button><div data-testid="expandable-text-box">Verified text</div><a href="${url}">Send</a></div></div>`,
+    '<div role="listitem"><button aria-label="Open control menu for post by Example"></button><div data-testid="expandable-text-box">Discussing <a href="https://www.linkedin.com/feed/update/urn:li:activity:456/">this other post</a></div></div>',
   );
-  const result = await domOperation(
-    "post_resolve",
-    { url, expected_author: "Example", expected_text_prefix: "Verified text" },
-    {},
-  );
-  expect(result.entityUrn).toBe("urn:li:share:123");
-  document.querySelector("a")!.remove();
-  const scan = await domOperation("feed_list", { limit: 1 }, {});
-  expect(scan.items[0].entityUrn).toBeNull();
+  const result = await domOperation("feed_list", { limit: 1 }, {});
+  expect(result.items[0].entityUrn).toBeNull();
 });
 
 it("refuses a session-only parent before opening an editor", async () => {

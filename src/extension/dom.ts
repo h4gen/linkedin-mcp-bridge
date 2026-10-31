@@ -82,6 +82,15 @@ export async function domOperation(
           "componentkey",
           "href",
         ]) {
+          // Links quoted in the post body identify their linked content, not
+          // this card. Only native card permalinks may establish its identity.
+          if (
+            attr === "href" &&
+            node.closest(
+              '.feed-shared-update-v2__commentary,.feed-shared-inline-show-more-text__text-view,.feed-shared-update-v2__description,.update-components-text,[data-test-id="main-feed-post-content"],[data-testid="expandable-text-box"]',
+            )
+          )
+            continue;
           let value = node.getAttribute(attr) ?? "";
           try {
             value = decodeURIComponent(value);
@@ -95,10 +104,10 @@ export async function domOperation(
           // SDUI detail cards expose their native share identity in their own
           // permalink (image/send controls), even when component keys are opaque.
           if (attr === "href") {
-            const shareLink = value.match(
-              /^https:\/\/www\.linkedin\.com\/posts\/[^/?#]+-share-(\d+)-/,
-            )?.[1];
-            if (shareLink) return "urn:li:share:" + shareLink;
+            const nativeLink = value.match(
+              /^https:\/\/www\.linkedin\.com\/posts\/[^/?#]+-(share|ugcPost)-(\d+)-/,
+            );
+            if (nativeLink) return `urn:li:${nativeLink[1]}:${nativeLink[2]}`;
           }
           const ugc = value.match(
             /(?:userGeneratedContent(?:Post)?Id|ugcPostId)=(\d+)/,
