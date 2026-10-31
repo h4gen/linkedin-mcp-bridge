@@ -12,6 +12,7 @@ import { extractionOperation } from "./extraction.js";
 import { firstDegreeConnection, relationshipStatus } from "./profile-state.js";
 import { domOperation } from "./dom.js";
 import { replyPermalink, visibleCommentProof } from "./comment-proof.js";
+import { navigationTargetReached } from "./navigation.js";
 import type { Request } from "../core/api.js";
 import { VERSION, PROTOCOL, NATIVE_HOST as HOST } from "../version.js";
 const area = (k: string) =>
@@ -201,7 +202,13 @@ const engine = new Engine({
     async function navigate(url: string, fresh = false, postRedirect = false) {
       check();
       const tab = await chrome.tabs.get(id);
-      if (tab.url === url && tab.status === "complete" && !fresh) return;
+      if (
+        tab.url === url &&
+        !tab.pendingUrl &&
+        tab.status === "complete" &&
+        !fresh
+      )
+        return;
       // A fresh search clears SDUI filters that are not represented in the URL.
       if (tab.url === url && fresh) await chrome.tabs.reload(id);
       else await chrome.tabs.update(id, { url });
@@ -209,13 +216,9 @@ const engine = new Engine({
         check();
         const current = await chrome.tabs.get(id);
         if (
-          (current.url === url ||
-            (postRedirect &&
-              /^https:\/\/www\.linkedin\.com\/(feed\/update\/|posts\/)/.test(
-                current.url ?? "",
-              ))) &&
+          navigationTargetReached(current, url, tab.url, postRedirect) &&
           (current.status === "complete" ||
-            (!current.pendingUrl && (await documentReady(id, current.url!))))
+            (await documentReady(id, current.url!)))
         )
           return;
         if (current.url && /\/(login|checkpoint)/.test(current.url))
@@ -715,7 +718,9 @@ const engine = new Engine({
         ) {
           await navigate(observed.href, false, true);
           const finalUrl = (await chrome.tabs.get(id)).url!;
+          value.verification_error = "parent_permalink_mismatch";
           if (replyPermalink(finalUrl, a.parent_comment_id, value.receipt_id)) {
+            value.verification_error = "reply_not_visible_on_permalink";
             for (let n = 0; n < 8; n++) {
               const proof = await chrome.scripting.executeScript({
                 injectImmediately: true,
@@ -728,14 +733,19 @@ const engine = new Engine({
                 value.verified = true;
                 value.parent_comment_id = a.parent_comment_id;
                 value.parent_relation = "known";
+                delete value.verification_error;
                 break;
               }
               await new Promise((r) => setTimeout(r, 500));
             }
           }
         }
-      } catch {
+      } catch (error) {
         /* Keep the observed receipt and unknown outcome; never resend. */
+        value.verification_error =
+          error instanceof Fault
+            ? error.code
+            : "reply_verification_unavailable";
       }
       delete value.verification_url;
     }

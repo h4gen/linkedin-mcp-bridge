@@ -629,6 +629,8 @@ export class Engine {
         if (op === "post_comment" && a.parent_comment_id) {
           row.parent_relation = result.parent_relation ?? "unknown";
           if (result.receipt_id) row.observed_reply_id = result.receipt_id;
+          if (result.verification_error)
+            row.verification_error = result.verification_error;
         }
         row.status = id || verified ? "confirmed" : "unknown_outcome";
         if (id) row.receipt_id = id;
