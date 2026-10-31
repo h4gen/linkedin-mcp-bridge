@@ -140,3 +140,12 @@ Runtime change: `83bc7aa`. Development build fingerprint: `f6ba079240b57639ca6fa
 - Read-only inbox listing returned two rows. Closed the recovered work tab, then ran a first-degree people search and a separate CLI doctor concurrently. Both succeeded; people search returned two rows and doctor exited zero.
 - Terminated only the verified development native-host process. The extension restarted it automatically; an immediately launched doctor succeeded in 2.16 seconds with a new host PID.
 - No LinkedIn writes, messages, invitations or posts were dispatched during live acceptance. A full browser restart was simulated in tests rather than interrupting the user's other Chrome tabs. Chrome Store draft and five explainer assets were preserved; no Store submission was made.
+
+## Recovery stress follow-up — 2026-10-31
+
+Compared the existing Google Keyword Planner / shared Browser Bridge's bounded replay and reconnect behavior with this bridge. Four failing regression tests exposed a lookup/injection tab-loss race, queued work surviving its native port, interrupted API reads surfacing transient disconnects, and a client recovery window shorter than the extension's maximum backoff. The fixes are integrated in `e774391`.
+
+- Typecheck, formatting and all 135 tests pass. Additional coverage includes 20 successive host/tab failures, cancellation during request pacing, a 30-second host outage, bounded API replay with identical cursor arguments, no DOM/write replay, and unknown outcomes for corrupted write responses.
+- Reloaded the installed development extension; verified fingerprint `6682a44791faad4977155ee15acf4a03d08a7c2c6c745cd70fa7f29d5a72fdd9` matches the canonical build. A temporary macOS screen-control failure was resolved before this verification.
+- Three live SIGKILL cycles each interrupted four outstanding doctor clients. All 12 returned connected with exit code zero and the expected build. Each cycle acquired a new host PID and recovered its stale host lock without intervention. All four clients completed 5.02, 5.17 and 5.05 seconds after the respective crash.
+- Final connected-MCP health and a two-row inbox read passed after the stress test. No external writes were performed. Full-browser restart and tab-discard cases remain simulated tests; this does not constitute a multi-day soak test or a Windows live acceptance run.
