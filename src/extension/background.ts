@@ -217,7 +217,21 @@ const engine = new Engine({
           throw new Fault("not_logged_in");
         await new Promise((r) => setTimeout(r, 250));
       }
-      throw new Fault("work_tab_navigation_timeout");
+      const last = await chrome.tabs.get(id);
+      throw new Fault(
+        "work_tab_navigation_timeout",
+        "work_tab_navigation_timeout",
+        {
+          navigation: {
+            expected_path: new URL(url).pathname,
+            observed_path: last.url ? new URL(last.url).pathname : null,
+            status: last.status,
+            pending_path: last.pendingUrl
+              ? new URL(last.pendingUrl).pathname
+              : null,
+          },
+        },
+      );
     }
     if (
       ["profile_get", "profile_posts_list", "relationship_get"].includes(op) &&

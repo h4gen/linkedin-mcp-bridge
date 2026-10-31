@@ -80,6 +80,9 @@ async function main() {
                     ...errorDetails(
                       e instanceof Error ? e.message : "operation_failed",
                     ),
+                    ...((e as any)?.details?.navigation
+                      ? { navigation: (e as any).details.navigation }
+                      : {}),
                     ...((e as { details?: { retry_at?: string } })?.details
                       ?.retry_at
                       ? {
