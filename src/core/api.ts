@@ -1,4 +1,4 @@
-import { newestFirst, exactPeer } from "./read-models.js";
+import { newestFirst, exactPeer, personRef } from "./read-models.js";
 import { Args, Fault, Operation } from "./contracts.js";
 import { collection, normalize, restli } from "./normalize.js";
 export type Request = {
@@ -244,7 +244,7 @@ export async function readApi(
     return {
       profile: {
         entityUrn: p.entityUrn ?? null,
-        name: [p.firstName, p.lastName].filter(Boolean).join(" "),
+        name: personRef(p).name,
         headline: p.headline ?? p.occupation ?? null,
         profile_url:
           "https://www.linkedin.com/in/" +
@@ -440,7 +440,7 @@ export async function readApi(
           typeof invitation.message === "string" ? invitation.message : null,
         profile: {
           entityUrn: member.dashEntityUrn ?? member.entityUrn ?? null,
-          name: [member.firstName, member.lastName].filter(Boolean).join(" "),
+          name: personRef(member).name,
           headline: member.occupation ?? null,
           profile_url: member.publicIdentifier
             ? "https://www.linkedin.com/in/" + member.publicIdentifier + "/"

@@ -2,6 +2,25 @@ import { z } from "zod";
 import { schemas, writes, type Operation } from "./contracts.js";
 
 const row = (shape: z.ZodRawShape) => z.object(shape).passthrough();
+const relationshipEvidence = z.array(
+  z.object({ source: z.string(), value: z.string() }).strict(),
+);
+const invitationScan = z
+  .object({
+    pages: z.number().int().min(0).max(3),
+    checked_count: z.number().int().min(0).max(60),
+    complete: z.boolean(),
+    matched: z.boolean(),
+    stop_reason: z.enum([
+      "match_found",
+      "source_exhausted",
+      "page_limit",
+      "source_incomplete",
+      "source_unavailable",
+    ]),
+    error_code: z.string().optional(),
+  })
+  .strict();
 const person = row({
   entityUrn: z.string().nullable().optional(),
   profile_url: z.string().nullable().optional(),
@@ -213,21 +232,30 @@ const definitions = {
   },
   relationship_get: {
     adapter: "dom",
-    output: row({
-      profile_urn: z.string(),
-      status: z.enum([
-        "connected",
-        "outgoing_pending",
-        "incoming_pending",
-        "not_connected",
-        "unknown",
-      ]),
-      messaging: z.enum(["allowed", "not_allowed", "unknown"]),
-      observed_at: z.string(),
-      evidence: z.array(
-        z.object({ source: z.string(), value: z.string() }).strict(),
-      ),
-    }),
+    output: z
+      .object({
+        profile_urn: z.string(),
+        status: z.enum([
+          "connected",
+          "outgoing_pending",
+          "incoming_pending",
+          "not_connected",
+          "unknown",
+        ]),
+        messaging: z.enum(["allowed", "not_allowed", "unknown"]),
+        observed_at: z.string(),
+        evidence: relationshipEvidence,
+        connection_degree: z.enum(["1", "2", "3", "unknown"]),
+        messaging_evidence: relationshipEvidence,
+        invitation_scan: z
+          .object({ received: invitationScan, sent: invitationScan })
+          .strict(),
+        action_scan: z
+          .object({ reason: z.string(), menu_opened: z.boolean() })
+          .strict(),
+        reason: z.string(),
+      })
+      .strict(),
   },
   messages_list: {
     adapter: "api",

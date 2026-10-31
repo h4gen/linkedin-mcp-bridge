@@ -10,7 +10,7 @@ it("opens the feed for a fresh feed reader after another primitive changed the w
     "https://www.linkedin.com/feed/update/urn:li:activity:123/";
   const original = h.chrome.scripting.executeScript.getMockImplementation()!;
   h.chrome.scripting.executeScript.mockImplementation(async (opts: any) => {
-    if (opts.func.name === "domOperation")
+    if (opts.args?.[0] === "feed_list")
       return [
         {
           result: {

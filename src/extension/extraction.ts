@@ -1,5 +1,6 @@
+import { waitForPost, postUrlIdentity } from "./post-context.js";
 // Parsers adapted from the user's lead-extractor-for-linkedin-posts (1.1.10).
-// Self-contained: Chrome serializes this function into an isolated world.
+// Runs from the statically packaged adapter bundle in an isolated world.
 export async function extractionOperation(
   op: string,
   a: Record<string, any>,
@@ -321,8 +322,7 @@ export async function extractionOperation(
               const target = new URL(href, location.href);
               if (
                 target.origin !== location.origin ||
-                decodeURIComponent(target.pathname).replace(/\/$/, "") !==
-                  expectedPath
+                !identities.includes(postUrlIdentity(target.href) ?? "")
               )
                 return false;
             } catch {
@@ -357,11 +357,6 @@ export async function extractionOperation(
         }) || null
       );
     }
-
-    const findCommentsRoot = (post: HTMLElement): HTMLElement =>
-      // SDUI permalink comments are siblings of the post, inside its own paged container.
-      post.closest<HTMLElement>('[componentkey*="pagedCommentsContainer"]') ||
-      post;
 
     function activateReactionTrigger(trigger: HTMLElement) {
       // SDUI's press control needs the press/release sequence, not only HTMLElement.click().
@@ -459,28 +454,9 @@ export async function extractionOperation(
       /checkpoint|challenge|login/.test(location.pathname)
     )
       throw Error("session_unavailable");
-    const expectedPath = "/feed/update/" + a.post_urn;
-    const targets = Array.from(
-      document.querySelectorAll<HTMLElement>(
-        "[data-mcp-post-urn],[data-urn],[data-id]",
-      ),
-    ).filter((e) =>
-      ["data-mcp-post-urn", "data-urn", "data-id"].some(
-        (k) => e.getAttribute(k) === a.post_urn,
-      ),
+    const { root, commentsRoot, identities, onPermalink } = await waitForPost(
+      a.post_urn,
     );
-    const direct = targets.filter(
-      (e) => !targets.some((other) => other !== e && other.contains(e)),
-    );
-    const onPermalink =
-      decodeURIComponent(location.pathname).replace(/\/$/, "") === expectedPath;
-    const root =
-      direct.length === 1
-        ? direct[0]
-        : onPermalink
-          ? document.querySelector<HTMLElement>('main, [role="main"]')
-          : null;
-    if (!root) throw Error("post_target_not_unique");
     const seen = new Set<string>(state.seen ?? []);
     if (seen.size >= 10000) throw Error("traversal_limit_reached");
     const items: Profile[] = [];
@@ -548,7 +524,6 @@ export async function extractionOperation(
       }
     }
 
-    const commentsRoot = findCommentsRoot(root);
     if (!commentsRoot.querySelector(COMMENT_SELECTOR)) {
       const comments = Array.from(
         root.querySelectorAll<HTMLButtonElement>("button"),
@@ -611,6 +586,7 @@ export async function extractionOperation(
   } catch (e) {
     return {
       bridge_error: e instanceof Error ? e.message : "extraction_failed",
+      details: (e as any)?.details,
     };
   }
 }

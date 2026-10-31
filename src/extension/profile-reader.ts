@@ -1,3 +1,53 @@
+const visible = (element: Element) => !!element.getClientRects().length;
+function profileActionEvidence(labels: string[]) {
+  const evidence: Array<{ source: string; value: string }> = [];
+  if (
+    labels.some((t) =>
+      /^(?:Connect(?: with .+)?|Invite .+ to connect|Vernetzen(?: mit .+)?)$/i.test(
+        t,
+      ),
+    )
+  )
+    evidence.push({
+      source: "verified_profile_action",
+      value: "connect_available",
+    });
+  if (
+    labels.some((t) =>
+      /^(?:Pending(?: invitation)?|Invitation sent|Ausstehend|Anfrage gesendet)$/i.test(
+        t,
+      ),
+    )
+  )
+    evidence.push({
+      source: "verified_profile_action",
+      value: "outgoing_pending",
+    });
+  if (
+    labels.some((t) =>
+      /^(?:Accept(?: invitation)?|Einladung annehmen|Annehmen)$/i.test(t),
+    )
+  )
+    evidence.push({
+      source: "verified_profile_action",
+      value: "incoming_pending",
+    });
+  return evidence;
+}
+function profileTopCard(expectedUrl: string): HTMLElement | null {
+  const path = new URL(expectedUrl).pathname.replace(/\/$/, "");
+  const contacts = [
+    ...document.querySelectorAll<HTMLAnchorElement>("a[href]"),
+  ].filter((a) => visible(a) && a.pathname === path + "/overlay/contact-info/");
+  const cards = new Set<HTMLElement>();
+  for (const contact of contacts) {
+    let top = contact.parentElement;
+    for (let i = 0; top && i < 7 && !top.querySelector("h1,h2"); i++)
+      top = top.parentElement;
+    if (top && top.querySelectorAll("h1,h2").length === 1) cards.add(top);
+  }
+  return cards.size === 1 ? [...cards][0] : null;
+}
 // Packaged, read-only profile adapter. The caller resolves and verifies the basic profile first.
 export function profileReader(expectedUrl: string, expectedUrn: string) {
   const canonical = (v: string) => new URL(v).pathname.replace(/\/$/, "");
@@ -44,37 +94,41 @@ export function profileReader(expectedUrl: string, expectedUrn: string) {
   const contact = links.find(
     (a) => a.pathname === canonical(expectedUrl) + "/overlay/contact-info/",
   );
-  let top = contact?.parentElement;
-  for (let i = 0; top && i < 7 && !top.querySelector("h1,h2"); i++)
-    top = top.parentElement;
-  if (
-    !top ||
-    !top.querySelector("h1,h2") ||
-    top.querySelectorAll("h1,h2").length !== 1
-  )
-    return { bridge_error: "profile_loading" };
-  const labels = top
-    ? [...top.querySelectorAll("button,a,p,span")]
-        .filter(visible)
-        .map((e) =>
-          (e.getAttribute("aria-label") ?? e.textContent ?? "").trim(),
-        )
-    : [];
-  const direct = labels.some((t) => /^[·•]?\s*(1st|1\.)$/.test(t));
-  const pending = labels.some((t) => /^(Pending|Ausstehend)$/.test(t));
-  const connect = labels.some((t) => /^(Connect|Vernetzen)$/.test(t));
-  const messaging = links.some(
-    (a) =>
-      a.pathname.includes("/messaging/compose/") &&
-      new URL(a.href).searchParams.get("profileUrn") === expectedUrn,
-  );
+  const top = profileTopCard(expectedUrl);
+  if (!top) return { bridge_error: "profile_loading" };
+  const labels = [...top.querySelectorAll("p,span")]
+    .filter(visible)
+    .map((e) => e.textContent?.trim() ?? "");
+  const degrees = [
+    ...new Set(
+      labels.flatMap((label) => {
+        const degree = label.match(/^[·•]?\s*([123])(?:st|nd|rd|\.)\+?$/i)?.[1];
+        return degree ? [degree] : [];
+      }),
+    ),
+  ];
+  const connection_degree = degrees.length === 1 ? degrees[0] : "unknown";
+  const actions = [...top.querySelectorAll("button,a,[role=button]")]
+    .filter(visible)
+    .map((e) => (e.getAttribute("aria-label") ?? e.textContent ?? "").trim());
+  const actionEvidence = profileActionEvidence(actions);
+  const direct = degrees.includes("1");
   const status = direct
     ? "connected"
-    : pending
+    : actionEvidence.some((e) => e.value === "outgoing_pending")
       ? "outgoing_pending"
-      : connect
-        ? "not_connected"
-        : "unknown";
+      : actionEvidence.some((e) => e.value === "incoming_pending")
+        ? "incoming_pending"
+        : actionEvidence.some((e) => e.value === "connect_available")
+          ? "not_connected"
+          : "unknown";
+  const messaging = [...top.querySelectorAll<HTMLAnchorElement>("a[href]")]
+    .filter(visible)
+    .some(
+      (a) =>
+        a.pathname.includes("/messaging/compose/") &&
+        new URL(a.href).searchParams.get("profileUrn") === expectedUrn,
+    );
   const current: string[] = [];
   const experienceHeading = headings.find((h) =>
     /^(Experience|Berufserfahrung)$/.test(h.textContent?.trim() ?? ""),
@@ -144,12 +198,118 @@ export function profileReader(expectedUrl: string, expectedUrn: string) {
       status,
       messaging: messaging ? "allowed" : "unknown",
       observed_at: new Date().toISOString(),
-      evidence:
-        status === "unknown"
-          ? []
-          : [{ source: "verified_profile_top_card", value: status }],
+      connection_degree,
+      messaging_evidence: messaging
+        ? [
+            {
+              source: "verified_profile_compose_link",
+              value: "ui_affordance_only",
+            },
+          ]
+        : [],
+      evidence: [
+        ...degrees.map((value) => ({
+          source: "verified_profile_degree",
+          value,
+        })),
+        ...(direct
+          ? [{ source: "verified_profile_top_card", value: "connected" }]
+          : []),
+        ...actionEvidence,
+        ...(degrees.length > 1
+          ? [{ source: "verified_profile_top_card", value: "degree_conflict" }]
+          : []),
+      ],
     },
   };
+}
+
+export async function readProfileRelationship(
+  expectedUrl: string,
+  expectedUrn: string,
+) {
+  const read = profileReader(expectedUrl, expectedUrn);
+  if (read.bridge_error) return read;
+  const relationship = read.relationship!;
+  const result = {
+    ...relationship,
+    action_scan: { reason: "profile_actions_observed", menu_opened: false },
+  };
+  if (relationship.status !== "unknown") return result;
+  const top = profileTopCard(expectedUrl)!;
+  const more = [
+    ...top.querySelectorAll<HTMLElement>('button,[role="button"]'),
+  ].filter(
+    (e) =>
+      visible(e) &&
+      /^(?:More(?: actions)?|Mehr|Weitere(?: Aktionen)?)$/i.test(
+        (e.getAttribute("aria-label") ?? e.textContent ?? "").trim(),
+      ),
+  );
+  if (more.length !== 1) {
+    result.action_scan.reason = more.length
+      ? "profile_action_menu_ambiguous"
+      : "profile_actions_unavailable";
+    return result;
+  }
+  const trigger = more[0];
+  if (trigger.getAttribute("aria-expanded") === "true") {
+    result.action_scan.reason = "profile_action_menu_already_open";
+    return result;
+  }
+  const before = new Set(
+    [...document.querySelectorAll<HTMLElement>('[role="menu"]')].filter(
+      visible,
+    ),
+  );
+  let owned: HTMLElement | undefined;
+  try {
+    trigger.click();
+    result.action_scan.menu_opened = true;
+    for (let n = 0; n < 6; n++) {
+      const menus = [
+        ...document.querySelectorAll<HTMLElement>('[role="menu"]'),
+      ].filter(visible);
+      const fresh = menus.filter((m) => !before.has(m));
+      owned =
+        menus.find(
+          (m) => m.id && m.id === trigger.getAttribute("aria-controls"),
+        ) ?? (fresh.length === 1 ? fresh[0] : undefined);
+      if (owned) break;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    if (location.origin + location.pathname !== expectedUrl || !top.isConnected)
+      return { bridge_error: "profile_navigation_changed" };
+    if (!owned) {
+      result.action_scan.reason = "profile_action_menu_unavailable";
+      return result;
+    }
+    const evidence = profileActionEvidence(
+      [
+        ...owned.querySelectorAll<HTMLElement>(
+          'button,a,[role="menuitem"],[role="button"]',
+        ),
+      ]
+        .filter(visible)
+        .map((e) =>
+          (e.getAttribute("aria-label") ?? e.textContent ?? "").trim(),
+        ),
+    );
+    result.evidence.push(
+      ...evidence.map((e) => ({ ...e, source: "verified_profile_more_menu" })),
+    );
+    result.action_scan.reason = evidence.length
+      ? "profile_actions_observed"
+      : "profile_actions_unavailable";
+    return result;
+  } finally {
+    if (trigger.isConnected && trigger.getAttribute("aria-expanded") === "true")
+      trigger.click();
+    else if (owned?.isConnected)
+      owned.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+  }
 }
 
 // Bounded lazy-section loading on the already verified profile route.

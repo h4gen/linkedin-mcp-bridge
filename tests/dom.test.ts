@@ -98,7 +98,7 @@ it("rejects duplicate post targets instead of choosing the first", async () => {
   );
   await expect(
     domOperation("post_get", { post_urn: "urn:li:activity:123" }, {}),
-  ).resolves.toEqual({ bridge_error: "post_target_not_unique" });
+  ).resolves.toMatchObject({ bridge_error: "post_target_ambiguous" });
 });
 
 it("scrolls the nearest actual overflow container to discover another page", async () => {
@@ -197,6 +197,7 @@ it("opens only the exact permalink's SDUI reaction count inside a nested card", 
     { post_urn: "urn:li:activity:123", limit: 1 },
     {},
   );
+  expect(result.bridge_error).toBeUndefined();
   expect(result.items).toHaveLength(1);
   expect(unrelated).not.toHaveBeenCalled();
 });
@@ -276,7 +277,7 @@ it("returns missing scan targets as serializable errors across executeScript", a
     {},
   );
   expect(JSON.parse(JSON.stringify(result))).toEqual({
-    bridge_error: "post_target_not_unique",
+    bridge_error: "post_target_not_found",
   });
 });
 

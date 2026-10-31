@@ -29,7 +29,11 @@ await build({
 });
 await build({
   define,
-  entryPoints: ["src/extension/background.ts", "src/extension/popup.ts"],
+  entryPoints: [
+    "src/extension/background.ts",
+    "src/extension/popup.ts",
+    "src/extension/page-adapters.ts",
+  ],
   outdir: "dist/extension",
   bundle: true,
   platform: "browser",

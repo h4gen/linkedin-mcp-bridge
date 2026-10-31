@@ -3,6 +3,7 @@ import { JSDOM } from "jsdom";
 import {
   profileReader,
   prepareProfile,
+  readProfileRelationship,
 } from "../src/extension/profile-reader.js";
 function profile(body: string) {
   const dom = new JSDOM(
@@ -17,6 +18,71 @@ function profile(body: string) {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
+});
+it("reads Connect only from the exact profile's More menu and closes it", async () => {
+  profile("<aside><button>Connect</button></aside>");
+  document.querySelector("p")!.textContent = "• 3rd";
+  const more = document.createElement("button");
+  more.textContent = "More";
+  more.setAttribute("aria-controls", "own-menu");
+  more.onclick = () => {
+    if (document.getElementById("own-menu")) {
+      document.getElementById("own-menu")!.remove();
+      more.setAttribute("aria-expanded", "false");
+      return;
+    }
+    more.setAttribute("aria-expanded", "true");
+    const menu = document.createElement("div");
+    menu.id = "own-menu";
+    menu.setAttribute("role", "menu");
+    menu.innerHTML =
+      '<button role="menuitem" aria-label="Invite Example to connect">Connect</button>';
+    document.body.append(menu);
+  };
+  document.querySelector("section")!.append(more);
+  const result = await readProfileRelationship(
+    "https://www.linkedin.com/in/example/",
+    "urn:li:fsd_profile:example",
+  );
+  expect(result).toMatchObject({
+    connection_degree: "3",
+    action_scan: { menu_opened: true, reason: "profile_actions_observed" },
+  });
+  expect((result as any).evidence).toContainEqual({
+    source: "verified_profile_more_menu",
+    value: "connect_available",
+  });
+  expect(document.getElementById("own-menu")).toBeNull();
+});
+it("explains missing actions on a restricted top card without reading recommendations", async () => {
+  profile("<aside><button>Pending</button></aside>");
+  document.querySelector("p")!.textContent = "";
+  const result = await readProfileRelationship(
+    "https://www.linkedin.com/in/example/",
+    "urn:li:fsd_profile:example",
+  );
+  expect(result).toMatchObject({
+    status: "unknown",
+    connection_degree: "unknown",
+    evidence: [],
+    action_scan: { reason: "profile_actions_unavailable" },
+  });
+});
+it("records second-degree and accessible Connect action independently", () => {
+  profile("");
+  document.querySelector("p")!.textContent = "• 2nd";
+  const button = document.createElement("button");
+  button.setAttribute("aria-label", "Connect with Example");
+  document.querySelector("section")!.append(button);
+  const relationship = profileReader(
+    "https://www.linkedin.com/in/example/",
+    "urn:li:fsd_profile:example",
+  ).relationship;
+  expect(relationship).toMatchObject({ connection_degree: "2" });
+  expect(relationship?.evidence).toContainEqual({
+    source: "verified_profile_action",
+    value: "connect_available",
+  });
 });
 it("reads scoped profile sections without confusing headings and current roles", () => {
   profile(

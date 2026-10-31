@@ -25,6 +25,31 @@ export function errorDetails(code: string) {
       ),
   };
 }
+// Only bounded adapter diagnostics cross the public error boundary; never raw DOM,
+// source payloads, URLs or session tokens.
+export function adapterDiagnostics(details: Record<string, unknown> = {}) {
+  const allowed = new Set([
+    "tab_changed",
+    "document_changed",
+    "path_changed",
+    "user_interaction",
+    "session_marker_missing",
+    "session_changed",
+    "filters_changed",
+    "context_version_mismatch",
+  ]);
+  const result: Record<string, string | number> = {};
+  if (typeof details.reason === "string" && allowed.has(details.reason))
+    result.reason = details.reason;
+  for (const key of ["candidate_count", "matching_count"])
+    if (
+      typeof details[key] === "number" &&
+      Number.isSafeInteger(details[key]) &&
+      details[key] >= 0
+    )
+      result[key] = details[key];
+  return result;
+}
 export function retryAt(value: string | null | undefined, now: number): number {
   const seconds = value?.trim() && Number(value);
   const parsed =

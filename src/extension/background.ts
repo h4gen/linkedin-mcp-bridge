@@ -1,5 +1,11 @@
+import {
+  scanRelationshipInvitations,
+  resolveRelationship,
+} from "../core/relationships.js";
+import { inspectDomSession } from "./dom-session.js";
+import { personRef } from "../core/read-models.js";
 import { readApi } from "../core/api.js";
-import { profileReader, prepareProfile } from "./profile-reader.js";
+import { prepareProfile } from "./profile-reader.js";
 import { workTab } from "./work-tab.js";
 import { composerOperation } from "./composer.js";
 import { cursorEvictions } from "../core/cursor-budget.js";
@@ -8,9 +14,7 @@ import { Engine, Store } from "../core/engine.js";
 import { Fault } from "../core/contracts.js";
 import { self, normalize } from "../core/normalize.js";
 import { pageFetch } from "./page-fetch.js";
-import { extractionOperation } from "./extraction.js";
-import { firstDegreeConnection, relationshipStatus } from "./profile-state.js";
-import { domOperation } from "./dom.js";
+import { firstDegreeConnection } from "./profile-state.js";
 import { replyPermalink, visibleCommentProof } from "./comment-proof.js";
 import { navigationTargetReached } from "./navigation.js";
 import type { Request } from "../core/api.js";
@@ -143,16 +147,14 @@ async function fetchRequest(r: Request, check = () => {}) {
     throw new Fault("empty_browser_response");
   const identities = normalize(result.data).entities;
   for (const p of identities) {
-    const urn = p.dashEntityUrn ?? p.entityUrn;
-    const name = [p.firstName, p.lastName].filter(Boolean).join(" ");
+    const person = personRef(p);
+    const urn = person.entityUrn;
+    const name = person.name;
     if (typeof urn === "string" && /^urn:li:fsd_profile:/.test(urn) && name)
       await store.set("identity:" + urn, {
         urn,
         name,
-        profile_url:
-          typeof p.publicIdentifier === "string"
-            ? "https://www.linkedin.com/in/" + p.publicIdentifier + "/"
-            : null,
+        profile_url: person.profile_url,
       });
   }
   return result.data;
@@ -174,19 +176,25 @@ async function invalidateDocument() {
 async function validateDomCursor(_op: string, state: Record<string, any>) {
   if (!state.dom_session) return;
   const id = await tabId();
-  if (id !== state.tab_id) throw new Fault("cursor_invalidated");
-  const check = await chrome.scripting.executeScript({
+  if (id !== state.tab_id)
+    throw new Fault("cursor_invalidated", "cursor_invalidated", {
+      reason: "tab_changed",
+    });
+  const result = await chrome.scripting.executeScript({
     injectImmediately: true,
     target: { tabId: id },
     world: "ISOLATED",
-    func: () =>
-      (window as any).__liBridgeSessionPath ===
-      location.pathname + location.search
-        ? (window as any).__liBridgeSession
-        : null,
+    func: inspectDomSession,
+    args: [state.dom_context ?? {}],
   });
-  if (check[0]?.result !== state.dom_session)
-    throw new Fault("cursor_invalidated");
+  const reason =
+    state.document_id && result[0]?.documentId !== state.document_id
+      ? "document_changed"
+      : result[0]?.result?.reason;
+  if (reason || !result[0]?.result?.context)
+    throw new Fault("cursor_invalidated", "cursor_invalidated", {
+      reason: reason ?? "session_marker_missing",
+    });
 }
 const engine = new Engine({
   generation: () => generation,
@@ -199,6 +207,33 @@ const engine = new Engine({
     check();
     if (state.dom_session) await validateDomCursor(op, state);
     await chrome.tabs.update(id, { active: true });
+    async function pageOperation(
+      operation: string,
+      args: Record<string, any>,
+      cursor = {},
+    ) {
+      check();
+      const loaded = await chrome.scripting.executeScript({
+        target: { tabId: id },
+        world: "ISOLATED",
+        files: ["page-adapters.js"],
+        injectImmediately: true,
+      });
+      const documentId = loaded[0]?.documentId;
+      return chrome.scripting.executeScript({
+        target: documentId
+          ? { tabId: id, documentIds: [documentId] }
+          : { tabId: id },
+        world: "ISOLATED",
+        injectImmediately: true,
+        func: (
+          op: string,
+          args: Record<string, any>,
+          state: Record<string, any>,
+        ) => (window as any).__liBridgeAdapters(op, args, state),
+        args: [operation, args, cursor],
+      });
+    }
     async function navigate(url: string, fresh = false, postRedirect = false) {
       check();
       const tab = await chrome.tabs.get(id);
@@ -303,12 +338,9 @@ const engine = new Engine({
       for (let attempt = 0; attempt < 20; attempt++) {
         check();
         extra = (
-          await chrome.scripting.executeScript({
-            injectImmediately: true,
-            target: { tabId: id },
-            world: "ISOLATED",
-            func: profileReader,
-            args: [basic.profile_url, basic.entityUrn],
+          await pageOperation("profile_read", {
+            profile_url: basic.profile_url,
+            profile_urn: basic.entityUrn,
           })
         )[0]?.result;
         if (
@@ -345,45 +377,25 @@ const engine = new Engine({
         };
       }
       if (op === "relationship_get") {
-        const rel = extra.relationship!;
-        const pending: string[] = [];
-        for (const direction of ["received", "sent"]) {
-          let cursor = {};
-          for (let n = 0; n < 3; n++) {
-            const page = await readApi(
+        const observed = (
+          await pageOperation("profile_relationship", {
+            profile_url: basic.profile_url,
+            profile_urn: basic.entityUrn,
+          })
+        )[0]?.result;
+        if (!observed || observed.bridge_error)
+          throw new Fault(observed?.bridge_error ?? "profile_shape_changed");
+        const scans = await scanRelationshipInvitations(
+          a.profile_urn,
+          (direction, cursor) =>
+            readApi(
               "invitations_list",
               { account_urn: a.account_urn, direction, limit: 20 },
               cursor,
               (r) => fetchRequest(r, check),
-            );
-            if (
-              page.items.some(
-                (x: any) =>
-                  x.profile.entityUrn?.replace(
-                    "fs_miniProfile",
-                    "fsd_profile",
-                  ) === a.profile_urn,
-              )
-            ) {
-              pending.push(
-                direction === "sent" ? "outgoing_pending" : "incoming_pending",
-              );
-              break;
-            }
-            if (!page.next) break;
-            cursor = page.next;
-          }
-        }
-        if (pending.length) {
-          rel.evidence.push(
-            ...pending.map((value) => ({
-              source: "exact_invitation_profile",
-              value,
-            })),
-          );
-          rel.status = relationshipStatus(rel.status, pending);
-        }
-        return rel;
+            ),
+        );
+        return resolveRelationship(observed, scans);
       }
       if (!extra.posts_url && extra.activity_url) {
         await navigate(extra.activity_url);
@@ -620,37 +632,20 @@ const engine = new Engine({
         "post_comment",
       ].includes(op)
     ) {
-      const url = a.post_urn.startsWith("urn:li:activity:")
-        ? "https://www.linkedin.com/feed/update/" + a.post_urn + "/"
-        : await store.get("post-url:" + a.post_urn);
+      const url =
+        (await store.get("post-url:" + a.post_urn)) ??
+        (a.post_urn.startsWith("urn:li:activity:")
+          ? "https://www.linkedin.com/feed/update/" + a.post_urn + "/"
+          : undefined);
       const tab = await chrome.tabs.get(id);
-      const target = await chrome.scripting.executeScript({
-        injectImmediately: true,
-        target: { tabId: id },
-        world: "ISOLATED",
-        func: (urn: string) =>
-          Array.from(
-            document.querySelectorAll(
-              "[data-mcp-post-urn],[data-urn],[data-id]",
-            ),
-          ).some((e) =>
-            ["data-mcp-post-urn", "data-urn", "data-id"].some(
-              (k) => e.getAttribute(k) === urn,
-            ),
-          ),
-        args: [a.post_urn],
+      const target = await pageOperation("post_context", {
+        post_urn: a.post_urn,
       });
-      if (!target[0]?.result && !url)
+      if (target[0]?.result?.bridge_error === "post_target_ambiguous")
+        throw new Fault("post_target_ambiguous");
+      if (!target[0]?.result?.matched && !url)
         throw new Fault("post_location_unresolved");
-      if (!target[0]?.result && tab.url !== url) {
-        await chrome.tabs.update(id, { url });
-        for (let attempt = 0; attempt < 40; attempt++) {
-          await new Promise((r) => setTimeout(r, 250));
-          const current = await chrome.tabs.get(id);
-          if (current.status === "complete" && current.url === url) break;
-          if (attempt === 39) throw new Fault("post_navigation_timeout");
-        }
-      }
+      if (!target[0]?.result?.matched && tab.url !== url) await navigate(url);
     }
     check();
     const session = state.dom_session ?? crypto.randomUUID();
@@ -670,49 +665,39 @@ const engine = new Engine({
             if (dismiss) dismiss.click();
             else if (dialog.getClientRects().length) throw Error("ui_conflict");
           }
-          w.__liBridgeSession = session;
-          w.__liBridgeSessionPath = location.pathname + location.search;
-          if (!w.__liBridgeSessionGuard) {
-            w.__liBridgeSessionGuard = true;
-            document.addEventListener(
-              "click",
-              (event) => {
-                if (
-                  event.isTrusted &&
-                  (event.target as Element)?.closest("button,a,[role=button]")
-                )
-                  w.__liBridgeSession = undefined;
-              },
-              true,
-            );
-          }
         },
         args: [session],
       });
+      await pageOperation("session_begin", {
+        token: session,
+        preparing: op === "posts_search",
+      });
     }
     check();
-    const result = await chrome.scripting.executeScript({
-      injectImmediately: true,
-      target: { tabId: id },
-      world: "ISOLATED",
-      func: ["comments_list", "reactions_list"].includes(op)
-        ? extractionOperation
-        : [
-              "post_draft_create",
-              "post_schedule",
-              "scheduled_posts_list",
-              "scheduled_post_cancel",
-            ].includes(op)
-          ? composerOperation
-          : domOperation,
-      args: [op, { ...a, execution_session: session }, state],
-    });
+    const planning = [
+      "post_draft_create",
+      "post_schedule",
+      "scheduled_posts_list",
+      "scheduled_post_cancel",
+    ].includes(op);
+    const result = planning
+      ? await chrome.scripting.executeScript({
+          injectImmediately: true,
+          target: { tabId: id },
+          world: "ISOLATED",
+          func: composerOperation,
+          args: [op, { ...a, execution_session: session }, state],
+        })
+      : await pageOperation(op, { ...a, execution_session: session }, state);
     if (!result[0]?.result) throw new Fault("ui_operation_failed");
     if (result[0].result.bridge_error)
       throw new Fault(
         result[0].result.bridge_error,
         result[0].result.bridge_error,
-        { dispatch_state: result[0].result.dispatch_state },
+        {
+          ...result[0].result.details,
+          dispatch_state: result[0].result.dispatch_state,
+        },
       );
     let value = result[0].result;
     if (
@@ -774,20 +759,10 @@ const engine = new Engine({
         throw new Fault("post_url_unsupported");
       await navigate(observed.href, false, true);
       const finalUrl = (await chrome.tabs.get(id)).url!;
-      const resolved = await chrome.scripting.executeScript({
-        injectImmediately: true,
-        target: { tabId: id },
-        world: "ISOLATED",
-        func: domOperation,
-        args: [
-          op,
-          {
-            url: finalUrl,
-            expected_author: value.source_author,
-            expected_text_prefix: value.source_text_prefix,
-          },
-          {},
-        ],
+      const resolved = await pageOperation(op, {
+        url: finalUrl,
+        expected_author: value.source_author,
+        expected_text_prefix: value.source_text_prefix,
       });
       const resolvedValue = resolved[0]?.result;
       if (!resolvedValue || resolvedValue.bridge_error)
@@ -827,13 +802,37 @@ const engine = new Engine({
         ? "profile_first_degree"
         : "connection_state_unverified";
     }
-    if (value.next)
-      value.next = { ...value.next, dom_session: session, tab_id: id };
-    if (value.entityUrn && value.url)
-      await store.set("post-url:" + value.entityUrn, value.url);
-    for (const post of value.items ?? [])
+    if (value.next) {
+      const bound = await chrome.scripting.executeScript({
+        injectImmediately: true,
+        target: { tabId: id },
+        world: "ISOLATED",
+        func: inspectDomSession,
+        args: [{ version: 1, token: session }],
+      });
+      const reason =
+        result[0]?.documentId && result[0].documentId !== bound[0]?.documentId
+          ? "document_changed"
+          : bound[0]?.result?.reason;
+      if (reason || !bound[0]?.result?.context)
+        throw new Fault("cursor_invalidated", "cursor_invalidated", {
+          reason: reason ?? "session_marker_missing",
+        });
+      value.next = {
+        ...value.next,
+        dom_session: session,
+        tab_id: id,
+        document_id: bound[0].documentId,
+        dom_context: bound[0].result.context,
+      };
+    }
+    for (const post of [value, ...(value.items ?? [])])
       if (post.entityUrn && post.url)
-        await store.set("post-url:" + post.entityUrn, post.url);
+        for (const urn of new Set<string>([
+          post.entityUrn,
+          ...(post.observed_identities ?? []),
+        ]))
+          await store.set("post-url:" + urn, post.url);
     return value;
   },
   account: async () => {

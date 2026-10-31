@@ -1,3 +1,11 @@
+import { bindDomSession } from "./dom-session.js";
+import {
+  postRoots,
+  postIdentity,
+  postIdentities,
+  postContext,
+  waitForPost,
+} from "./post-context.js";
 // This entire function is injected into the connected LinkedIn tab. Never accepts
 // JavaScript, selectors or arbitrary URLs from an MCP caller.
 export async function domOperation(
@@ -54,76 +62,9 @@ export async function domOperation(
       if (matches.length !== 1) return fail("ui_control_ambiguous_or_missing");
       return matches[0];
     };
-    // Modern SDUI and legacy post structure, adapted from the user's LinkedIn extractor.
-    const roots = () => {
-      const nodes = [
-        ...document.querySelectorAll(
-          '[data-urn^="urn:li:activity:"],[data-id^="urn:li:activity:"],.feed-shared-update-v2,[role="listitem"]:has(button[aria-label^="Open control menu for post by "]),[role="listitem"]:has(button[aria-label="Comment"]):has(button[aria-label="Repost"])',
-        ),
-      ];
-      return nodes.filter(
-        (e) => !nodes.some((other) => other !== e && other.contains(e)),
-      );
-    };
-    const identity = (e: Element): string | null => {
-      for (const node of [
-        e,
-        ...e.querySelectorAll(
-          '[data-urn],[data-id],[data-entity-urn],[data-reaction-urn],[id*="ContentUrn"],[componentkey*="ContentUrn"],[componentkey*="userGeneratedContentId="],[componentkey*="ugcPostId="],[componentkey*="shareId="],a[href*="/feed/update/"],a[href*="/posts/"]',
-        ),
-      ]) {
-        for (const attr of [
-          "data-mcp-post-urn",
-          "data-urn",
-          "data-id",
-          "data-entity-urn",
-          "data-reaction-urn",
-          "id",
-          "componentkey",
-          "href",
-        ]) {
-          // Links quoted in the post body identify their linked content, not
-          // this card. Only native card permalinks may establish its identity.
-          if (
-            attr === "href" &&
-            node.closest(
-              '.feed-shared-update-v2__commentary,.feed-shared-inline-show-more-text__text-view,.feed-shared-update-v2__description,.update-components-text,[data-test-id="main-feed-post-content"],[data-testid="expandable-text-box"]',
-            )
-          )
-            continue;
-          let value = node.getAttribute(attr) ?? "";
-          try {
-            value = decodeURIComponent(value);
-          } catch {}
-          const direct = value.match(
-            /urn:li:(?:activity|share|ugcPost):\d+/,
-          )?.[0];
-          if (direct) return direct;
-          const activity = value.match(/activity[-:](\d+)/)?.[1];
-          if (activity) return "urn:li:activity:" + activity;
-          // SDUI detail cards expose their native share identity in their own
-          // permalink (image/send controls), even when component keys are opaque.
-          if (attr === "href") {
-            const nativeLink = value.match(
-              /^https:\/\/www\.linkedin\.com\/posts\/[^/?#]+-(share|ugcPost)-(\d+)-/,
-            );
-            if (nativeLink) return `urn:li:${nativeLink[1]}:${nativeLink[2]}`;
-          }
-          const ugc = value.match(
-            /(?:userGeneratedContent(?:Post)?Id|ugcPostId)=(\d+)/,
-          )?.[1];
-          if (ugc) return "urn:li:ugcPost:" + ugc;
-          const share = value.match(/shareId=(\d+)/)?.[1];
-          if (share) return "urn:li:share:" + share;
-        }
-      }
-      return null;
-    };
-    const card = () => {
-      const all = roots().filter((e) => identity(e) === a.post_urn);
-      if (all.length !== 1) return fail("post_target_not_unique");
-      return all[0];
-    };
+    const roots = postRoots;
+    const identity = postIdentity;
+    const card = () => postContext(a.post_urn).root;
     const fill = (e: HTMLElement, text: string) => {
       if (
         a.execution_session &&
@@ -181,6 +122,7 @@ export async function domOperation(
         hash = Math.imul(hash ^ ch.charCodeAt(0), 16777619);
       return {
         entityUrn,
+        observed_identities: postIdentities(e),
         scan_key: entityUrn ?? "local:" + String(hash >>> 0),
         text,
         text_truncated: [...e.querySelectorAll("button")].some((b) =>
@@ -246,12 +188,7 @@ export async function domOperation(
       };
     };
     if (["post_get", "post_like", "post_comment"].includes(op)) {
-      for (
-        let n = 0;
-        n < 8 && !roots().some((e) => identity(e) === a.post_urn);
-        n++
-      )
-        await wait();
+      await waitForPost(a.post_urn);
     }
     if (["feed_list", "posts_search", "profile_posts_list"].includes(op)) {
       if (op === "posts_search" && !state.dom_session) {
@@ -323,6 +260,11 @@ export async function domOperation(
         fail("search_filter_not_applied");
       if (op === "feed_list" && !location.pathname.startsWith("/feed"))
         fail("open_feed_in_connected_tab");
+      if (op === "posts_search" && !state.dom_session)
+        bindDomSession(a.execution_session, {
+          sort: a.sort,
+          date_posted: a.date_posted,
+        });
       const seen = new Set<string>(state.seen ?? []);
       if (seen.size >= 10000) fail("traversal_limit_reached");
       let items: Record<string, any>[] = [];
@@ -386,7 +328,10 @@ export async function domOperation(
               })())
           : postData(e).scan_key === a.scan_key,
       );
-      if (matches.length !== 1) fail("post_target_not_unique");
+      if (matches.length !== 1)
+        fail(
+          matches.length ? "post_target_ambiguous" : "post_target_not_found",
+        );
       const post = matches[0];
       const initial = postData(post);
       if (a.expected_author && initial.author !== a.expected_author)
@@ -578,8 +523,7 @@ export async function domOperation(
     }
     if (op === "post_comment") {
       const post = card();
-      const root =
-        post.closest('[componentkey*="pagedCommentsContainer"]') ?? post;
+      const root = postContext(a.post_urn).commentsRoot;
       const selector =
         '.comments-comment-item,.comments-comment-entity,[data-comment-urn],div[componentkey^="replaceableComment_"]';
       const sourceId = (e: Element | null): string | null => {
@@ -711,9 +655,7 @@ export async function domOperation(
       submits[0].click();
       const findReplies = () =>
         [
-          ...(
-            card().closest('[componentkey*="pagedCommentsContainer"]') ?? card()
-          ).querySelectorAll(selector),
+          ...postContext(a.post_urn).commentsRoot.querySelectorAll(selector),
         ].filter((e) => {
           const id = sourceId(e);
           const body = e.querySelector(
@@ -1062,6 +1004,7 @@ export async function domOperation(
     return {
       bridge_error:
         error instanceof Error ? error.message : "dom_operation_failed",
+      ...((error as any)?.details ? { details: (error as any).details } : {}),
       ...(tracksDispatch
         ? { dispatch_state: mutationStarted ? "dispatched" : "not_dispatched" }
         : {}),

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { errorDetails } from "./core/errors.js";
+import { errorDetails, adapterDiagnostics } from "./core/errors.js";
 import { capabilities } from "./core/capabilities.js";
 import { VERSION } from "./version.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -80,6 +80,7 @@ async function main() {
                     ...errorDetails(
                       e instanceof Error ? e.message : "operation_failed",
                     ),
+                    ...adapterDiagnostics((e as any)?.details),
                     ...((e as any)?.details?.navigation
                       ? { navigation: (e as any).details.navigation }
                       : {}),

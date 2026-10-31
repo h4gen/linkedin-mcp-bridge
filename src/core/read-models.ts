@@ -46,12 +46,22 @@ export function personRef(p: Args): Args {
   let identifier =
     member.publicIdentifier ??
     member.public_identifier ??
-    (typeof member.profile_url === "string"
-      ? member.profile_url.match(
-          /^https:\/\/www\.linkedin\.com\/in\/([^/?#]+)/,
-        )?.[1]
-      : null) ??
+    [
+      member.profile_url,
+      member.profileUrl,
+      p.profile_url,
+      p.profileUrl,
+    ].flatMap((value) =>
+      typeof value === "string"
+        ? [
+            value.match(
+              /^https:\/\/www\.linkedin\.com\/in\/([^/?#]+)\/?(?:[?#].*)?$/,
+            )?.[1],
+          ].filter(Boolean)
+        : [],
+    )[0] ??
     null;
+  if (typeof identifier !== "string") identifier = null;
   if (identifier) {
     try {
       identifier = decodeURIComponent(identifier);
@@ -63,8 +73,11 @@ export function personRef(p: Args): Args {
   return {
     entityUrn: urn,
     name:
-      asText(member.name) ||
-      [member.firstName, member.lastName].filter(Boolean).join(" "),
+      asText(member.name).trim() ||
+      [member.firstName, member.lastName]
+        .map((value) => asText(value).trim())
+        .filter(Boolean)
+        .join(" "),
     public_identifier: identifier,
     profile_url: identifier
       ? `https://www.linkedin.com/in/${encodeURIComponent(identifier)}/`
