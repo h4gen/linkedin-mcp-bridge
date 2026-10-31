@@ -284,9 +284,18 @@ it.each(["share", "ugcPost"])(
   "resolves a native %s permalink from the scoped detail card, not the address alone",
   async (kind) => {
     const url = `https://www.linkedin.com/posts/example_topic-${kind}-123-abcd/`;
-    page(
+    const dom = page(
       `<div componentkey="pagedCommentsContainer"><div role="listitem"><button aria-label="Open control menu for post by Example"></button><div data-testid="expandable-text-box">Verified text</div><a href="${url}">Send</a></div></div>`,
     );
+    const listed = await domOperation("feed_list", { limit: 1 }, {});
+    expect(listed.items[0].url).toBe(url);
+    const resolvedScan = await domOperation(
+      "post_resolve",
+      { scan_key: listed.items[0].scan_key },
+      {},
+    );
+    expect(resolvedScan.url).toBe(url);
+    dom.reconfigure({ url });
     const result = await domOperation(
       "post_resolve",
       {
@@ -297,7 +306,9 @@ it.each(["share", "ugcPost"])(
       {},
     );
     expect(result.entityUrn).toBe(`urn:li:${kind}:123`);
+    expect(result.url).toBe(url);
     document.querySelector("a")!.remove();
+    dom.reconfigure({ url: "https://www.linkedin.com/feed/" });
     const scan = await domOperation("feed_list", { limit: 1 }, {});
     expect(scan.items[0].entityUrn).toBeNull();
   },

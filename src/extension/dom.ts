@@ -241,11 +241,8 @@ export async function domOperation(
             e.querySelectorAll<HTMLAnchorElement>(
               'a[href*="/feed/update/"],a[href*="/posts/"]',
             ),
-          )
-            .map((a) => a.href)
-            .find(
-              (url) => entityUrn && decodeURIComponent(url).includes(entityUrn),
-            ) ?? null,
+          ).find((link) => entityUrn && identity(link) === entityUrn)?.href ??
+          null,
       };
     };
     if (["post_get", "post_like", "post_comment"].includes(op)) {
