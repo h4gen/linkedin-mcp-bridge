@@ -135,6 +135,10 @@ export function profileReader(expectedUrl: string, expectedUrn: string) {
       return { status: text ? "available" : "unavailable", text };
     })(),
     posts_url: posts.length === 1 ? posts[0].href : null,
+    activity_url:
+      links.find((a) =>
+        a.pathname.startsWith(canonical(expectedUrl) + "/recent-activity/"),
+      )?.href ?? null,
     relationship: {
       profile_urn: expectedUrn,
       status,
@@ -146,4 +150,31 @@ export function profileReader(expectedUrl: string, expectedUrn: string) {
           : [{ source: "verified_profile_top_card", value: status }],
     },
   };
+}
+
+// Bounded lazy-section loading on the already verified profile route.
+export async function prepareProfile(expectedUrl: string) {
+  if (location.origin + location.pathname !== expectedUrl) return;
+  for (let step = 0; step < 4; step++) {
+    if (
+      [...document.querySelectorAll("h2")].some((e) =>
+        /^(Experience|Berufserfahrung)$/.test(e.textContent?.trim() ?? ""),
+      )
+    )
+      return;
+    let scroller: Element | null = document.querySelector(
+      'main [role="region"],main',
+    );
+    while (scroller) {
+      if (
+        /auto|scroll/.test(window.getComputedStyle(scroller).overflowY) &&
+        scroller.scrollHeight > scroller.clientHeight + 100
+      )
+        break;
+      scroller = scroller.parentElement;
+    }
+    (scroller ?? document.scrollingElement)?.scrollBy(0, 750);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    if (location.origin + location.pathname !== expectedUrl) return;
+  }
 }

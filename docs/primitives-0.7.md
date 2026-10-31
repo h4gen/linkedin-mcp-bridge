@@ -41,7 +41,7 @@ SDUI can render an editor in a sibling row. The adapter accepts only the newly o
 Read-only browser checks established:
 
 - Content search's visible sort choices: Top Match and Latest. Date choices: Past 24 hours, Past week, Past month; Reset clears the filter. Applied state is represented by checked “Filter by …” controls, not query parameters.
-- Profile top cards expose an exact Contact info route and a message-compose link carrying the profile URN. About paragraphs and the observed recent-activity/all link are available. Experience was not exposed in the sampled loaded profile; current-position availability must therefore remain explicit.
+- Profile top cards expose an exact Contact info route and a message-compose link carrying the profile URN. About paragraphs and the observed recent-activity/all link are available. Experience appears only after scrolling in the sampled profile. The adapter performs at most four bounded scroll steps, then reads role/company/date context from that section. Missing sections remain explicitly unavailable.
 - SDUI comments use `replaceableComment_urn:li:comment:(ugcPost:…,…)` component keys. The permalink post and comment rows share a `pagedCommentsContainer`; comments and reply editors can be siblings. Flat replies do not, by themselves, prove their parent.
 - The user-supplied short post URL resolves to a feed-update activity page; the original content can have a different ugcPost identity than the repost activity URL. Resolution uses the page's scoped source identity.
 

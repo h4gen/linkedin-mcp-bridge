@@ -218,6 +218,14 @@ export async function domOperation(
             ) ?? null,
       };
     };
+    if (["post_get", "post_like", "post_comment"].includes(op)) {
+      for (
+        let n = 0;
+        n < 8 && !roots().some((e) => identity(e) === a.post_urn);
+        n++
+      )
+        await wait();
+    }
     if (["feed_list", "posts_search", "profile_posts_list"].includes(op)) {
       if (op === "posts_search" && !state.dom_session) {
         for (
@@ -332,6 +340,8 @@ export async function domOperation(
       };
     }
     if (op === "post_resolve") {
+      if (a.url)
+        for (let n = 0; n < 8 && !roots().some(identity); n++) await wait();
       const permalink = document.querySelector(
         '[componentkey*="pagedCommentsContainer"]',
       );

@@ -1,5 +1,5 @@
 import { readApi } from "../core/api.js";
-import { profileReader } from "./profile-reader.js";
+import { profileReader, prepareProfile } from "./profile-reader.js";
 import { workTab } from "./work-tab.js";
 import { composerOperation } from "./composer.js";
 import { cursorEvictions } from "../core/cursor-budget.js";
@@ -40,6 +40,7 @@ let lastRequest = 0;
 async function browserFetch(id: number, request: Request) {
   try {
     return await chrome.scripting.executeScript({
+      injectImmediately: true,
       target: { tabId: id },
       world: "MAIN",
       func: pageFetch,
@@ -57,6 +58,7 @@ async function browserFetch(id: number, request: Request) {
 async function documentReady(id: number, url: string) {
   try {
     const result = await chrome.scripting.executeScript({
+      injectImmediately: true,
       target: { tabId: id },
       world: "ISOLATED",
       func: (expected: string) =>
@@ -158,6 +160,7 @@ async function invalidateDocument() {
   if (c?.tabId)
     await chrome.scripting
       .executeScript({
+        injectImmediately: true,
         target: { tabId: c.tabId },
         world: "ISOLATED",
         func: () => {
@@ -171,6 +174,7 @@ async function validateDomCursor(_op: string, state: Record<string, any>) {
   const id = await tabId();
   if (id !== state.tab_id) throw new Fault("cursor_invalidated");
   const check = await chrome.scripting.executeScript({
+    injectImmediately: true,
     target: { tabId: id },
     world: "ISOLATED",
     func: () =>
@@ -249,17 +253,32 @@ const engine = new Engine({
       );
       await navigate(basic.profile_url);
       await chrome.scripting.executeScript({
+        injectImmediately: true,
         target: { tabId: id },
         world: "ISOLATED",
         func: () => {
           (window as any).__liBridgeSession = undefined;
         },
       });
+      if (
+        op === "profile_get" &&
+        a.sections.some((s: string) =>
+          ["about", "current_positions"].includes(s),
+        )
+      )
+        await chrome.scripting.executeScript({
+          injectImmediately: true,
+          target: { tabId: id },
+          world: "ISOLATED",
+          func: prepareProfile,
+          args: [basic.profile_url],
+        });
       let extra;
       for (let attempt = 0; attempt < 20; attempt++) {
         check();
         extra = (
           await chrome.scripting.executeScript({
+            injectImmediately: true,
             target: { tabId: id },
             world: "ISOLATED",
             func: profileReader,
@@ -338,6 +357,31 @@ const engine = new Engine({
         }
         return rel;
       }
+      if (!extra.posts_url && extra.activity_url) {
+        await navigate(extra.activity_url);
+        for (let n = 0; n < 12; n++) {
+          const links = await chrome.scripting.executeScript({
+            injectImmediately: true,
+            target: { tabId: id },
+            world: "ISOLATED",
+            func: (profile: string) =>
+              [...document.querySelectorAll<HTMLAnchorElement>("a[href]")]
+                .filter(
+                  (a) =>
+                    /^(Posts|Beiträge)$/.test(a.textContent?.trim() ?? "") &&
+                    a.href.startsWith(profile + "recent-activity/"),
+                )
+                .map((a) => a.href),
+            args: [basic.profile_url],
+          });
+          const urls = [...new Set(links[0]?.result ?? [])];
+          if (urls.length === 1) {
+            extra.posts_url = urls[0];
+            break;
+          }
+          await new Promise((r) => setTimeout(r, 300));
+        }
+      }
       if (!extra.posts_url)
         throw new Fault("profile_posts_location_unresolved");
       await navigate(extra.posts_url);
@@ -373,6 +417,7 @@ const engine = new Engine({
       // Refresh only an empty editor/manager in our dedicated work tab.
       const stamp = crypto.randomUUID();
       const safe = await chrome.scripting.executeScript({
+        injectImmediately: true,
         target: { tabId: id },
         world: "ISOLATED",
         func: (stamp: string) => {
@@ -520,6 +565,7 @@ const engine = new Engine({
       const loadingTab = await chrome.tabs.get(id);
       if (!loadingTab.pendingUrl) {
         const ready = await chrome.scripting.executeScript({
+          injectImmediately: true,
           target: { tabId: id },
           world: "ISOLATED",
           func: () => document.readyState !== "loading" && !!document.body,
@@ -548,6 +594,7 @@ const engine = new Engine({
         : await store.get("post-url:" + a.post_urn);
       const tab = await chrome.tabs.get(id);
       const target = await chrome.scripting.executeScript({
+        injectImmediately: true,
         target: { tabId: id },
         world: "ISOLATED",
         func: (urn: string) =>
@@ -578,6 +625,7 @@ const engine = new Engine({
     const session = state.dom_session ?? crypto.randomUUID();
     if (!state.dom_session) {
       await chrome.scripting.executeScript({
+        injectImmediately: true,
         target: { tabId: id },
         world: "ISOLATED",
         func: (session: string) => {
@@ -613,6 +661,7 @@ const engine = new Engine({
     }
     check();
     const result = await chrome.scripting.executeScript({
+      injectImmediately: true,
       target: { tabId: id },
       world: "ISOLATED",
       func: ["comments_list", "reactions_list"].includes(op)
@@ -650,6 +699,7 @@ const engine = new Engine({
       value.verified = false;
       for (let attempt = 0; attempt < 12; attempt++) {
         const proof = await chrome.scripting.executeScript({
+          injectImmediately: true,
           target: { tabId: id },
           world: "ISOLATED",
           func: firstDegreeConnection,
