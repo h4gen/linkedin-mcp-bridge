@@ -5,6 +5,7 @@ import {
   newestFirst,
   textWindow,
   exactPeer,
+  personRef,
 } from "../src/core/read-models.js";
 import { readApi } from "../src/core/api.js";
 import { parse, schemas } from "../src/core/contracts.js";
@@ -234,4 +235,56 @@ it("public message and conversation schemas reject source drift", async () => {
       message: { ...good.message, $type: "leak" },
     }).success,
   ).toBe(false);
+});
+
+it("keeps international profile identifiers directly usable across post and profile readers", async () => {
+  const { postView } = await import("../src/core/read-models.js");
+  const post = postView({
+    author: "Example",
+    author_profile_url: "https://www.linkedin.com/in/test-m%C3%BCller/",
+  });
+  const input = parse("profile_get", {
+    account_urn: "urn:li:fsd_profile:me",
+    public_identifier: post.author_identity.public_identifier,
+  });
+  const r = await readApi("profile_get", input, {}, async (request) => {
+    expect(
+      new URLSearchParams(request.path.split("?")[1]).get("memberIdentity"),
+    ).toBe("test-müller");
+    return {
+      data: {
+        elements: [
+          {
+            entityUrn: "urn:li:fsd_profile:x",
+            publicIdentifier: "test-müller",
+            firstName: "Example",
+          },
+        ],
+      },
+    };
+  });
+  expect(r.profile.profile_url).toBe(
+    "https://www.linkedin.com/in/test-m%C3%BCller/",
+  );
+});
+
+it("does not expose malformed encoded identifiers as usable profile references", async () => {
+  for (const publicIdentifier of [
+    "bad%encoding",
+    "path%2Fother",
+    "name%3Fquery",
+    "x".repeat(151),
+  ]) {
+    expect(personRef({ publicIdentifier }).identity_status).toBe("unresolved");
+    await expect(
+      readApi(
+        "profile_get",
+        { public_identifier: publicIdentifier },
+        {},
+        async () => {
+          throw new Error("must not fetch");
+        },
+      ),
+    ).rejects.toThrow("invalid_profile_identifier");
+  }
 });

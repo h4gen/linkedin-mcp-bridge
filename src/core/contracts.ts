@@ -134,7 +134,7 @@ export const schemas = {
       ...account,
       public_identifier: z
         .string()
-        .regex(/^[\w%\-]{1,150}$/)
+        .regex(/^[\p{L}\p{M}\p{N}_%\-]{1,450}$/u)
         .optional(),
       profile_urn: profileUrn.optional(),
       sections: z

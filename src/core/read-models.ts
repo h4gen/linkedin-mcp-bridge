@@ -43,7 +43,7 @@ export function personRef(p: Args): Args {
     /^urn:li:(fsd_profile|fs_miniProfile):[\w-]+$/.test(raw)
       ? raw.replace("fs_miniProfile", "fsd_profile")
       : null;
-  const identifier =
+  let identifier =
     member.publicIdentifier ??
     member.public_identifier ??
     (typeof member.profile_url === "string"
@@ -52,6 +52,14 @@ export function personRef(p: Args): Args {
         )?.[1]
       : null) ??
     null;
+  if (identifier) {
+    try {
+      identifier = decodeURIComponent(identifier);
+      if (!/^[\p{L}\p{M}\p{N}_-]{1,150}$/u.test(identifier)) identifier = null;
+    } catch {
+      identifier = null;
+    }
+  }
   return {
     entityUrn: urn,
     name:
@@ -59,7 +67,7 @@ export function personRef(p: Args): Args {
       [member.firstName, member.lastName].filter(Boolean).join(" "),
     public_identifier: identifier,
     profile_url: identifier
-      ? `https://www.linkedin.com/in/${identifier}/`
+      ? `https://www.linkedin.com/in/${encodeURIComponent(identifier)}/`
       : null,
     identity_status: urn || identifier ? "resolved" : "unresolved",
   };
@@ -135,13 +143,10 @@ export function postView(row: Args): Args {
           /^https:\/\/www\.linkedin\.com\/in\/([^/?#]+)/,
         )?.[1] ?? null)
       : null;
-  const author = {
-    entityUrn: null,
+  const author = personRef({
     name: asText(row.author),
-    public_identifier: identifier,
-    profile_url: row.author_profile_url ?? null,
-    identity_status: identifier ? "resolved" : "unresolved",
-  };
+    publicIdentifier: identifier,
+  });
   return {
     entityUrn: row.entityUrn ?? null,
     scan_key: row.scan_key ?? null,

@@ -92,6 +92,14 @@ export async function domOperation(
           if (direct) return direct;
           const activity = value.match(/activity[-:](\d+)/)?.[1];
           if (activity) return "urn:li:activity:" + activity;
+          // SDUI detail cards expose their native share identity in their own
+          // permalink (image/send controls), even when component keys are opaque.
+          if (attr === "href") {
+            const shareLink = value.match(
+              /^https:\/\/www\.linkedin\.com\/posts\/[^/?#]+-share-(\d+)-/,
+            )?.[1];
+            if (shareLink) return "urn:li:share:" + shareLink;
+          }
           const ugc = value.match(
             /(?:userGeneratedContent(?:Post)?Id|ugcPostId)=(\d+)/,
           )?.[1];

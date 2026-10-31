@@ -209,21 +209,30 @@ export async function readApi(
   if (op === "conversations_get")
     return { conversation: await getConversation(a, fetch) };
   if (op === "profile_get") {
+    let identifier: string | undefined;
+    try {
+      identifier = a.public_identifier
+        ? decodeURIComponent(a.public_identifier)
+        : undefined;
+      if (identifier && !/^[\p{L}\p{M}\p{N}_-]{1,150}$/u.test(identifier))
+        throw new Fault("invalid_profile_identifier");
+    } catch {
+      throw new Fault("invalid_profile_identifier");
+    }
     const rawProfile = await fetch({
       path:
         "/identity/dash/profiles?" +
         new URLSearchParams({
           q: "memberIdentity",
-          memberIdentity:
-            a.public_identifier ?? a.profile_urn?.split(":").at(-1),
+          memberIdentity: identifier ?? a.profile_urn?.split(":").at(-1),
           decorationId:
             "com.linkedin.voyager.dash.deco.identity.profile.WebTopCardCore-19",
         }),
     });
     const normalized = normalize(rawProfile);
     const matchesProfile = (x: Args) =>
-      a.public_identifier
-        ? x.publicIdentifier === a.public_identifier
+      identifier
+        ? x.publicIdentifier === identifier
         : x.entityUrn?.replace("fs_miniProfile", "fsd_profile") ===
           a.profile_urn;
     const matches = normalized.entities.filter(matchesProfile);
@@ -237,7 +246,10 @@ export async function readApi(
         entityUrn: p.entityUrn ?? null,
         name: [p.firstName, p.lastName].filter(Boolean).join(" "),
         headline: p.headline ?? p.occupation ?? null,
-        profile_url: "https://www.linkedin.com/in/" + p.publicIdentifier + "/",
+        profile_url:
+          "https://www.linkedin.com/in/" +
+          encodeURIComponent(p.publicIdentifier) +
+          "/",
         public_identifier: p.publicIdentifier,
         location:
           p.geoLocation?.geo?.defaultLocalizedName ?? p.locationName ?? null,
