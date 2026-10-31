@@ -1,8 +1,8 @@
 # LinkedIn MCP – AI Connector for Claude & Codex
 
-27 primitive LinkedIn tools for local AI agents: inbox and message history, people research, invitations, feed interactions, native text drafts and scheduling. The agent composes these tools; this project does not implement workflows, a CRM or an inbox index.
+32 primitive LinkedIn tools for local AI agents: inbox and message history, people research, invitations, feed interactions, native text drafts and scheduling. The agent composes these tools; this project does not implement workflows, a CRM or an inbox index.
 
-**0.6.0 — Chrome Web Store publication pending.** Installation from Git supports macOS and native Windows with Google Chrome and Node.js 22+. Both platforms pass CI, including native registration, process round-trips and an isolated Chromium/native-messaging smoke test. Live LinkedIn checks were performed on macOS. Linux/WSL and direct web-chat connections are outside this release.
+**0.7.0 — Chrome Web Store draft; live acceptance pending.** Installation from Git supports macOS and native Windows with Google Chrome and Node.js 22+. Both platforms pass CI, including native registration, process round-trips and an isolated Chromium/native-messaging smoke test. Live LinkedIn checks were performed on macOS. Linux/WSL and direct web-chat connections are outside this release.
 
 LinkedIn credentials stay in Chrome. Requested content goes to your selected MCP client and may go to its AI provider. No hosted relay or product telemetry. Writes execute directly after target and idempotency checks; there is no extension approval queue.
 
@@ -51,18 +51,20 @@ Read MCP server instructions and `health` first. Use returned account and target
 
 `conversations_search` matches participant/title/preview, not message-body history. The agent can read histories ad hoc. Summaries, follow-up reasoning and notes belong to the agent or the user's existing systems.
 
+See [0.7 primitive contracts and migration](docs/primitives-0.7.md) for compact read responses, text windows, exact relationship/conversation lookup and scoped comment replies. Existing MCP processes must restart to discover the five new tools; the browser connection stays bound.
+
 ## Tools
 
 All names have a `linkedin_` prefix. First call `health`, then supply its `account_urn` to every account operation.
 
-| Area        | Tools                                                                                                                                            |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Inbox       | `conversations_list`, `conversations_search`, `conversations_get`, `messages_list`, `message_send`, `conversation_update`, `conversation_delete` |
-| People      | `profile_get`, `people_search`, `invitations_list`, `invitation_send`, `invitation_respond`, `invitation_withdraw`                               |
-| Feed        | `feed_list`, `post_get`, `post_like`, `post_comment`, `comments_list`                                                                            |
-| Planning    | `post_draft_create`, `post_schedule`, `scheduled_posts_list`, `scheduled_post_cancel`                                                            |
-| GTM         | `people_search_filters`, `reactions_list`, `post_resolve`                                                                                        |
-| Diagnostics | `health`, `operation_get`                                                                                                                        |
+| Area        | Tools                                                                                                                                                                                 |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Inbox       | `conversations_list`, `conversations_search`, `conversations_get`, `conversations_find`, `messages_list`, `message_get`, `message_send`, `conversation_update`, `conversation_delete` |
+| People      | `profile_get`, `profile_posts_list`, `relationship_get`, `people_search`, `invitations_list`, `invitation_send`, `invitation_respond`, `invitation_withdraw`                          |
+| Feed        | `feed_list`, `posts_search`, `post_get`, `post_like`, `post_comment`, `comments_list`                                                                                                 |
+| Planning    | `post_draft_create`, `post_schedule`, `scheduled_posts_list`, `scheduled_post_cancel`                                                                                                 |
+| GTM         | `people_search_filters`, `reactions_list`, `post_resolve`                                                                                                                             |
+| Diagnostics | `health`, `operation_get`                                                                                                                                                             |
 
 Lists default to 20, max 50. LinkedIn Inbox requests are capped at 20 per backend page because live requests for 50 return an unusable response; use the cursor to continue. Pass the returned opaque `next_cursor` as `cursor` with the **same arguments**. Cursors expire after 30 minutes, are bound to account, filters and operation, and reset with the browser session. Lists are live, not immutable snapshots. Deduplicate by entity URN when traversing a changing inbox. `conversations_search` searches participant/title/preview content in each fetched page; follow its cursor to search older pages. It is not full historical message search.
 
@@ -96,7 +98,7 @@ Calls serialize across MCP clients in the extension. HTTP requests have at least
 
 ### DOM operation boundaries
 
-The DOM adapter uses only packaged operations, exact target URNs, unique visible controls and English/German labels. It never accepts caller-supplied selectors, scripts or URLs. A missing/ambiguous target fails rather than clicking an unrelated control.
+The DOM adapter uses only packaged operations, exact target URNs, unique visible controls and English/German labels. It never accepts caller-supplied selectors or scripts. `post_resolve` accepts only validated LinkedIn post URLs. A missing/ambiguous target fails rather than clicking an unrelated control.
 
 Feed pagination is a bounded live scroll. `post_resolve` resolves a rendered card's `scan_key` through its scoped control menu and binds its exact identity to that card. A share ID is not advertised as a verified public permalink. Read reactions/comments on the resolved card; if no matching card exists, post reads navigate only the work tab when a supported activity location or observed permalink is available. No arbitrary navigation URL is accepted.
 
@@ -106,7 +108,7 @@ Feed pagination is a bounded live scroll. `post_resolve` resolves a rendered car
 
 Collection jobs were removed in 0.3. Use direct cursor pages. DOM reads use a dedicated LinkedIn work tab and bring it forward to avoid background timer throttling. Navigating or clicking controls in that tab invalidates its traversal cursor; API reads do not. A consumed cursor replays its cached page. Session cursors expire after 30 minutes and share a 5 MiB storage budget. See [interface contract](docs/interface-patterns.md).
 
-The registry exposes all 24 operations in development and pilot builds. `health` reports current-build acceptance separately from availability. `release:check` still requires current-commit evidence for every capability and the publishing prerequisites; acceptance does not gate individual calls.
+The registry exposes all 32 operations in development and pilot builds. `health` reports current-build acceptance separately from availability. `release:check` still requires current-commit evidence for every capability and the publishing prerequisites; acceptance does not gate individual calls.
 
 ## Development and packaging
 

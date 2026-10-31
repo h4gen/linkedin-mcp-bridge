@@ -8,19 +8,115 @@ const person = row({
   name: z.string().optional(),
   headline: z.string().nullable().optional(),
 });
-const conversation = row({
-  entityUrn: z.string(),
-  title: z.string().nullable().optional(),
-});
-const message = row({
-  entityUrn: z.string(),
-  deliveredAt: z.number().optional(),
-});
-const post = row({
-  entityUrn: z.string().nullable(),
-  text: z.string(),
-  url: z.string().nullable(),
-});
+const reference = z
+  .object({
+    entityUrn: z.string().nullable(),
+    name: z.string(),
+    public_identifier: z.string().nullable(),
+    profile_url: z.string().nullable(),
+    identity_status: z.enum(["resolved", "unresolved"]),
+  })
+  .strict();
+const excerpt = z
+  .object({
+    text: z.string(),
+    text_truncated: z.boolean(),
+    total_chars: z.number(),
+  })
+  .strict();
+const windowFields = {
+  text_revision: z.string(),
+  text_offset: z.number(),
+  total_chars: z.number(),
+  next_text_offset: z.number().nullable(),
+  text_complete: z.boolean(),
+};
+const conversation = z
+  .object({
+    entityUrn: z.string(),
+    title: z.string().nullable(),
+    participants: z.array(reference),
+    last_activity_at: z.number().nullable(),
+    preview: excerpt,
+    read: z.boolean().nullable(),
+    category: z.string().nullable(),
+  })
+  .strict();
+const message = z
+  .object({
+    entityUrn: z.string(),
+    deliveredAt: z.number().nullable(),
+    sender: reference,
+    text: z.string(),
+    text_truncated: z.boolean(),
+    total_chars: z.number(),
+    timestamp_status: z.enum(["known", "unknown"]),
+    attachments: z.array(
+      z
+        .object({
+          name: z.string().nullable(),
+          media_type: z.string().nullable(),
+          size_bytes: z.number().nullable(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+const post = z
+  .object({
+    entityUrn: z.string().nullable(),
+    scan_key: z.string().nullable(),
+    text: z.string(),
+    text_truncated: z.boolean(),
+    total_chars: z.number(),
+    source_text_truncated: z.boolean(),
+    source: z.string(),
+    full_text: z.union([
+      z
+        .object({ operation: z.literal("post_get"), post_urn: z.string() })
+        .strict(),
+      z
+        .object({
+          operation: z.literal("post_resolve"),
+          scan_key: z.string().nullable(),
+        })
+        .strict(),
+    ]),
+    author: z.string(),
+    author_identity: reference,
+    original_author: reference.nullable(),
+    published_at: z.string().nullable(),
+    visible_time: z.string().nullable(),
+    date_precision: z.enum(["timestamp", "relative", "unknown"]),
+    post_kind: z.enum(["original", "repost", "unknown"]),
+    url: z.string().nullable(),
+    identity_status: z.enum(["resolved", "unresolved"]),
+  })
+  .strict();
+const section = z
+  .object({
+    status: z.enum(["available", "not_present", "unavailable"]),
+    text: z.string().nullable().optional(),
+  })
+  .strict();
+const profile = z
+  .object({
+    entityUrn: z.string().nullable(),
+    name: z.string(),
+    headline: z.string().nullable(),
+    profile_url: z.string(),
+    public_identifier: z.string(),
+    location: z.string().nullable(),
+    sections: z
+      .object({
+        basic: section.optional(),
+        about: section.optional(),
+        current_positions: section.optional(),
+        location: section.optional(),
+      })
+      .strict(),
+  })
+  .strict();
 const comment = row({
   id: z.string(),
   text: z.string().optional(),
@@ -88,10 +184,55 @@ const definitions = {
     output: list(conversation),
   },
   conversations_get: { adapter: "api", output: row({ conversation }) },
+  message_get: {
+    adapter: "api",
+    output: z
+      .object({
+        message: message.extend(windowFields),
+        conversation_urn: z.string(),
+      })
+      .strict(),
+  },
+  conversations_find: {
+    adapter: "api",
+    source: "local_scan",
+    order: "source_order",
+    output: list(conversation),
+  },
+  posts_search: {
+    adapter: "dom",
+    source: "dom_session",
+    order: "linkedin_search_order",
+    output: list(post),
+  },
+  profile_posts_list: {
+    adapter: "dom",
+    source: "dom_session",
+    order: "profile_activity_order",
+    output: list(post),
+  },
+  relationship_get: {
+    adapter: "dom",
+    output: row({
+      profile_urn: z.string(),
+      status: z.enum([
+        "connected",
+        "outgoing_pending",
+        "incoming_pending",
+        "not_connected",
+        "unknown",
+      ]),
+      messaging: z.enum(["allowed", "not_allowed", "unknown"]),
+      observed_at: z.string(),
+      evidence: z.array(
+        z.object({ source: z.string(), value: z.string() }).strict(),
+      ),
+    }),
+  },
   messages_list: {
     adapter: "api",
     source: "timestamp",
-    order: "source_timestamp_order",
+    order: "newest_first",
     output: list(message),
   },
   people_search: {
@@ -113,7 +254,7 @@ const definitions = {
       partial: z.boolean(),
     }),
   },
-  profile_get: { adapter: "api", output: row({ profile: person }) },
+  profile_get: { adapter: "dom", output: z.object({ profile }).strict() },
   invitations_list: {
     adapter: "api",
     source: "offset",
@@ -134,9 +275,12 @@ const definitions = {
   },
   post_resolve: {
     adapter: "dom",
-    output: row({ entityUrn: z.string().nullable() }),
+    output: post,
   },
-  post_get: { adapter: "dom", output: post },
+  post_get: {
+    adapter: "dom",
+    output: post.extend({ ...windowFields, reason: z.string().optional() }),
+  },
   comments_list: {
     adapter: "dom",
     source: "dom_session",

@@ -1,3 +1,12 @@
+import {
+  conversationView,
+  postView,
+  personRef,
+  participantRefs,
+  messageView,
+  messageText,
+  textWindow,
+} from "./read-models.js";
 import { planningWrites, scheduleTime } from "./post-planning.js";
 import { capabilities, capabilityStatus } from "./capabilities.js";
 import { VERSION, PROTOCOL } from "../version.js";
@@ -475,6 +484,9 @@ export class Engine {
             }
           : {}),
         ...(op === "conversation_update" ? { action: a.action } : {}),
+        ...(a.parent_comment_id
+          ? { parent_comment_id: a.parent_comment_id }
+          : {}),
         fingerprint: scope,
         account_urn: expected,
         created_at: previous?.created_at ?? d.now(),
@@ -610,6 +622,10 @@ export class Engine {
         const id =
           receipt(result, op) ??
           (result?.verified === true ? result?.receipt_id : undefined);
+        if (op === "post_comment" && a.parent_comment_id) {
+          row.parent_relation = result.parent_relation ?? "unknown";
+          if (result.receipt_id) row.observed_reply_id = result.receipt_id;
+        }
         row.status = id || verified ? "confirmed" : "unknown_outcome";
         if (id) row.receipt_id = id;
         if (op === "message_send") {
@@ -632,6 +648,7 @@ export class Engine {
               "invitation_respond",
               "invitation_withdraw",
               "conversation_delete",
+              "post_comment",
             ].includes(op))
         )
           dispatched = false;
@@ -665,8 +682,17 @@ export class Engine {
       state = saved.state;
     }
     check();
+    if (op === "message_get") {
+      const locator = await d.store.get(
+        "cursor:message-lookup:" +
+          (await d.hash(
+            expected + "|" + a.conversation_urn + "|" + a.message_urn,
+          )),
+      );
+      if (locator?.expires > d.now()) state = { before: locator.before };
+    }
     const api = capabilities[op].adapter === "api";
-    const result = api
+    let result = api
       ? await readApi(op, a, state, d.fetch)
       : await d.dom(
           op,
@@ -679,6 +705,25 @@ export class Engine {
             : a,
           state,
         );
+    for (const person of [
+      result.profile,
+      ...(result.items ?? []).flatMap((r: Args) => [
+        r,
+        r.profile,
+        ...participantRefs(r),
+        personRef(r.sender ?? {}),
+      ]),
+      ...participantRefs(result.conversation ?? {}),
+    ]) {
+      if (
+        person?.entityUrn?.startsWith("urn:li:fsd_profile:") &&
+        person.profile_url
+      )
+        await d.store.set("identity:" + person.entityUrn, {
+          ...person,
+          urn: person.entityUrn,
+        });
+    }
     if (op === "scheduled_posts_list") {
       result.items = await Promise.all(
         result.items.map(async (item: Args) => ({
@@ -729,6 +774,62 @@ export class Engine {
           : null,
       };
     }
+    if (["people_search", "reactions_list"].includes(op))
+      result.items = result.items.map((r: Args) => ({
+        ...r,
+        public_identifier: personRef(r).public_identifier,
+        identity_status: personRef(r).identity_status,
+      }));
+    if (op === "comments_list")
+      result.items = result.items.map((r: Args) => ({
+        ...r,
+        author: { ...r.author, ...personRef(r.author ?? r) },
+      }));
+    // Public projections happen after internal pagination and mutation checks.
+    if (
+      [
+        "conversations_list",
+        "conversations_search",
+        "conversations_find",
+      ].includes(op)
+    )
+      result.items = result.items.map((r: Args) =>
+        conversationView(r, a.category),
+      );
+    if (op === "conversations_get")
+      result.conversation = conversationView(result.conversation);
+    if (op === "messages_list") {
+      for (const message of result.items)
+        if (typeof message.deliveredAt === "number")
+          await d.store.set(
+            "cursor:message-lookup:" +
+              (await d.hash(
+                expected + "|" + a.conversation_urn + "|" + message.entityUrn,
+              )),
+            {
+              before: message.deliveredAt + 1,
+              expires: d.now() + 1800000,
+            },
+          );
+      result.items = result.items.map(messageView);
+    }
+    if (op === "message_get")
+      result.message = {
+        ...messageView(result.message),
+        ...(await textWindow(messageText(result.message), a, d.hash)),
+      };
+    if (op === "post_get") {
+      const sourceTruncated = !!result.text_truncated;
+      const window = await textWindow(result.text ?? "", a, d.hash);
+      result = { ...postView(result), ...window };
+      if (sourceTruncated) {
+        result.text_complete = false;
+        result.reason = "source_text_truncated";
+      }
+    }
+    if (op === "post_resolve") result = postView(result);
+    if (["feed_list", "posts_search", "profile_posts_list"].includes(op))
+      result.items = result.items.map(postView);
     // Cache a consumed cursor's page: retries must not advance the live DOM twice.
     if (cursorRecord)
       await d.store.set("cursor:" + a.cursor, {

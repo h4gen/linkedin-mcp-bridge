@@ -76,7 +76,7 @@ describe("contracts", () => {
     ).toThrow();
   });
   it("caps pages and validates all tool schemas", () => {
-    expect(Object.keys(schemas)).toHaveLength(27);
+    expect(Object.keys(schemas)).toHaveLength(32);
     expect(() =>
       parse("messages_list", {
         account_urn: account,
@@ -338,4 +338,27 @@ it("encodes LinkedIn message trackingId as sixteen bytes, not the UUID spelling"
   expect((r?.body as any).message.originToken).toBe(
     "00112233-4455-4677-8899-aabbccddeeff",
   );
+});
+
+it("binds a comment receipt to its parent and never repeats an unknown reply", async () => {
+  const f = fixture();
+  const a = {
+    account_urn: account,
+    post_urn: "urn:li:activity:123",
+    text: "Test reply",
+    parent_comment_id: "urn:li:comment:one",
+    idempotency_key: "parent-key-one",
+  };
+  const first = await f.engine.run("post_comment", a);
+  expect(first.status).toBe("unknown_outcome");
+  expect(first.parent_comment_id).toBe(a.parent_comment_id);
+  await f.engine.run("post_comment", a);
+  expect(f.dom).toHaveBeenCalledTimes(1);
+  await expect(
+    f.engine.run("post_comment", {
+      ...a,
+      parent_comment_id: "urn:li:comment:two",
+    }),
+  ).rejects.toThrow("idempotency");
+  expect(f.dom).toHaveBeenCalledTimes(1);
 });

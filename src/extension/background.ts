@@ -1,3 +1,5 @@
+import { readApi } from "../core/api.js";
+import { profileReader } from "./profile-reader.js";
 import { workTab } from "./work-tab.js";
 import { composerOperation } from "./composer.js";
 import { cursorEvictions } from "../core/cursor-budget.js";
@@ -174,6 +176,172 @@ const engine = new Engine({
     check();
     if (state.dom_session) await validateDomCursor(op, state);
     await chrome.tabs.update(id, { active: true });
+    async function navigate(url: string, fresh = false) {
+      check();
+      const tab = await chrome.tabs.get(id);
+      if (tab.url === url && tab.status === "complete" && !fresh) return;
+      // A fresh search clears SDUI filters that are not represented in the URL.
+      if (tab.url === url && fresh) await chrome.tabs.reload(id);
+      else await chrome.tabs.update(id, { url });
+      for (let n = 0; n < 80; n++) {
+        check();
+        const current = await chrome.tabs.get(id);
+        if (current.status === "complete" && current.url === url) return;
+        if (current.url && /\/(login|checkpoint)/.test(current.url))
+          throw new Fault("not_logged_in");
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      throw new Fault("work_tab_navigation_timeout");
+    }
+    if (
+      ["profile_get", "profile_posts_list", "relationship_get"].includes(op) &&
+      !state.dom_session
+    ) {
+      const cached = a.profile_urn
+        ? await store.get("identity:" + a.profile_urn)
+        : undefined;
+      const identifier =
+        a.public_identifier ??
+        cached?.public_identifier ??
+        cached?.profile_url?.match(/\/in\/([^/?#]+)/)?.[1];
+
+      const basic = (
+        await readApi(
+          "profile_get",
+          identifier
+            ? { public_identifier: identifier }
+            : { profile_urn: a.profile_urn },
+          {},
+          (r) => fetchRequest(r, check),
+        )
+      ).profile;
+      if (
+        a.profile_urn &&
+        basic.entityUrn?.replace("fs_miniProfile", "fsd_profile") !==
+          a.profile_urn
+      )
+        throw new Fault("profile_identity_mismatch");
+      basic.entityUrn = basic.entityUrn?.replace(
+        "fs_miniProfile",
+        "fsd_profile",
+      );
+      await navigate(basic.profile_url);
+      await chrome.scripting.executeScript({
+        target: { tabId: id },
+        world: "ISOLATED",
+        func: () => {
+          (window as any).__liBridgeSession = undefined;
+        },
+      });
+      let extra;
+      for (let attempt = 0; attempt < 20; attempt++) {
+        check();
+        extra = (
+          await chrome.scripting.executeScript({
+            target: { tabId: id },
+            world: "ISOLATED",
+            func: profileReader,
+            args: [basic.profile_url, basic.entityUrn],
+          })
+        )[0]?.result;
+        if (extra && extra.bridge_error !== "profile_loading") break;
+        await new Promise((r) => setTimeout(r, 400));
+      }
+      if (!extra || extra.bridge_error)
+        throw new Fault(extra?.bridge_error ?? "profile_shape_changed");
+      await store.set("identity:" + basic.entityUrn, {
+        ...basic,
+        posts_url: extra.posts_url,
+      });
+      if (op === "profile_get") {
+        const all: Record<string, any> = {
+          basic: { status: "available" },
+          about: extra.about,
+          current_positions: extra.current_positions,
+          location: {
+            status: basic.location ? "available" : extra.location!.status,
+            text: basic.location ?? extra.location!.text,
+          },
+        };
+        return {
+          profile: {
+            ...basic,
+            sections: Object.fromEntries(
+              a.sections.map((k: string) => [k, all[k]]),
+            ),
+          },
+        };
+      }
+      if (op === "relationship_get") {
+        const rel = extra.relationship!;
+        const pending: string[] = [];
+        for (const direction of ["received", "sent"]) {
+          let cursor = {};
+          for (let n = 0; n < 3; n++) {
+            const page = await readApi(
+              "invitations_list",
+              { account_urn: a.account_urn, direction, limit: 20 },
+              cursor,
+              (r) => fetchRequest(r, check),
+            );
+            if (
+              page.items.some(
+                (x: any) =>
+                  x.profile.entityUrn?.replace(
+                    "fs_miniProfile",
+                    "fsd_profile",
+                  ) === a.profile_urn,
+              )
+            ) {
+              pending.push(
+                direction === "sent" ? "outgoing_pending" : "incoming_pending",
+              );
+              break;
+            }
+            if (!page.next) break;
+            cursor = page.next;
+          }
+        }
+        if (pending.length) {
+          rel.evidence.push(
+            ...pending.map((value) => ({
+              source: "exact_invitation_profile",
+              value,
+            })),
+          );
+          rel.status =
+            rel.status === "connected" || pending.length > 1
+              ? "unknown"
+              : pending[0];
+        }
+        return rel;
+      }
+      if (!extra.posts_url)
+        throw new Fault("profile_posts_location_unresolved");
+      await navigate(extra.posts_url);
+    }
+    if (op === "posts_search" && !state.dom_session) {
+      await navigate(
+        "https://www.linkedin.com/search/results/content/?keywords=" +
+          encodeURIComponent(a.query) +
+          "&origin=FACETED_SEARCH",
+        true,
+      );
+    }
+    if (op === "post_resolve" && a.url) {
+      const url = new URL(a.url);
+      if (
+        url.protocol !== "https:" ||
+        url.hostname !== "www.linkedin.com" ||
+        !/^\/(feed\/update\/urn:li:(activity|ugcPost|share):\d+\/?|posts\/[^/]+\/?)$/.test(
+          decodeURIComponent(url.pathname),
+        )
+      )
+        throw new Fault("post_url_unsupported");
+      url.search = "";
+      url.hash = "";
+      await navigate(url.href);
+    }
     if (
       op === "scheduled_posts_list" ||
       op === "scheduled_post_cancel" ||
@@ -683,12 +851,12 @@ chrome.alarms.onAlarm.addListener(async () => {
   await engine.expireReceipts();
 });
 const initialized = (async () => {
-  if ((await store.get("schemaVersion")) !== 1) {
+  if ((await store.get("schemaVersion")) !== 2) {
     generation++;
     await chrome.storage.session.clear();
     await chrome.storage.local.remove("allowInboxChanges");
     // Schema migration is independent of release version; compatible updates keep the binding.
-    await store.set("schemaVersion", 1);
+    await store.set("schemaVersion", 2);
   }
   if (await store.get("connection")) connectHost();
 })();

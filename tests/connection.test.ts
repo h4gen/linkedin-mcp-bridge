@@ -201,7 +201,7 @@ it.each([false, true])(
   async (paused) => {
     const h = await harness({ paused, schema: "0.3.0", missing: true });
     expect(h.local.connection.paused).toBe(paused);
-    expect(h.local.schemaVersion).toBe(1);
+    expect(h.local.schemaVersion).toBe(2);
     const reply = (await h.request()).result;
     expect(reply.connected).toBe(!paused);
     if (paused) {

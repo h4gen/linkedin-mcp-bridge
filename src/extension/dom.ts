@@ -9,6 +9,7 @@ export async function domOperation(
     "invitation_respond",
     "invitation_withdraw",
     "conversation_delete",
+    "post_comment",
   ].includes(op);
   let mutationStarted = false;
   try {
@@ -152,6 +153,16 @@ export async function domOperation(
         entityUrn,
         scan_key: entityUrn ?? "local:" + String(hash >>> 0),
         text,
+        text_truncated: [...e.querySelectorAll("button")].some((b) =>
+          /^(…|\.\.\.)?\s*(more|mehr)$/i.test(b.textContent?.trim() ?? ""),
+        ),
+        post_kind: [...e.querySelectorAll("p")]
+          .slice(0, 3)
+          .some((p) =>
+            /reposted this|hat dies repostet/i.test(p.textContent ?? ""),
+          )
+          ? "repost"
+          : "original",
         author,
         author_profile_url: (() => {
           const link = e.querySelector<HTMLAnchorElement>(
@@ -175,7 +186,12 @@ export async function domOperation(
           return new Set(candidates).size === 1 ? candidates[0] : null;
         })(),
         published_at: e.querySelector("time")?.getAttribute("datetime") ?? null,
-        visible_time: e.querySelector("time")?.textContent?.trim() ?? null,
+        visible_time:
+          e.querySelector("time")?.textContent?.trim() ??
+          [...e.querySelectorAll("p")]
+            .map((p) => p.textContent?.trim() ?? "")
+            .find((t) => /^\d+\s*(s|m|h|d|w|mo|y)\s*•/.test(t)) ??
+          null,
         engagement: Array.from(
           e.querySelectorAll(
             '.social-details-social-counts, [aria-label*="reaction"], [aria-label*="comment"]',
@@ -202,8 +218,75 @@ export async function domOperation(
             ) ?? null,
       };
     };
-    if (op === "feed_list") {
-      if (!location.pathname.startsWith("/feed"))
+    if (["feed_list", "posts_search", "profile_posts_list"].includes(op)) {
+      if (op === "posts_search" && !state.dom_session) {
+        for (
+          let n = 0;
+          n < 12 &&
+          !matchingControls(document, /^Filter by (Sort by|Top Match|Latest)$/)
+            .length;
+          n++
+        )
+          await wait();
+        const configure = async (
+          name: RegExp,
+          value: string,
+          expected: string,
+        ) => {
+          button(document, name).click();
+          await wait();
+          const labels = [...document.querySelectorAll("p,label")].filter(
+            (e) => visible(e) && e.textContent?.trim() === value,
+          );
+          if (labels.length !== 1) fail("search_filter_unavailable");
+          (labels[0] as HTMLElement).click();
+          button(document, /^Show results$/).click();
+          for (let n = 0; n < 12; n++) {
+            await wait();
+            if (
+              matchingControls(
+                document,
+                new RegExp("^Filter by " + expected + "$"),
+              ).length === 1
+            )
+              return;
+          }
+          fail("search_filter_not_applied");
+        };
+        if (a.sort === "latest")
+          await configure(
+            /^Filter by (Sort by|Top Match|Latest)$/,
+            "Latest",
+            "Latest",
+          );
+        else if (
+          matchingControls(document, /^Filter by (Sort by|Top Match)$/)
+            .length !== 1
+        )
+          fail("search_filter_not_applied");
+        if (a.date_posted !== "any") {
+          const label = (
+            {
+              day: "Past 24 hours",
+              week: "Past week",
+              month: "Past month",
+            } as Record<string, string>
+          )[a.date_posted];
+          await configure(
+            /^Filter by (Date posted|Past 24 hours|Past week|Past month)$/,
+            label,
+            label,
+          );
+        }
+      }
+      if (
+        op === "posts_search" &&
+        !state.dom_session &&
+        a.date_posted === "any" &&
+        matchingControls(document, /^Filter by Date posted$/).length !== 1
+      )
+        fail("search_filter_not_applied");
+      if (op === "feed_list" && !location.pathname.startsWith("/feed"))
         fail("open_feed_in_connected_tab");
       const seen = new Set<string>(state.seen ?? []);
       if (seen.size >= 10000) fail("traversal_limit_reached");
@@ -217,7 +300,7 @@ export async function domOperation(
             !seen.has(p.scan_key) &&
             items.length < a.limit
           ) {
-            items.push(p);
+            items.push({ ...p, source: op });
             seen.add(p.scan_key);
           }
         if (items.length >= a.limit) break;
@@ -240,19 +323,40 @@ export async function domOperation(
       return {
         items,
         partial: true,
-        reason: "bounded_live_feed_scan",
+        reason:
+          op === "feed_list"
+            ? "bounded_live_feed_scan"
+            : "bounded_live_post_scan",
         next: items.length ? { seen: [...seen] } : undefined,
         scans: stagnant,
       };
     }
     if (op === "post_resolve") {
-      const matches = roots().filter(
-        (e) => postData(e).scan_key === a.scan_key,
+      const permalink = document.querySelector(
+        '[componentkey*="pagedCommentsContainer"]',
+      );
+      const matches = roots().filter((e) =>
+        a.url
+          ? !!identity(e) &&
+            (permalink?.contains(e) ||
+              (() => {
+                const decoded = decodeURIComponent(location.href),
+                  urn = identity(e)!;
+                return (
+                  decoded.includes(urn) ||
+                  decoded.includes("activity-" + urn.split(":").at(-1))
+                );
+              })())
+          : postData(e).scan_key === a.scan_key,
       );
       if (matches.length !== 1) fail("post_target_not_unique");
       const post = matches[0];
       const initial = postData(post);
-      if (initial.entityUrn) return initial;
+      if (initial.entityUrn)
+        return {
+          ...initial,
+          ...(a.url ? { url: location.origin + location.pathname } : {}),
+        };
       const trigger = post.querySelector<HTMLButtonElement>(
         'button[aria-label^="Open control menu for post by "]',
       );
@@ -319,62 +423,199 @@ export async function domOperation(
           );
       }
     }
-    if (op === "post_get") return postData(card());
+    if (op === "post_get") {
+      const root = card();
+      const more = [
+        ...root.querySelectorAll<HTMLButtonElement>("button"),
+      ].filter((b) =>
+        /^(…|\.\.\.)?\s*(more|mehr)$/i.test(b.textContent?.trim() ?? ""),
+      );
+      if (more.length === 1) {
+        more[0].click();
+        await wait();
+      }
+      return postData(root);
+    }
     if (op === "post_like") {
       const root = card();
       const b = button(
         root,
-        /^(Like|Unlike|Gefällt mir|Gefällt mir nicht mehr)(\s|$)/i,
+        /^(Like|Unlike|Gefällt mir|Gefällt mir nicht mehr)(\s|$)|^Reaction button state:/i,
       );
-      const active = b.getAttribute("aria-pressed") === "true";
+      const reactionState = (control: HTMLElement): boolean | null => {
+        const label = control.getAttribute("aria-label") ?? "";
+        if (label === "Reaction button state: no reaction") return false;
+        if (/^Reaction button state: .+/.test(label)) return true;
+        const pressed = control.getAttribute("aria-pressed");
+        return pressed === "true" ? true : pressed === "false" ? false : null;
+      };
+      const active = reactionState(b);
+      if (active === null) fail("reaction_state_unknown");
       if (active === a.liked) return { verified: true };
       b.click();
       await wait();
-      return { verified: b.getAttribute("aria-pressed") === String(a.liked) };
+      const current = button(
+        card(),
+        /^(Like|Unlike|Gefällt mir|Gefällt mir nicht mehr)(\s|$)|^Reaction button state:/i,
+      );
+      return { verified: reactionState(current) === a.liked };
     }
     if (op === "post_comment") {
-      const root = card();
-      const beforeComments = new Set([
-        ...root.querySelectorAll(
-          ".comments-comment-item,.comments-comment-entity",
-        ),
-      ]);
-      button(root, /^(Comment|Kommentieren)$/i).click();
-      await wait();
-      const fields = [
-        ...root.querySelectorAll<HTMLElement>(
-          '[contenteditable="true"][role="textbox"],.ql-editor[contenteditable="true"]',
-        ),
-      ].filter(visible);
-      if (fields.length !== 1) fail("comment_editor_not_unique");
-      fill(fields[0], a.text);
-      button(root, /^(Post|Comment|Kommentieren|Posten)$/i).click();
-      await wait();
-      const newComment = [
-        ...root.querySelectorAll(
-          ".comments-comment-item,.comments-comment-entity",
-        ),
-      ].find(
-        (e) =>
-          !beforeComments.has(e) &&
-          e
-            .querySelector(
-              ".comments-comment-item__main-content,.comments-comment-entity__content",
-            )
-            ?.textContent?.trim() === a.text,
+      const post = card();
+      const root =
+        post.closest('[componentkey*="pagedCommentsContainer"]') ?? post;
+      const selector =
+        '.comments-comment-item,.comments-comment-entity,[data-comment-urn],div[componentkey^="replaceableComment_"]';
+      const sourceId = (e: Element | null): string | null => {
+        if (!e) return null;
+        for (const attr of [
+          "componentkey",
+          "data-id",
+          "data-urn",
+          "data-comment-urn",
+          "id",
+        ]) {
+          const value = e.getAttribute(attr);
+          if (value && /urn:li:comment:/.test(value)) return value;
+        }
+        return null;
+      };
+      const ownControls = (scope: Element, pattern: RegExp) =>
+        matchingControls(scope, pattern).filter(
+          (e) => e.closest(selector) === scope,
+        );
+      let parent: Element | undefined;
+      let scope: Element = post;
+      if (a.parent_comment_id) {
+        if (
+          !/^(?:replaceableComment_)?urn:li:comment:/.test(a.parent_comment_id)
+        )
+          fail("comment_identity_not_stable");
+        let matches: Element[] = [];
+        // Bounded lookup; a missing or ambiguous target never falls back to a root comment.
+        for (let n = 0; n < 4; n++) {
+          matches = [...root.querySelectorAll(selector)].filter(
+            (e) => sourceId(e) === a.parent_comment_id,
+          );
+          if (matches.length || n === 3) break;
+          const more = matchingControls(
+            root,
+            /^(?:(?:Load|Show|View) )?(?:\d+ )?more comments?\b|^Weitere Kommentare|^Mehr Kommentare/i,
+          );
+          if (more.length !== 1) break;
+          more[0].click();
+          await wait();
+        }
+        if (matches.length !== 1) fail("parent_comment_not_unique");
+        parent = matches[0];
+        scope = parent;
+      }
+      const beforeIds = new Set(
+        [...root.querySelectorAll(selector)].map(sourceId).filter(Boolean),
       );
-      return {
-        verified:
-          !!newComment?.getAttribute("data-id") &&
+      const existingEditors = new Set([
+        ...root.querySelectorAll('[contenteditable="true"]'),
+      ]);
+      const triggers = parent
+        ? ownControls(parent, /^(Reply|Antworten)$/i)
+        : matchingControls(scope, /^(Comment|Kommentieren)$/i);
+      if (triggers.length !== 1) fail("comment_reply_control_not_unique");
+      triggers[0].click();
+      await wait();
+      const fieldsIn = (node: Element) =>
+        [
+          ...node.querySelectorAll<HTMLElement>(
+            '[contenteditable="true"][role="textbox"],.ql-editor[contenteditable="true"]',
+          ),
+        ].filter(visible);
+      let fields = fieldsIn(scope);
+      if (
+        parent &&
+        fields.length === 0 &&
+        parent.matches('div[componentkey^="replaceableComment_"]')
+      ) {
+        // Observed SDUI places a newly opened editor in a following LazyColumn row.
+        // Stay between this exact comment and the next comment; never select a global editor.
+        let row: Element = parent;
+        while (row.parentElement && row.parentElement !== root)
+          row = row.parentElement;
+        let sibling = row.nextElementSibling;
+        for (
+          let n = 0;
+          sibling && n < 3;
+          n++, sibling = sibling.nextElementSibling
+        ) {
+          if (sibling.matches(selector) || sibling.querySelector(selector))
+            break;
+          const candidates = fieldsIn(sibling).filter(
+            (e) => !existingEditors.has(e),
+          );
+          if (candidates.length) {
+            scope = sibling;
+            fields = candidates;
+            break;
+          }
+        }
+      }
+      if (fields.length !== 1) fail("comment_editor_not_unique");
+      if (
+        parent &&
+        (!parent.isConnected || sourceId(parent) !== a.parent_comment_id)
+      )
+        fail("parent_comment_changed");
+      fill(fields[0], a.text);
+      await wait();
+      let submitScope: Element | null = fields[0].parentElement;
+      let submits: HTMLElement[] = [];
+      while (submitScope && scope.contains(submitScope)) {
+        submits = matchingControls(
+          submitScope,
+          /^(Post|Comment|Reply|Antworten|Kommentieren|Posten)$/i,
+        ).filter((e) => !triggers.includes(e));
+        if (submits.length || submitScope === scope) break;
+        submitScope = submitScope.parentElement;
+      }
+      if (submits.length !== 1) fail("comment_submit_not_unique");
+      // Revalidate target and cancellation immediately before the irreversible click.
+      if (card() !== post || (parent && !parent.isConnected))
+        fail("parent_comment_changed");
+      if (a.execution_deadline && Date.now() >= a.execution_deadline)
+        fail("cancelled");
+      mutationStarted = true;
+      submits[0].click();
+      await wait();
+      const candidates = [...root.querySelectorAll(selector)].filter((e) => {
+        const id = sourceId(e);
+        const body = e.querySelector(
+          '.comments-comment-item__main-content,.comments-comment-entity__content,[data-testid="expandable-text-box"]',
+        );
+        return (
+          id &&
+          !beforeIds.has(id) &&
+          body?.textContent?.trim() === a.text &&
           !!a.verified_actor?.profile_url &&
-          Array.from(
-            newComment.querySelectorAll<HTMLAnchorElement>('a[href*="/in/"]'),
-          ).some(
+          [...e.querySelectorAll<HTMLAnchorElement>('a[href*="/in/"]')].some(
             (link) =>
               link.href.split(/[?#]/)[0].replace(/\/$/, "") ===
               a.verified_actor.profile_url.replace(/\/$/, ""),
-          ),
-        receipt_id: newComment?.getAttribute("data-id") ?? undefined,
+          )
+        );
+      });
+      const reply = candidates.length === 1 ? candidates[0] : undefined;
+      const verifiedParent = reply
+        ? sourceId(reply.parentElement?.closest(selector) ?? null)
+        : null;
+      return {
+        verified:
+          !!reply && (!parent || verifiedParent === a.parent_comment_id),
+        receipt_id: reply ? sourceId(reply) : undefined,
+        post_urn: a.post_urn,
+        ...(parent
+          ? {
+              parent_comment_id: verifiedParent,
+              parent_relation: verifiedParent ? "known" : "unknown",
+            }
+          : {}),
       };
     }
     const readyUntil = Math.min(

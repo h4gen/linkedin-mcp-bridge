@@ -1,3 +1,4 @@
+import { newestFirst, exactPeer } from "./read-models.js";
 import { Args, Fault, Operation } from "./contracts.js";
 import { collection, normalize, restli } from "./normalize.js";
 export type Request = {
@@ -27,6 +28,82 @@ export async function readApi(
   fetch: Fetcher,
 ): Promise<Args> {
   let raw: any;
+  if (op === "message_get") {
+    let cursor: Args = state.before ? { before: state.before } : {};
+    for (let n = 0; n < 3; n++) {
+      const page = await readApi(
+        "messages_list",
+        { ...a, limit: 50 },
+        cursor,
+        fetch,
+      );
+      const row = page.items.find((m: Args) => m.entityUrn === a.message_urn);
+      if (row) return { message: row, conversation_urn: a.conversation_urn };
+      if (!page.next)
+        throw new Fault(
+          page.partial ? "message_lookup_incomplete" : "message_not_found",
+        );
+      cursor = page.next;
+    }
+    throw new Fault("message_lookup_incomplete");
+  }
+  if (op === "conversations_find") {
+    let index = state.category_index ?? 0;
+    let source = state.source ?? {};
+    const seen = new Set<string>(state.seen ?? []);
+    const buffered = [...(state.buffered ?? [])];
+    let scanned = 0;
+    const checked = new Set<string>();
+    for (
+      let n = 0;
+      n < 3 && index < a.categories.length && buffered.length < a.limit;
+      n++
+    ) {
+      const category = a.categories[index];
+      checked.add(category);
+      const page = await readApi(
+        "conversations_list",
+        { account_urn: a.account_urn, category, limit: 20 },
+        source,
+        fetch,
+      );
+      scanned += page.scanned;
+      for (const row of page.items)
+        if (
+          !seen.has(row.entityUrn) &&
+          exactPeer(row, a.account_urn, a.profile_urn)
+        ) {
+          seen.add(row.entityUrn);
+          buffered.push({ ...row, category });
+        }
+      if (!page.next) {
+        index++;
+        source = {};
+      } else {
+        if (page.next.nextCursor === source.nextCursor)
+          throw new Fault("pagination_stalled");
+        source = page.next;
+      }
+    }
+    const remaining = buffered.slice(a.limit),
+      more = index < a.categories.length || remaining.length > 0;
+    return {
+      items: buffered.slice(0, a.limit),
+      scanned,
+      checked_categories: [...checked],
+      partial: more,
+      completeness: more ? "more_available" : "source_exhausted",
+      next: more
+        ? {
+            category_index: index,
+            source,
+            seen: [...seen],
+            buffered: remaining,
+          }
+        : undefined,
+    };
+  }
+
   if (op === "messages_list" && (state.exhausted || state.buffered?.length)) {
     const items = (state.buffered ?? []).slice(0, a.limit);
     const remaining = (state.buffered ?? []).slice(a.limit);
@@ -137,20 +214,22 @@ export async function readApi(
         "/identity/dash/profiles?" +
         new URLSearchParams({
           q: "memberIdentity",
-          memberIdentity: a.public_identifier,
+          memberIdentity:
+            a.public_identifier ?? a.profile_urn?.split(":").at(-1),
           decorationId:
             "com.linkedin.voyager.dash.deco.identity.profile.WebTopCardCore-19",
         }),
     });
     const normalized = normalize(rawProfile);
-    const matches = normalized.entities.filter(
-      (x: Args) => x.publicIdentifier === a.public_identifier,
-    );
+    const matchesProfile = (x: Args) =>
+      a.public_identifier
+        ? x.publicIdentifier === a.public_identifier
+        : x.entityUrn?.replace("fs_miniProfile", "fsd_profile") ===
+          a.profile_urn;
+    const matches = normalized.entities.filter(matchesProfile);
     const candidates = matches.length
       ? matches
-      : collection(rawProfile).items.filter(
-          (x: Args) => x.publicIdentifier === a.public_identifier,
-        );
+      : collection(rawProfile).items.filter(matchesProfile);
     if (candidates.length !== 1) throw new Fault("profile_not_unique");
     const p = candidates[0];
     return {
@@ -160,6 +239,8 @@ export async function readApi(
         headline: p.headline ?? p.occupation ?? null,
         profile_url: "https://www.linkedin.com/in/" + p.publicIdentifier + "/",
         public_identifier: p.publicIdentifier,
+        location:
+          p.geoLocation?.geo?.defaultLocalizedName ?? p.locationName ?? null,
       },
     };
   }
@@ -286,19 +367,24 @@ export async function readApi(
     if (c.metadata.nextCursor) next = { nextCursor: c.metadata.nextCursor };
   } else if (op === "messages_list") {
     const seen = new Set<string>(state.seen ?? []);
-    const fresh = items.filter(
-      (x) => typeof x.entityUrn === "string" && !seen.has(x.entityUrn),
-    );
-    const available = [...(state.buffered ?? []), ...fresh];
+    const fresh = items.filter((x) => {
+      if (typeof x.entityUrn !== "string" || seen.has(x.entityUrn))
+        return false;
+      seen.add(x.entityUrn);
+      return true;
+    });
+    const available = newestFirst([...(state.buffered ?? []), ...fresh]);
     items = available.slice(0, a.limit);
     fresh.forEach((x) => seen.add(x.entityUrn));
     const times = c.items
       .map((x) => x.deliveredAt)
       .filter((x) => typeof x === "number");
     const before = times.length ? Math.min(...times) + 1 : undefined;
+    const missingTime = c.items.some((x) => typeof x.deliveredAt !== "number");
     const more = c.items.length >= 50;
     const stalled =
-      more && before !== undefined && before >= (state.before ?? Infinity);
+      missingTime ||
+      (more && (before === undefined || before >= (state.before ?? Infinity)));
     if (available.length > a.limit || (more && !stalled))
       next = {
         before,
@@ -553,19 +639,7 @@ export async function reconcileMessage(
           fetch,
         );
         for (const thread of page.items) {
-          const source =
-            thread.conversationParticipants ?? thread.participants ?? [];
-          const participants = (
-            Array.isArray(source) ? source : (source.elements ?? [])
-          )
-            .map(
-              (p: Args) =>
-                p.hostIdentityUrn ??
-                p.participantType?.member?.entityUrn ??
-                p.member?.entityUrn,
-            )
-            .filter((urn: string) => urn !== row.account_urn);
-          if (participants.length === 1 && participants[0] === row.target)
+          if (exactPeer(thread, row.account_urn, row.target))
             yield thread.entityUrn;
         }
         if (!page.next) break;

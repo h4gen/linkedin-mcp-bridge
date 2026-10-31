@@ -60,7 +60,7 @@ it("serves all typed tools through actual MCP stdio", async () => {
   try {
     await client.connect(transport);
     const result = await client.listTools();
-    expect(result.tools).toHaveLength(27);
+    expect(result.tools).toHaveLength(32);
     expect(result.tools.every((x) => x.outputSchema)).toBe(true);
     expect(
       result.tools.some((x) => x.name.startsWith("linkedin_extraction_")),
@@ -365,7 +365,7 @@ it("migrates old drafts without dispatch and retains mutation receipts", async (
   expect(status.version).toBe("0.5.0");
   expect(local.journal.old).toEqual(receipt);
   expect(local.connection.paused).toBe(false);
-  expect(local.schemaVersion).toBe(1);
+  expect(local.schemaVersion).toBe(2);
   expect(local.allowInboxChanges).toBeUndefined();
   expect(session).toEqual({});
   expect(dispatched).toBe(0);

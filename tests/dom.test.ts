@@ -189,3 +189,102 @@ it("returns missing scan targets as serializable errors across executeScript", a
     bridge_error: "post_target_not_unique",
   });
 });
+
+it("refuses a session-only parent before opening an editor", async () => {
+  page('<div data-urn="urn:li:activity:123"><button>Comment</button></div>');
+  const result = await domOperation(
+    "post_comment",
+    {
+      post_urn: "urn:li:activity:123",
+      parent_comment_id: "session:abc",
+      text: "Never send",
+    },
+    {},
+  );
+  expect(result.bridge_error).toBe("comment_identity_not_stable");
+});
+it("never falls back to a top-level comment when the parent is absent", async () => {
+  const dom = page(
+    '<div data-urn="urn:li:activity:123"><button>Comment</button></div>',
+  );
+  const click = vi.fn();
+  dom.window.document.querySelector("button")!.addEventListener("click", click);
+  const result = await domOperation(
+    "post_comment",
+    {
+      post_urn: "urn:li:activity:123",
+      parent_comment_id: "urn:li:comment:missing",
+      text: "Never send",
+    },
+    {},
+  );
+  expect(result.bridge_error).toBe("parent_comment_not_unique");
+  expect(click).not.toHaveBeenCalled();
+});
+it("rejects duplicate parent identities even when comments have the same text", async () => {
+  page(
+    '<div data-urn="urn:li:activity:123"><div class="comments-comment-item" data-id="urn:li:comment:1">same</div><div class="comments-comment-item" data-id="urn:li:comment:1">same</div></div>',
+  );
+  const result = await domOperation(
+    "post_comment",
+    {
+      post_urn: "urn:li:activity:123",
+      parent_comment_id: "urn:li:comment:1",
+      text: "Never send",
+    },
+    {},
+  );
+  expect(result.bridge_error).toBe("parent_comment_not_unique");
+});
+
+it("replies only below the exact stable parent despite identical comment text", async () => {
+  const dom = page(
+    '<div data-urn="urn:li:activity:123"><button>Comment</button><article class="comments-comment-entity" data-id="urn:li:comment:one"><p>Same text</p><button>Reply</button></article><article class="comments-comment-entity" data-id="urn:li:comment:two"><p>Same text</p><button>Reply</button></article></div>',
+  );
+  dom.window.Element.prototype.getClientRects = () => [{}] as any;
+  for (const name of ["HTMLTextAreaElement", "HTMLInputElement", "InputEvent"])
+    vi.stubGlobal(name, (dom.window as any)[name]);
+  const parent = dom.window.document.querySelector(
+    '[data-id="urn:li:comment:two"]',
+  )!;
+  const wrong = vi.fn();
+  dom.window.document
+    .querySelector('[data-id="urn:li:comment:one"] button')!
+    .addEventListener("click", wrong);
+  let sent = 0;
+  parent.querySelector("button")!.addEventListener("click", () => {
+    const editor = dom.window.document.createElement("div");
+    editor.setAttribute("contenteditable", "true");
+    editor.setAttribute("role", "textbox");
+    parent.append(editor);
+    const submit = dom.window.document.createElement("button");
+    submit.textContent = "Post";
+    parent.append(submit);
+    submit.onclick = () => {
+      sent++;
+      const child = dom.window.document.createElement("article");
+      child.className = "comments-comment-entity";
+      child.setAttribute("data-id", "urn:li:comment:reply");
+      child.innerHTML =
+        '<a href="/in/me/">Me</a><div class="comments-comment-entity__content">Targeted reply</div>';
+      parent.append(child);
+    };
+  });
+  const r = await domOperation(
+    "post_comment",
+    {
+      post_urn: "urn:li:activity:123",
+      parent_comment_id: "urn:li:comment:two",
+      text: "Targeted reply",
+      verified_actor: { profile_url: "https://www.linkedin.com/in/me/" },
+    },
+    {},
+  );
+  expect(r).toMatchObject({
+    verified: true,
+    receipt_id: "urn:li:comment:reply",
+    parent_comment_id: "urn:li:comment:two",
+  });
+  expect(sent).toBe(1);
+  expect(wrong).not.toHaveBeenCalled();
+});
