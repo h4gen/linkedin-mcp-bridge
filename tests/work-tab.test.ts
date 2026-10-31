@@ -4,7 +4,7 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
-function fixture() {
+function fixture(ready?: (id: number, url: string) => Promise<boolean>) {
   let generation = 0;
   const data: any = { connection: { tabId: 1, account: "me", paused: false } };
   const tab: any = {
@@ -24,6 +24,7 @@ function fixture() {
   const verify = vi.fn(async () => {}),
     invalidate = vi.fn(async () => {});
   const ensure = workTab({
+    ready,
     store: {
       get: async (k) => data[k],
       set: async (k, v) => {
@@ -94,4 +95,24 @@ it("revives a discarded work tab without replacing it", async () => {
   expect(await f.ensure()).toBe(2);
   expect(f.tabs.reload).toHaveBeenCalledExactlyOnceWith(2);
   expect(f.tabs.create).not.toHaveBeenCalled();
+});
+
+it("accepts an interactive exact document despite lingering resource loads", async () => {
+  const ready = vi.fn(async () => true),
+    f = fixture(ready);
+  f.tab.status = "loading";
+  expect(await f.ensure()).toBe(2);
+  expect(ready).toHaveBeenCalledWith(2, "https://www.linkedin.com/feed/");
+  expect(f.verify).toHaveBeenCalledTimes(1);
+});
+it("never mistakes the old interactive document for a pending navigation", async () => {
+  vi.useFakeTimers();
+  const ready = vi.fn(async () => true),
+    f = fixture(ready);
+  f.tab.status = "loading";
+  f.tab.pendingUrl = "https://www.linkedin.com/in/next/";
+  const result = f.ensure().catch((e) => e);
+  await vi.advanceTimersByTimeAsync(20100);
+  expect((await result).code).toBe("work_tab_loading_timeout");
+  expect(ready).not.toHaveBeenCalled();
 });

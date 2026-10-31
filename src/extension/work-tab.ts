@@ -7,6 +7,7 @@ export function workTab(deps: {
   generation: () => number;
   verify: (id: number, account: string) => Promise<void>;
   invalidate: () => Promise<void>;
+  ready?: (id: number, url: string) => Promise<boolean>;
 }) {
   let pending: Promise<number> | undefined;
   async function resolve() {
@@ -46,6 +47,8 @@ export function workTab(deps: {
     const deadline = Date.now() + 20000;
     while (tab.status !== "complete") {
       check();
+      if (!tab.pendingUrl && tab.url && (await deps.ready?.(id, tab.url)))
+        break;
       if (Date.now() >= deadline) throw new Fault("work_tab_loading_timeout");
       await new Promise((resolve) => setTimeout(resolve, 100));
       tab = await chrome.tabs.get(id).catch(() => {

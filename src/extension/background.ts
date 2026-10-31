@@ -54,7 +54,24 @@ async function browserFetch(id: number, request: Request) {
     );
   }
 }
+async function documentReady(id: number, url: string) {
+  try {
+    const result = await chrome.scripting.executeScript({
+      target: { tabId: id },
+      world: "ISOLATED",
+      func: (expected: string) =>
+        location.href === expected &&
+        document.readyState !== "loading" &&
+        !!document.body,
+      args: [url],
+    });
+    return result[0]?.result === true;
+  } catch {
+    return false;
+  }
+}
 const tabId = workTab({
+  ready: documentReady,
   store,
   generation: () => generation,
   verify: async (id, account) => {
@@ -186,7 +203,12 @@ const engine = new Engine({
       for (let n = 0; n < 80; n++) {
         check();
         const current = await chrome.tabs.get(id);
-        if (current.status === "complete" && current.url === url) return;
+        if (
+          current.url === url &&
+          (current.status === "complete" ||
+            (!current.pendingUrl && (await documentReady(id, url))))
+        )
+          return;
         if (current.url && /\/(login|checkpoint)/.test(current.url))
           throw new Fault("not_logged_in");
         await new Promise((r) => setTimeout(r, 250));
