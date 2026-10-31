@@ -21,8 +21,16 @@ export interface Store {
 }
 export interface Deps {
   store: Store;
-  fetch: Fetcher;
-  dom: (op: Operation, args: Args, state: Args) => Promise<Args>;
+  fetch: (
+    request: Parameters<Fetcher>[0],
+    check?: () => void,
+  ) => ReturnType<Fetcher>;
+  dom: (
+    op: Operation,
+    args: Args,
+    state: Args,
+    check?: () => void,
+  ) => Promise<Args>;
   account: () => Promise<string | undefined>;
   now: () => number;
   uuid: () => string;
@@ -86,7 +94,11 @@ export class Engine {
       },
       fetch: async (request) => {
         check();
-        return this.d.fetch(request);
+        return this.d.fetch(request, check);
+      },
+      dom: async (op, args, state) => {
+        check();
+        return this.d.dom(op, args, state, check);
       },
     };
     const check = () => {

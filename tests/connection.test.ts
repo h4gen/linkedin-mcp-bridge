@@ -267,3 +267,60 @@ it("explicit disconnect prevents scheduled reconnect and tab recovery", async ()
   expect(h.ports).toHaveLength(1);
   expect(h.chrome.tabs.create).not.toHaveBeenCalled();
 });
+
+it("recovers when the tab vanishes between lookup and read injection", async () => {
+  const h = await harness();
+  h.chrome.scripting.executeScript.mockImplementationOnce(async () => {
+    h.tabs.clear();
+    throw Error("No tab with id: 10.");
+  });
+  expect((await h.request()).result.connected).toBe(true);
+  expect(h.chrome.tabs.create).toHaveBeenCalledTimes(1);
+});
+it("cancels queued work belonging to a dead native port", async () => {
+  vi.useFakeTimers();
+  const h = await harness();
+  const read = h.request();
+  const queuedWrite = h.request("message_send", {
+    account_urn: account,
+    recipient_urn: "urn:li:fsd_profile:friend",
+    expected_participant_urns: ["urn:li:fsd_profile:friend"],
+    text: "Never send",
+    idempotency_key: "dead-port-queue",
+  });
+  h.ports[0].close();
+  await vi.advanceTimersByTimeAsync(5000);
+  await Promise.all([read, queuedWrite]);
+  expect(h.chrome.scripting.executeScript).not.toHaveBeenCalled();
+  expect(h.local.journal).toBeUndefined();
+});
+
+it("stops a request that loses its host while waiting for request pacing", async () => {
+  vi.useFakeTimers();
+  const h = await harness();
+  const first = h.request();
+  await vi.advanceTimersByTimeAsync(1);
+  await first;
+  h.chrome.scripting.executeScript.mockClear();
+  const paced = h.request();
+  await vi.advanceTimersByTimeAsync(100);
+  h.ports[0].close();
+  await vi.advanceTimersByTimeAsync(2000);
+  await paced;
+  expect(h.chrome.scripting.executeScript).not.toHaveBeenCalled();
+});
+it("survives twenty successive host and tab losses without accumulating tabs", async () => {
+  vi.useFakeTimers();
+  const h = await harness();
+  for (let i = 0; i < 20; i++) {
+    h.tabs.clear();
+    h.ports.at(-1).close();
+    await vi.advanceTimersByTimeAsync(1000);
+    const pending = h.request();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect((await pending).result.connected).toBe(true);
+    expect(h.tabs.size).toBe(1);
+  }
+  expect(h.ports).toHaveLength(21);
+  expect(h.chrome.tabs.create).toHaveBeenCalledTimes(20);
+});

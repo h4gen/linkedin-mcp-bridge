@@ -72,7 +72,8 @@ const tabId = workTab({
     if (keys.length) await chrome.storage.session.remove(keys);
   },
 });
-async function fetchRequest(r: Request) {
+async function fetchRequest(r: Request, check = () => {}) {
+  check();
   const requestGeneration = generation;
   const blocked = await store.get("blockedUntil");
   if (blocked > Date.now())
@@ -83,9 +84,26 @@ async function fetchRequest(r: Request) {
     setTimeout(r, Math.max(0, lastRequest + 1000 - Date.now())),
   );
   lastRequest = Date.now();
-  const id = await tabId();
-  if (generation !== requestGeneration) throw new Fault("cancelled");
-  const out = await browserFetch(id, r);
+  async function attempt() {
+    const id = await tabId();
+    if (generation !== requestGeneration) throw new Fault("cancelled");
+    check();
+    return browserFetch(id, r);
+  }
+  let out;
+  try {
+    out = await attempt();
+  } catch (e) {
+    // A tab may disappear after lookup. Replay only the API GET, not the
+    // surrounding operation, cursor traversal, or any dispatched mutation.
+    if (
+      r.method ||
+      !(e instanceof Fault) ||
+      !["browser_execution_failed", "work_tab_unavailable"].includes(e.code)
+    )
+      throw e;
+    out = await attempt();
+  }
   if (generation !== requestGeneration) throw new Fault("cancelled");
   const result = out[0]?.result;
   if (result?.error) {
@@ -151,8 +169,9 @@ const engine = new Engine({
   cursorContext: validateDomCursor,
   store,
   fetch: fetchRequest,
-  dom: async (op, a, state) => {
+  dom: async (op, a, state, check = () => {}) => {
     const id = await tabId();
+    check();
     if (state.dom_session) await validateDomCursor(op, state);
     await chrome.tabs.update(id, { active: true });
     if (
@@ -365,6 +384,7 @@ const engine = new Engine({
         }
       }
     }
+    check();
     const session = state.dom_session ?? crypto.randomUUID();
     if (!state.dom_session) {
       await chrome.scripting.executeScript({
@@ -401,6 +421,7 @@ const engine = new Engine({
         args: [session],
       });
     }
+    check();
     const result = await chrome.scripting.executeScript({
       target: { tabId: id },
       world: "ISOLATED",
@@ -478,7 +499,6 @@ const engine = new Engine({
       .map((x) => x.toString(16).padStart(2, "0"))
       .join(""),
 });
-const cancelled = new Set<string>();
 let port: chrome.runtime.Port | undefined;
 let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 let reconnectDelay = 1000;
@@ -496,15 +516,19 @@ function connectHost() {
   try {
     port = chrome.runtime.connectNative(HOST);
     const connectedPort = port;
+    const active = new Set<string>();
+    const cancelled = new Set<string>();
     port.onMessage.addListener(async (msg) => {
       reconnectDelay = 1000;
       nativeError = undefined;
       if (msg?.cancel) {
-        cancelled.add(msg.cancel);
+        if (active.has(msg.cancel)) cancelled.add(msg.cancel);
         return;
       }
       if (!msg || typeof msg.id !== "string" || typeof msg.op !== "string")
         return;
+      if (active.has(msg.id)) return;
+      active.add(msg.id);
       const current = connectedPort;
       try {
         if (msg.protocol !== PROTOCOL || msg.hostVersion !== VERSION)
@@ -516,7 +540,7 @@ function connectHost() {
           msg.op,
           msg.args,
           Math.min(Number(msg.deadline) || 0, Date.now() + 60000),
-          () => cancelled.has(msg.id),
+          () => port !== connectedPort || cancelled.has(msg.id),
         );
         if (
           new TextEncoder().encode(JSON.stringify(result)).byteLength >
@@ -538,6 +562,7 @@ function connectHost() {
             },
           });
       } finally {
+        active.delete(msg.id);
         cancelled.delete(msg.id);
       }
     });
@@ -653,8 +678,9 @@ chrome.alarms.onAlarm.addListener(async () => {
       (v as { expires: number }).expires < Date.now()
     )
       await chrome.storage.session.remove(k);
-  await engine.expireReceipts();
+  // Connection recovery must not wait behind a busy operation queue.
   if (await store.get("connection")) connectHost();
+  await engine.expireReceipts();
 });
 const initialized = (async () => {
   if ((await store.get("schemaVersion")) !== 1) {

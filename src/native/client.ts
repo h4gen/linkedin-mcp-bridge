@@ -1,3 +1,4 @@
+import { capabilities } from "../core/capabilities.js";
 import { writes, type Operation } from "../core/contracts.js";
 import { StringDecoder } from "node:string_decoder";
 import net from "node:net";
@@ -13,15 +14,32 @@ export async function call(
     throw Error("bridge_unavailable_open_extension");
   });
   const outcome = writes.has(op as Operation) ? "_unknown_outcome" : "";
-  // Only retry opening the socket: no request has been dispatched at this stage.
-  const until = Date.now() + 10000;
+  // Opening a socket is always retryable. Only idempotent API reads and health
+  // may also be replayed once after transport loss; DOM traversals and writes never are.
+  const safeRead =
+    op === "health" ||
+    (capabilities[op as Operation]?.adapter === "api" &&
+      !writes.has(op as Operation));
+  let replayedRead = false;
+  const deadline = Date.now() + 70000;
+  const until = Date.now() + 35000; // Covers the extension's capped 30-second backoff.
   let delay = 250;
   while (true) {
     try {
       return await exchange();
     } catch (e) {
-      if (!(e as any)?.beforeDispatch || Date.now() >= until || signal?.aborted)
+      const retryRead =
+        safeRead &&
+        !replayedRead &&
+        e instanceof Error &&
+        e.message === "bridge_disconnected";
+      if (
+        (!(e as any)?.beforeDispatch && !retryRead) ||
+        Date.now() >= until ||
+        signal?.aborted
+      )
         throw e;
+      if (retryRead) replayedRead = true;
       await new Promise<void>((resolve) => {
         const done = () => {
           clearTimeout(timer);
@@ -55,16 +73,20 @@ export async function call(
         err ? reject(err) : resolve(result);
       };
       const abort = () => finish(Error("cancelled" + outcome));
-      const timer = setTimeout(() => finish(Error("timeout" + outcome)), 70000);
+      const timer = setTimeout(
+        () => finish(Error("timeout" + outcome)),
+        Math.max(0, deadline - Date.now()),
+      );
       signal?.addEventListener("abort", abort, { once: true });
       socket.once("connect", () => {
+        if (finished) return;
         dispatched = true;
         socket.write(JSON.stringify({ id, op, args, token }) + "\n");
       });
       socket.on("data", (b) => {
         buf += textDecoder.write(b);
         if (buf.length > 8 * 1024 * 1024) {
-          finish(Error("response_too_large"));
+          finish(Error("response_too_large" + outcome));
           return;
         }
         const i = buf.indexOf("\n");
@@ -80,7 +102,7 @@ export async function call(
               )
             : finish(undefined, reply.result);
         } catch {
-          finish(Error("invalid_host_response"));
+          finish(Error("invalid_host_response" + outcome));
         }
       });
       socket.on("error", (e: NodeJS.ErrnoException) =>

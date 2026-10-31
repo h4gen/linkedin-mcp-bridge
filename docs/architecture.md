@@ -49,3 +49,9 @@ All 27 operations are exposed in every build. The approval module, review UI, in
 ## 0.5 native post planning
 
 The self-contained composer adapter owns native draft save/reopen, time confirmation, schedule listing and exact cancellation. It rejects immediate publish controls. The Engine binds schedule references to account, normalized text hash and timestamp, stores them without post bodies and expires them seven days after their scheduled time. Unknown planning receipts reconcile without redispatch. `post_create` is removed from the contract and executable adapter.
+
+### Transient failure recovery
+
+The client waits up to 35 seconds for a native-host socket, covering the extension's capped 30-second reconnect backoff. Health and registry-classified API reads can be replayed once after a transport disconnect, with identical arguments and a shared 70-second request deadline. DOM traversals and mutations are never replayed. Corrupted mutation responses retain unknown-outcome semantics.
+
+Native-port ownership is part of operation cancellation. Requests queued on a dead port cannot run on its replacement, and API/DOM adapters recheck cancellation immediately before dispatch after pacing or navigation. A vanished tab between lookup and API GET injection gets one recovery attempt. Existing account, pause, receipt, and cursor protections remain in force. Reconnect does not wait behind receipt cleanup in the operation queue.
