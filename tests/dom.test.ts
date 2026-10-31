@@ -435,35 +435,38 @@ it("recognizes SDUI search filters named by their child label", async () => {
   expect(r.items[0].source).toBe("posts_search");
 });
 
-it("resolves a scan through a newly observed copy-link toast without guessing its post ID", async () => {
-  const dom = page(
-    '<div role="listitem"><button aria-label="Open control menu for post by Author"></button><p data-testid="expandable-text-box">Source text</p></div>',
-  );
-  dom.window.Element.prototype.getClientRects = () => [{}] as any;
-  const trigger = dom.window.document.querySelector("button")!;
-  trigger.onclick = () => {
-    const menu = dom.window.document.createElement("div");
-    menu.setAttribute("role", "menu");
-    menu.innerHTML = '<button role="menuitem">Copy link to post</button>';
-    menu.querySelector("button")!.onclick = () => {
-      const toast = dom.window.document.createElement("div");
-      toast.setAttribute("role", "alert");
-      toast.innerHTML =
-        '<p>Link copied to clipboard.<a href="https://www.linkedin.com/safety/go/?url=https%3A%2F%2Flnkd.in%2Fp%2Fexample">View post</a></p>';
-      dom.window.document.body.append(toast);
-      menu.remove();
+it.each(["", "shareId=123", "ugcPostId=123"])(
+  "resolves a scan with identity %s through its fresh native copy-link toast",
+  async (sourceId) => {
+    const dom = page(
+      `<div role="listitem" componentkey="${sourceId}"><button aria-label="Open control menu for post by Author"></button><p data-testid="expandable-text-box">Source text</p></div>`,
+    );
+    dom.window.Element.prototype.getClientRects = () => [{}] as any;
+    const trigger = dom.window.document.querySelector("button")!;
+    trigger.onclick = () => {
+      const menu = dom.window.document.createElement("div");
+      menu.setAttribute("role", "menu");
+      menu.innerHTML = '<button role="menuitem">Copy link to post</button>';
+      menu.querySelector("button")!.onclick = () => {
+        const toast = dom.window.document.createElement("div");
+        toast.setAttribute("role", "alert");
+        toast.innerHTML =
+          '<p>Link copied to clipboard.<a href="https://www.linkedin.com/safety/go/?url=https%3A%2F%2Flnkd.in%2Fp%2Fexample">View post</a></p>';
+        dom.window.document.body.append(toast);
+        menu.remove();
+      };
+      dom.window.document.body.append(menu);
     };
-    dom.window.document.body.append(menu);
-  };
-  const feed = await domOperation("feed_list", { limit: 1 }, {});
-  const r = await domOperation(
-    "post_resolve",
-    { scan_key: feed.items[0].scan_key },
-    {},
-  );
-  expect(r).toEqual({
-    resolve_url: "https://lnkd.in/p/example",
-    source_author: "Author",
-    source_text_prefix: "Source text",
-  });
-});
+    const feed = await domOperation("feed_list", { limit: 1 }, {});
+    const r = await domOperation(
+      "post_resolve",
+      { scan_key: feed.items[0].scan_key },
+      {},
+    );
+    expect(r).toEqual({
+      resolve_url: "https://lnkd.in/p/example",
+      source_author: "Author",
+      source_text_prefix: "Source text",
+    });
+  },
+);

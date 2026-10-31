@@ -396,7 +396,14 @@ export async function domOperation(
         !initial.text.replace(/\s+/g, " ").startsWith(a.expected_text_prefix)
       )
         fail("post_resolution_mismatch");
-      if (initial.entityUrn)
+      // A native share/ugcPost ID alone is not a navigable reference. Resolve
+      // its observed permalink before returning it to the next primitive.
+      if (
+        initial.entityUrn &&
+        (initial.url ||
+          a.url ||
+          initial.entityUrn.startsWith("urn:li:activity:"))
+      )
         return {
           ...initial,
           ...(a.url ? { url: location.origin + location.pathname } : {}),
