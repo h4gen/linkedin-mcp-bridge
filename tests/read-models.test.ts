@@ -1,3 +1,4 @@
+import { expectedTools } from "./expected-tools.js";
 import { it, expect } from "vitest";
 import {
   conversationView,
@@ -118,42 +119,7 @@ it("requires exactly one profile or post reference", () => {
   ).toThrow("choose_post_reference");
 });
 it("exposes the explicit expected 32 primitive contracts", () => {
-  expect(Object.keys(schemas).sort()).toEqual(
-    [
-      "health",
-      "conversations_list",
-      "conversations_search",
-      "conversations_find",
-      "conversations_get",
-      "messages_list",
-      "message_get",
-      "message_send",
-      "conversation_update",
-      "conversation_delete",
-      "profile_get",
-      "people_search",
-      "people_search_filters",
-      "profile_posts_list",
-      "relationship_get",
-      "invitations_list",
-      "invitation_send",
-      "invitation_respond",
-      "invitation_withdraw",
-      "feed_list",
-      "posts_search",
-      "post_resolve",
-      "post_get",
-      "post_draft_create",
-      "post_schedule",
-      "scheduled_posts_list",
-      "scheduled_post_cancel",
-      "post_like",
-      "post_comment",
-      "comments_list",
-      "reactions_list",
-      "operation_get",
-    ].sort(),
-  );
+  expect(Object.keys(schemas).sort()).toEqual([...expectedTools].sort());
 });
 
 it("requires the previous revision for continuation windows", async () => {

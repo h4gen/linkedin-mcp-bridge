@@ -1,3 +1,4 @@
+import { expectedTools } from "./expected-tools.js";
 import { platformPaths } from "../src/native/platform.js";
 import { it, expect } from "vitest";
 import vm from "node:vm";
@@ -60,7 +61,9 @@ it("serves all typed tools through actual MCP stdio", async () => {
   try {
     await client.connect(transport);
     const result = await client.listTools();
-    expect(result.tools).toHaveLength(32);
+    expect(result.tools.map((tool) => tool.name).sort()).toEqual(
+      expectedTools.map((name) => "linkedin_" + name).sort(),
+    );
     expect(result.tools.every((x) => x.outputSchema)).toBe(true);
     expect(
       result.tools.some((x) => x.name.startsWith("linkedin_extraction_")),
