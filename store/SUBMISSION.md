@@ -1,6 +1,10 @@
-# Chrome Web Store draft — 0.7.0 preparation
+# Chrome Web Store draft — 0.7.0
 
-The existing 0.6.0 listing was saved in the Chrome Web Store Developer Dashboard on 2026-10-30. The 0.7.0 package is being prepared locally; portal package version must be verified separately. Status: Draft. Nothing submitted for review or published.
+The existing listing remains a Draft. On 2026-10-31 the dashboard showed package 0.6.0, the existing listing and all five explainers. The cumulative 0.7.0 Store ZIP was built locally and selected for upload; Google then required a renewed personal passkey sign-in. Until that sign-in and the resulting package version are verified, the portal update is unconfirmed. Nothing was submitted for review or published.
+
+Local 0.7.0 package: `artifacts/store-0.7.0/linkedin-extension.zip`, SHA-256 `96dd8c30746953f7dbd83f5fa6d7658ed0593b05a999d7958d0f8fc38f1c3f9d`. Its pilot-channel build metadata and `store-check.json` are alongside it. Runtime fingerprint: `52da5d75629b8af52d99be94397f9b7a0060d91ebe68c343cd1a4a54637d199c`.
+
+The Store check passes assets, package, metadata and both platform installation prerequisites, but still blocks submission for eleven missing final-runtime write capability proofs. All 21 read/diagnostic capabilities have current live evidence. See `docs/validation.md` for exact scope and the separate pending recipient reply/invitation acceptance.
 
 - Draft: https://chrome.google.com/webstore/devconsole/ca8c63eb-664b-4353-ac7c-af776311ddff/pibhcinkiadfplcaefllaeappkpnpfjm/edit
 - Assigned extension ID: `pibhcinkiadfplcaefllaeappkpnpfjm`.
