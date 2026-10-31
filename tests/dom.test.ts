@@ -288,3 +288,17 @@ it("replies only below the exact stable parent despite identical comment text", 
   expect(sent).toBe(1);
   expect(wrong).not.toHaveBeenCalled();
 });
+
+it("recognizes SDUI search filters named by their child label", async () => {
+  const dom = page(
+    '<div role="button"><div aria-label="Filter by Sort by"><label>Sort by</label></div></div><div role="button"><div aria-label="Filter by Date posted"><label>Date posted</label></div></div><div role="listitem"><button aria-label="Open control menu for post by Example"></button><p data-testid="expandable-text-box">Result</p></div>',
+  );
+  dom.window.Element.prototype.getClientRects = () => [{}] as any;
+  const r = await domOperation(
+    "posts_search",
+    { query: "test", sort: "relevance", date_posted: "any", limit: 1 },
+    {},
+  );
+  expect(r.items).toHaveLength(1);
+  expect(r.items[0].source).toBe("posts_search");
+});

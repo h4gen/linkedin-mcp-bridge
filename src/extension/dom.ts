@@ -37,9 +37,13 @@ export async function domOperation(
       ].filter(
         (e) =>
           visible(e) &&
-          [e.getAttribute("aria-label"), e.textContent].some((label) =>
-            pattern.test(label?.trim() ?? ""),
-          ) &&
+          [
+            e.getAttribute("aria-label"),
+            e.textContent,
+            e
+              .querySelector('[aria-label^="Filter by "]')
+              ?.getAttribute("aria-label"),
+          ].some((label) => pattern.test(label?.trim() ?? "")) &&
           e.getAttribute("aria-disabled") !== "true" &&
           !(e as HTMLButtonElement).disabled,
       );
@@ -573,6 +577,12 @@ export async function domOperation(
         (!parent.isConnected || sourceId(parent) !== a.parent_comment_id)
       )
         fail("parent_comment_changed");
+      if (
+        existingEditors.has(fields[0]) &&
+        fields[0].textContent?.trim() &&
+        fields[0].textContent?.trim() !== a.text.trim()
+      )
+        fail("comment_editor_not_empty");
       fill(fields[0], a.text);
       await wait();
       let submitScope: Element | null = fields[0].parentElement;
