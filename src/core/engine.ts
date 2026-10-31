@@ -349,20 +349,24 @@ export class Engine {
             throw new Fault("recipient_mismatch");
         } else {
           const found = await getConversation(a, d.fetch, check);
-          const participantList =
-            found.conversationParticipants ?? found.participants ?? [];
-          const participants = (
-            Array.isArray(participantList)
-              ? participantList
-              : (participantList.elements ?? [])
-          )
-            .map(
-              (p: Args) =>
-                p.hostIdentityUrn ??
-                p.participantType?.member?.entityUrn ??
-                p.member?.entityUrn,
-            )
-            .filter((u: any) => u !== expected);
+          const references = participantRefs(found);
+          const participants = references
+            .map((p) => p.entityUrn)
+            .filter((u) => u !== expected);
+          // Fresh exact-conversation identities remain usable after a worker/browser restart.
+          for (const person of references)
+            if (person.entityUrn && person.name) {
+              const old = await d.store.get("identity:" + person.entityUrn);
+              await d.store.set("identity:" + person.entityUrn, {
+                ...old,
+                ...Object.fromEntries(
+                  Object.entries(person).filter(
+                    ([, v]) => v !== null && v !== "",
+                  ),
+                ),
+                urn: person.entityUrn,
+              });
+            }
           if (
             participants.some((x: any) => typeof x !== "string") ||
             JSON.stringify([...new Set(participants)].sort()) !==

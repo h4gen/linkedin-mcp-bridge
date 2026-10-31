@@ -362,3 +362,44 @@ it("binds a comment receipt to its parent and never repeats an unknown reply", a
   ).rejects.toThrow("idempotency");
   expect(f.dom).toHaveBeenCalledTimes(1);
 });
+
+it("rebuilds recipient identity from the exact messaging conversation after restart", async () => {
+  const f = fixture(),
+    conversation = "urn:li:msg_conversation:restored";
+  f.fetch.mockImplementation(async (r: any) =>
+    r.path === "/me"
+      ? me
+      : r.method === "POST"
+        ? { data: { entityUrn: "urn:li:msg_message:sent" } }
+        : {
+            data: { elements: [] },
+            included: [
+              {
+                entityUrn: conversation,
+                participants: [
+                  { hostIdentityUrn: account, member: { firstName: "Self" } },
+                  { hostIdentityUrn: recipient, member: { firstName: "Peer" } },
+                ],
+              },
+            ],
+          },
+  );
+  const engine = new Engine({
+    store: f.store,
+    fetch: f.fetch,
+    dom: f.dom,
+    identity: async (urn) => f.data["identity:" + urn],
+    account: async () => account,
+    now: () => 1000,
+    uuid: () => "token",
+    hash: async (x) => x,
+  });
+  const r = await engine.run("message_send", {
+    ...send,
+    recipient_urn: undefined,
+    conversation_urn: conversation,
+  });
+  expect(r.status).toBe("confirmed");
+  expect(f.data["identity:" + recipient].name).toBe("Peer");
+  expect(f.dom).not.toHaveBeenCalled();
+});

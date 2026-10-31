@@ -144,7 +144,8 @@ try {
   cli.stdout.on("data", (b) => (stdout += b));
   cli.stderr.on("data", (b) => (stderr += b));
   const [code] = await once(cli, "exit");
-  assert.equal(code, 0, stderr);
+  assert.equal(code, 1, stderr);
+  assert.equal(JSON.parse(stdout).connected, false);
   assert.equal(JSON.parse(stdout).version, version);
   assert(
     context.serviceWorkers().length >= 2,

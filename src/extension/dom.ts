@@ -366,6 +366,13 @@ export async function domOperation(
       if (matches.length !== 1) fail("post_target_not_unique");
       const post = matches[0];
       const initial = postData(post);
+      if (a.expected_author && initial.author !== a.expected_author)
+        fail("post_resolution_mismatch");
+      if (
+        a.expected_text_prefix &&
+        !initial.text.replace(/\s+/g, " ").startsWith(a.expected_text_prefix)
+      )
+        fail("post_resolution_mismatch");
       if (initial.entityUrn)
         return {
           ...initial,
@@ -395,6 +402,71 @@ export async function domOperation(
             menus.find((m) => post.contains(m)) ??
             (!opened && appeared.length === 1 ? appeared[0] : undefined);
           if (owned) {
+            const copy = matchingControls(
+              owned,
+              /^(Copy link to post|Link zum Beitrag kopieren)$/i,
+            );
+            if (copy.length === 1) {
+              const prior = new Set([
+                ...document.querySelectorAll<HTMLAnchorElement>(
+                  '[role="alert"] a[href]',
+                ),
+              ]);
+              for (const link of prior)
+                if (
+                  /^(View post|Beitrag ansehen)$/.test(
+                    link.textContent?.trim() ?? "",
+                  )
+                ) {
+                  const alert = link.closest('[role="alert"]');
+                  const dismiss = alert
+                    ? matchingControls(alert, /^(Dismiss|Schließen)$/i)
+                    : [];
+                  if (dismiss.length === 1) dismiss[0].click();
+                }
+              copy[0].click();
+              for (let n = 0; n < 6; n++) {
+                await wait();
+                const copied = [
+                  ...document.querySelectorAll<HTMLAnchorElement>(
+                    '[role="alert"] a[href]',
+                  ),
+                ].filter(
+                  (link) =>
+                    !prior.has(link) &&
+                    /^(View post|Beitrag ansehen)$/.test(
+                      link.textContent?.trim() ?? "",
+                    ),
+                );
+                if (
+                  copied.length === 1 &&
+                  post.isConnected &&
+                  postData(post).scan_key === initial.scan_key
+                ) {
+                  let url = new URL(copied[0].href);
+                  if (
+                    url.origin === "https://www.linkedin.com" &&
+                    url.pathname === "/safety/go/"
+                  )
+                    url = new URL(url.searchParams.get("url") ?? "");
+                  if (
+                    (url.origin === "https://lnkd.in" &&
+                      /^\/p\/[\w-]+$/.test(url.pathname)) ||
+                    (url.origin === "https://www.linkedin.com" &&
+                      /^\/(feed\/update\/|posts\/)/.test(url.pathname))
+                  )
+                    return {
+                      resolve_url: url.href,
+                      source_author: initial.author,
+                      source_text_prefix: initial.text
+                        .replace(/\s+/g, " ")
+                        .slice(0, 120),
+                    };
+                  fail("post_url_unsupported");
+                }
+              }
+              fail("post_permalink_unavailable");
+            }
             const links = [
               ...owned.querySelectorAll<HTMLAnchorElement>("a[href]"),
             ];

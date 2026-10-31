@@ -197,7 +197,7 @@ const engine = new Engine({
     check();
     if (state.dom_session) await validateDomCursor(op, state);
     await chrome.tabs.update(id, { active: true });
-    async function navigate(url: string, fresh = false) {
+    async function navigate(url: string, fresh = false, postRedirect = false) {
       check();
       const tab = await chrome.tabs.get(id);
       if (tab.url === url && tab.status === "complete" && !fresh) return;
@@ -208,9 +208,13 @@ const engine = new Engine({
         check();
         const current = await chrome.tabs.get(id);
         if (
-          current.url === url &&
+          (current.url === url ||
+            (postRedirect &&
+              /^https:\/\/www\.linkedin\.com\/(feed\/update\/|posts\/)/.test(
+                current.url ?? "",
+              ))) &&
           (current.status === "complete" ||
-            (!current.pendingUrl && (await documentReady(id, url))))
+            (!current.pendingUrl && (await documentReady(id, current.url!))))
         )
           return;
         if (current.url && /\/(login|checkpoint)/.test(current.url))
@@ -697,7 +701,42 @@ const engine = new Engine({
         result[0].result.bridge_error,
         { dispatch_state: result[0].result.dispatch_state },
       );
-    const value = result[0].result;
+    let value = result[0].result;
+    if (op === "post_resolve" && value.resolve_url) {
+      const observed = new URL(value.resolve_url);
+      if (
+        !(
+          (observed.origin === "https://lnkd.in" &&
+            /^\/p\/[\w-]+$/.test(observed.pathname)) ||
+          (observed.origin === "https://www.linkedin.com" &&
+            /^\/(feed\/update\/|posts\/)/.test(observed.pathname))
+        )
+      )
+        throw new Fault("post_url_unsupported");
+      await navigate(observed.href, false, true);
+      const finalUrl = (await chrome.tabs.get(id)).url!;
+      const resolved = await chrome.scripting.executeScript({
+        injectImmediately: true,
+        target: { tabId: id },
+        world: "ISOLATED",
+        func: domOperation,
+        args: [
+          op,
+          {
+            url: finalUrl,
+            expected_author: value.source_author,
+            expected_text_prefix: value.source_text_prefix,
+          },
+          {},
+        ],
+      });
+      const resolvedValue = resolved[0]?.result;
+      if (!resolvedValue || resolvedValue.bridge_error)
+        throw new Fault(
+          resolvedValue?.bridge_error ?? "post_identity_unavailable",
+        );
+      value = resolvedValue;
+    }
     if (op === "invitation_respond" && a.action === "accept" && !a.preflight) {
       const profile = a.verified_target.profile;
       await chrome.tabs.update(id, { url: profile.profile_url });
