@@ -129,3 +129,14 @@ Historical write acceptance below/above is retained as historical evidence. Auto
 Before initial public publication, the original Git history was backed up locally and Google Ads account identifiers were redacted from the public history with user authorization. Research measurements and the report remain available; original unredacted metadata is not distributed.
 
 Native planning was also rechecked on 0.6.0: draft save/reopen and same-key receipt replay passed; the marked draft was discarded, a test post was scheduled seven days ahead, cancellation was confirmed and a fresh scheduled listing returned zero items. No immediate post, message, comment or invitation was dispatched during this release acceptance.
+
+## Connection recovery — 2026-10-31
+
+Runtime change: `83bc7aa`. Development build fingerprint: `f6ba079240b57639ca6fab2bfe40f523bbd46d845c65c21cabfe0eee85aecae1`.
+
+- Failure-first reproduction: health returned disconnected for two queued clients when the saved work-tab ID no longer existed. The regression now passes without a Connect action.
+- Typecheck and all 123 tests passed on integrated `main` after a fresh remote fetch. Coverage includes tab loss, changed IDs after a simulated browser restart, worker recreation, single-flight recovery, load timeout, discarded tabs, pause/disconnect, account mismatch, expired login, host backoff, pre-dispatch retries and no replay after dispatched-write transport loss. Existing receipt, draft/scheduling, pagination and MCP contract tests remain passing.
+- Reloaded the installed development extension from the canonical build without reconnecting. With no LinkedIn tab open, real MCP health automatically created a background work tab and returned connected. Installed and local build fingerprints matched.
+- Read-only inbox listing returned two rows. Closed the recovered work tab, then ran a first-degree people search and a separate CLI doctor concurrently. Both succeeded; people search returned two rows and doctor exited zero.
+- Terminated only the verified development native-host process. The extension restarted it automatically; an immediately launched doctor succeeded in 2.16 seconds with a new host PID.
+- No LinkedIn writes, messages, invitations or posts were dispatched during live acceptance. A full browser restart was simulated in tests rather than interrupting the user's other Chrome tabs. Chrome Store draft and five explainer assets were preserved; no Store submission was made.
