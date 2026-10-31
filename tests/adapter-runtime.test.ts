@@ -83,6 +83,7 @@ async function harness() {
   w.setTimeout = fastTimeout;
   w.clearTimeout = clearTimeout;
   let interactDuringFilter = false;
+  let apiEntities: any[] = [];
   let documentId = "document-1",
     scrolls = 0;
   const local: any = {
@@ -194,7 +195,7 @@ async function harness() {
                 data:
                   opts.args[0].path === "/me"
                     ? { data: { miniProfile: { entityUrn: account } } }
-                    : { data: { elements: [] } },
+                    : { data: { elements: [] }, included: apiEntities },
               },
             },
           ];
@@ -255,6 +256,9 @@ async function harness() {
   return {
     w,
     session,
+    setApiEntities: (value: any[]) => {
+      apiEntities = value;
+    },
     tab,
     mount(url: string, html: string) {
       dom.reconfigure({ url });
@@ -403,4 +407,31 @@ it("does not bind a cursor over user interaction during filter preparation", asy
   expect(r.error).toMatchObject({ code: "cancelled" });
   expect(h.w.__liBridgeTraversal.invalidated).toBe("user_interaction");
   expect(r.result?.next_cursor).toBeUndefined();
+});
+
+it("preserves known profile references when messaging supplies only text-object names", async () => {
+  const h = await harness(),
+    urn = "urn:li:fsd_profile:peer";
+  h.session["identity:" + urn] = {
+    urn,
+    name: "Old Name",
+    profile_url: "https://www.linkedin.com/in/example/",
+    public_identifier: "example",
+  };
+  h.setApiEntities([
+    {
+      entityUrn: urn,
+      firstName: { text: "Álex" },
+      lastName: { text: "Example" },
+    },
+  ]);
+  expect(
+    (await h.request("invitations_list", { direction: "sent", limit: 1 }))
+      .error,
+  ).toBeUndefined();
+  expect(h.session["identity:" + urn]).toMatchObject({
+    name: "Álex Example",
+    profile_url: "https://www.linkedin.com/in/example/",
+    public_identifier: "example",
+  });
 });

@@ -152,9 +152,15 @@ async function fetchRequest(r: Request, check = () => {}) {
     const name = person.name;
     if (typeof urn === "string" && /^urn:li:fsd_profile:/.test(urn) && name)
       await store.set("identity:" + urn, {
+        ...(await store.get("identity:" + urn)),
         urn,
         name,
-        profile_url: person.profile_url,
+        ...(person.profile_url
+          ? {
+              profile_url: person.profile_url,
+              public_identifier: person.public_identifier,
+            }
+          : {}),
       });
   }
   return result.data;

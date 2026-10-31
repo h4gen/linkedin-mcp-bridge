@@ -41,6 +41,21 @@ function profileTopCard(expectedUrl: string): HTMLElement | null {
   ].filter((a) => visible(a) && a.pathname === path + "/overlay/contact-info/");
   const cards = new Set<HTMLElement>();
   for (const contact of contacts) {
+    // The source top-card section owns both the identity header and its sibling
+    // action row. The nearest heading wrapper alone omits those actions.
+    const section = contact.closest<HTMLElement>("section");
+    if (
+      section &&
+      section.querySelectorAll("h1,h2").length === 1 &&
+      [
+        ...section.querySelectorAll<HTMLAnchorElement>(
+          'a[href*="/overlay/contact-info/"]',
+        ),
+      ].every((a) => a.pathname === path + "/overlay/contact-info/")
+    ) {
+      cards.add(section);
+      continue;
+    }
     let top = contact.parentElement;
     for (let i = 0; top && i < 7 && !top.querySelector("h1,h2"); i++)
       top = top.parentElement;

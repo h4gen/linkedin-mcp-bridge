@@ -22,6 +22,10 @@ afterEach(() => {
 it("reads Connect only from the exact profile's More menu and closes it", async () => {
   profile("<aside><button>Connect</button></aside>");
   document.querySelector("p")!.textContent = "• 3rd";
+  const section = document.querySelector("section")!;
+  const header = document.createElement("div");
+  while (section.firstChild) header.append(section.firstChild);
+  section.append(header);
   const more = document.createElement("button");
   more.textContent = "More";
   more.setAttribute("aria-controls", "own-menu");
