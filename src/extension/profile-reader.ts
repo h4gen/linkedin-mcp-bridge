@@ -153,13 +153,22 @@ export function profileReader(expectedUrl: string, expectedUrn: string) {
 }
 
 // Bounded lazy-section loading on the already verified profile route.
-export async function prepareProfile(expectedUrl: string) {
+export async function prepareProfile(
+  expectedUrl: string,
+  target: "sections" | "posts" = "sections",
+) {
   if (location.origin + location.pathname !== expectedUrl) return;
   for (let step = 0; step < 4; step++) {
     if (
-      [...document.querySelectorAll("h2")].some((e) =>
-        /^(Experience|Berufserfahrung)$/.test(e.textContent?.trim() ?? ""),
-      )
+      target === "posts"
+        ? [...document.querySelectorAll<HTMLAnchorElement>("a[href]")].some(
+            (a) =>
+              /Show all posts|Alle Beiträge/i.test(a.textContent ?? "") &&
+              a.href.startsWith(expectedUrl + "recent-activity/"),
+          )
+        : [...document.querySelectorAll("h2")].some((e) =>
+            /^(Experience|Berufserfahrung)$/.test(e.textContent?.trim() ?? ""),
+          )
     )
       return;
     let scroller: Element | null = document.querySelector(

@@ -283,17 +283,21 @@ const engine = new Engine({
         },
       });
       if (
-        op === "profile_get" &&
-        a.sections.some((s: string) =>
-          ["about", "current_positions"].includes(s),
-        )
+        op === "profile_posts_list" ||
+        (op === "profile_get" &&
+          a.sections.some((s: string) =>
+            ["about", "current_positions"].includes(s),
+          ))
       )
         await chrome.scripting.executeScript({
           injectImmediately: true,
           target: { tabId: id },
           world: "ISOLATED",
           func: prepareProfile,
-          args: [basic.profile_url],
+          args: [
+            basic.profile_url,
+            op === "profile_posts_list" ? "posts" : "sections",
+          ],
         });
       let extra;
       for (let attempt = 0; attempt < 20; attempt++) {
@@ -307,7 +311,12 @@ const engine = new Engine({
             args: [basic.profile_url, basic.entityUrn],
           })
         )[0]?.result;
-        if (extra && extra.bridge_error !== "profile_loading") break;
+        if (
+          extra &&
+          extra.bridge_error !== "profile_loading" &&
+          (op !== "profile_posts_list" || extra.posts_url || extra.activity_url)
+        )
+          break;
         await new Promise((r) => setTimeout(r, 400));
       }
       if (!extra || extra.bridge_error)
