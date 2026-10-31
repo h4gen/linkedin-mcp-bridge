@@ -166,6 +166,41 @@ it("does not collapse identical comments without source IDs", async () => {
   );
 });
 
+it("opens only the exact permalink's SDUI reaction count inside a nested card", async () => {
+  const { extractionOperation } = await import(
+    "../src/extension/extraction.js"
+  );
+  const dom = page(
+    '<main><div role="listitem"><a id="other" href="/feed/update/urn:li:activity:999/">12 reactions</a></div><div role="listitem"><div componentkey="replaceableComment_example"><a id="comment" href="/feed/update/urn:li:activity:123/">2 reactions</a></div><a id="count" href="/feed/update/urn:li:activity:123/">1,122 reactions</a></div></main>',
+  );
+  dom.reconfigure({
+    url: "https://www.linkedin.com/feed/update/urn:li:activity:123/",
+  });
+  dom.window.Element.prototype.getClientRects = () => [{}] as any;
+  vi.stubGlobal(
+    "getComputedStyle",
+    dom.window.getComputedStyle.bind(dom.window),
+  );
+  const unrelated = vi.fn();
+  document.querySelector("#other")!.addEventListener("click", unrelated);
+  document.querySelector("#comment")!.addEventListener("click", unrelated);
+  document.querySelector("#count")!.addEventListener("click", (event) => {
+    event.preventDefault();
+    const dialog = document.createElement("div");
+    dialog.setAttribute("role", "dialog");
+    dialog.innerHTML =
+      '<h2>Reactions</h2><div data-testid="lazy-column"><a href="https://www.linkedin.com/in/person/"><p>Person</p><p>Founder</p></a></div>';
+    document.body.append(dialog);
+  });
+  const result = await extractionOperation(
+    "reactions_list",
+    { post_urn: "urn:li:activity:123", limit: 1 },
+    {},
+  );
+  expect(result.items).toHaveLength(1);
+  expect(unrelated).not.toHaveBeenCalled();
+});
+
 it("keeps an owned reaction dialog open across cursor pages", async () => {
   const { extractionOperation } = await import(
     "../src/extension/extraction.js"

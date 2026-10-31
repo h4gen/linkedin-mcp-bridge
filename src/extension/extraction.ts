@@ -311,8 +311,24 @@ export async function extractionOperation(
           const ownPost = control.closest(
             '[data-urn], [data-id^="urn:"], [role="listitem"]',
           );
-          if (ownPost && ownPost !== post && !ownPost.contains(post))
-            return false;
+          if (ownPost && ownPost !== post && !ownPost.contains(post)) {
+            // On SDUI permalinks the fallback root is main, while the count
+            // lives inside a nested listitem. Require its native link to name
+            // this exact post; never accept another card's reaction count.
+            const href = control.getAttribute("href");
+            if (!onPermalink || !href) return false;
+            try {
+              const target = new URL(href, location.href);
+              if (
+                target.origin !== location.origin ||
+                decodeURIComponent(target.pathname).replace(/\/$/, "") !==
+                  expectedPath
+              )
+                return false;
+            } catch {
+              return false;
+            }
+          }
           const labelledElement = control.hasAttribute("aria-labelledby")
             ? control
             : control.querySelector("[aria-labelledby]");
