@@ -108,7 +108,7 @@ Feed pagination is a bounded live scroll. `post_resolve` resolves a rendered car
 
 Collection jobs were removed in 0.3. Use direct cursor pages. DOM reads use a dedicated LinkedIn work tab and bring it forward to avoid background timer throttling. Navigating or clicking controls in that tab invalidates its traversal cursor; API reads do not. A consumed cursor replays its cached page. Session cursors expire after 30 minutes and share a 5 MiB storage budget. See [interface contract](docs/interface-patterns.md).
 
-The registry exposes all 32 operations in development and pilot builds. `health` reports current-build acceptance separately from availability. `release:check` still requires current-commit evidence for every capability and the publishing prerequisites; acceptance does not gate individual calls.
+The registry exposes all 32 operations in development and pilot builds. `health` reports current-build acceptance separately from availability. `store:check` requires current-runtime evidence for every capability and the publishing prerequisites; acceptance does not gate individual calls.
 
 ## Development and packaging
 

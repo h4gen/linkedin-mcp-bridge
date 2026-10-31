@@ -14,6 +14,8 @@ Public Chrome extension with a separate Git-installed MCP server for macOS and n
 
 All executable adapters are bundled. No arbitrary URL, selector, JavaScript or native command is accepted over MCP.
 
-Release prerequisite: all original basic capabilities, including deletion, invitation mutations and public text interactions, require runtime-bound per-capability acceptance evidence. All 27 tools are exposed, but availability does not establish live acceptance or store readiness.
+Release prerequisite: all capabilities, including deletion, invitation mutations and public text interactions, require runtime-bound per-capability acceptance evidence. All 32 tools are exposed, but availability does not establish live acceptance or store readiness.
 
-Version 0.6 retains immediate post creation with native text drafts and scheduling. Verify draft preservation, future-time validation, scheduled listing and cancellation using disposable test content; never publish a test immediately.
+Version 0.7 provides native text drafts and scheduling instead of immediate post creation. Verify draft preservation, future-time validation, scheduled listing and cancellation without immediate publication. Any public acceptance comment or reply must be meaningful and relevant to its actual context; never publish technical test labels or placeholders, even temporarily. Arrange cleanup before performing authorized public acceptance.
+
+The five added primitives are `message_get`, `posts_search`, `profile_posts_list`, `relationship_get` and `conversations_find`. They compose with the existing tools; no built-in outreach workflow or CRM is included. Messages use dedicated messaging APIs and exact conversation/participant identities, never the feed's messaging overlay.

@@ -91,33 +91,36 @@ it("cancellation stops pre-dispatch retry", async () => {
   expect(mocks.connect).toHaveBeenCalledTimes(1);
 });
 
-it("recovers an interrupted API read once, while retaining its exact arguments", async () => {
-  vi.useFakeTimers();
-  const first = socket(),
-    recovered = socket();
-  mocks.connect.mockReturnValueOnce(first).mockReturnValue(recovered);
-  const args = {
-    account_urn: "urn:li:fsd_profile:me",
-    limit: 2,
-    cursor: "same-cursor",
-  };
-  const pending = call("conversations_list", args).catch((e) => e);
-  await vi.advanceTimersByTimeAsync(0);
-  first.emit("connect");
-  first.emit("end");
-  await vi.advanceTimersByTimeAsync(250);
-  expect(mocks.connect).toHaveBeenCalledTimes(2);
-  recovered.emit("connect");
-  const request = JSON.parse(recovered.write.mock.calls[0][0]);
-  expect(request.args).toEqual(args);
-  recovered.emit(
-    "data",
-    Buffer.from(
-      JSON.stringify({ id: request.id, result: { items: [] } }) + "\n",
-    ),
-  );
-  expect(await pending).toEqual({ items: [] });
-});
+it.each(["conversations_list", "conversations_find", "message_get"])(
+  "recovers interrupted API reader %s once, retaining its exact arguments",
+  async (operation) => {
+    vi.useFakeTimers();
+    const first = socket(),
+      recovered = socket();
+    mocks.connect.mockReturnValueOnce(first).mockReturnValue(recovered);
+    const args = {
+      account_urn: "urn:li:fsd_profile:me",
+      limit: 2,
+      cursor: "same-cursor",
+    };
+    const pending = call(operation, args).catch((e) => e);
+    await vi.advanceTimersByTimeAsync(0);
+    first.emit("connect");
+    first.emit("end");
+    await vi.advanceTimersByTimeAsync(250);
+    expect(mocks.connect).toHaveBeenCalledTimes(2);
+    recovered.emit("connect");
+    const request = JSON.parse(recovered.write.mock.calls[0][0]);
+    expect(request.args).toEqual(args);
+    recovered.emit(
+      "data",
+      Buffer.from(
+        JSON.stringify({ id: request.id, result: { items: [] } }) + "\n",
+      ),
+    );
+    expect(await pending).toEqual({ items: [] });
+  },
+);
 it("waits through the extension's maximum 30-second reconnect backoff", async () => {
   vi.useFakeTimers();
   const start = Date.now();
@@ -144,20 +147,27 @@ it("waits through the extension's maximum 30-second reconnect backoff", async ()
   expect(await pending).toEqual({ connected: true });
 });
 
-it.each(["feed_list", "reactions_list", "post_draft_create", "post_schedule"])(
-  "never replays stateful DOM operation %s",
-  async (op) => {
-    vi.useFakeTimers();
-    const s = socket();
-    mocks.connect.mockReturnValue(s);
-    const pending = call(op, {}).catch((e) => e);
-    await vi.advanceTimersByTimeAsync(0);
-    s.emit("connect");
-    s.emit("end");
-    expect((await pending).message).toMatch(/^bridge_disconnected/);
-    expect(mocks.connect).toHaveBeenCalledTimes(1);
-  },
-);
+it.each([
+  "feed_list",
+  "reactions_list",
+  "post_draft_create",
+  "post_schedule",
+  "posts_search",
+  "profile_posts_list",
+  "profile_get",
+  "relationship_get",
+  "post_comment",
+])("never replays stateful DOM operation %s", async (op) => {
+  vi.useFakeTimers();
+  const s = socket();
+  mocks.connect.mockReturnValue(s);
+  const pending = call(op, {}).catch((e) => e);
+  await vi.advanceTimersByTimeAsync(0);
+  s.emit("connect");
+  s.emit("end");
+  expect((await pending).message).toMatch(/^bridge_disconnected/);
+  expect(mocks.connect).toHaveBeenCalledTimes(1);
+});
 it("stops after one API replay if the second host also disconnects", async () => {
   vi.useFakeTimers();
   const a = socket(),
