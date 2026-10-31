@@ -94,6 +94,7 @@ export function resolveRelationship(
   if (
     evidence.some((e) => e.value === "degree_conflict") ||
     (outgoing && incoming) ||
+    (connect && (outgoing || incoming)) ||
     (connected && (outgoing || incoming || nonFirst || connect))
   )
     reason = "conflicting_relationship_evidence";

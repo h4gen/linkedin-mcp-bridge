@@ -112,6 +112,16 @@ it("never treats disappearance as acceptance and rejects conflicting evidence", 
   expect(
     resolveRelationship(profile([ev("connected")], "2"), empty).status,
   ).toBe("unknown");
+  for (const pending of ["outgoing_pending", "incoming_pending"])
+    expect(
+      resolveRelationship(
+        profile([ev("connect_available"), ev(pending)]),
+        empty,
+      ),
+    ).toMatchObject({
+      status: "unknown",
+      reason: "conflicting_relationship_evidence",
+    });
 });
 it("reports unavailable source coverage but propagates account and cancellation failures", async () => {
   const scans = await scanRelationshipInvitations(target, async () => {
