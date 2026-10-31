@@ -17,7 +17,8 @@ flowchart LR
 - `src/core/engine.ts`: serialization, account checks, pagination, mutation journal, cancellation boundary and reconciliation.
 - `src/core/api.ts`: typed routes, Rest.li variables and operation-specific response handling.
 - `src/core/normalize.ts`: bounded normalized-reference resolution; missing collection is a schema error.
-- `src/extension/background.ts`: native connection, pause/disconnect, browser-side storage, cooldown and request pacing.
+- `src/extension/background.ts`: native connection with bounded reconnect backoff, pause/disconnect, browser-side storage, cooldown and request pacing.
+- `src/extension/work-tab.ts`: single-flight work-tab recovery, bounded loading and account verification; ephemeral tab IDs are not durable connection identity.
 - `src/extension/page-fetch.ts`: browser authentication boundary and strict path allowlist.
 - `src/extension/dom.ts`: bounded reads and scoped UI mutations.
 - `src/native/`: framed native host, per-user socket, generated wire IDs and client transport.
@@ -39,11 +40,11 @@ API adapters own server cursor, timestamp and offset semantics. DOM adapters own
 
 Conversation lookup is shared by public reads, exact recipient validation and mutation postconditions. State verification requests the necessary source fields instead of accepting a partial conversation entity. Delete verification scans mailbox membership, not still-readable historical messages. Message reconciliation follows older pages and can locate new-recipient conversations without dispatching again.
 
-A connection-generation change invalidates queued operations and guards journal writes. In-flight external actions may still have taken effect; no retry is implied. Old pending receipts stay unknown. Updating to 0.3 clears temporary cursors/drafts, pauses the connection for reconnection to the work tab, and retains the seven-day mutation journal.
+A connection-generation change invalidates queued operations and guards journal writes. In-flight external actions may still have taken effect; no retry is implied. Old pending receipts stay unknown. Storage schema revision 1 clears legacy temporary state without pausing an active connection. Release version changes do not imply schema changes. Explicit pause/disconnect is retained, as is the seven-day mutation journal.
 
 ## 0.4 direct writes
 
-All 27 operations are exposed in every build. The approval module, review UI, inbox permission and test-write build flag have been removed. Writes retain account/target checks, serialization, durable receipts and postconditions. Acceptance metadata informs release readiness only. Migration clears session drafts and the old inbox preference without replaying actions or deleting the mutation journal; it pauses the bound connection for reconnection. Local data clearing is available in the popup.
+All 27 operations are exposed in every build. The approval module, review UI, inbox permission and test-write build flag have been removed. Writes retain account/target checks, serialization, durable receipts and postconditions. Acceptance metadata informs release readiness only. Migration clears session drafts and the old inbox preference without replaying actions or deleting the mutation journal; it preserves the bound connection and its explicit pause state. Local data clearing is available in the popup.
 
 ## 0.5 native post planning
 

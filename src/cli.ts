@@ -30,6 +30,7 @@ async function main() {
         `version_mismatch: CLI ${VERSION}, connected extension ${health.version}. Reload/update the extension, reconnect, then run doctor again.`,
       );
     console.log(JSON.stringify(health, null, 2));
+    if (!health.connected) process.exitCode = 1;
     return;
   }
   if (command !== "mcp")

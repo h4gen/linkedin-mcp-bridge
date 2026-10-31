@@ -1,3 +1,4 @@
+import { workTab } from "./work-tab.js";
 import { composerOperation } from "./composer.js";
 import { cursorEvictions } from "../core/cursor-budget.js";
 import { retryAt } from "../core/errors.js";
@@ -34,14 +35,43 @@ const store: Store = {
 };
 let generation = 0;
 let lastRequest = 0;
-async function tabId() {
-  const c = await store.get("connection");
-  if (!c || c.paused) throw new Fault("disconnected_or_paused");
-  const tab = await chrome.tabs.get(c.tabId);
-  if (!tab.url?.startsWith("https://www.linkedin.com/"))
-    throw new Fault("connected_tab_unavailable");
-  return c.tabId as number;
+async function browserFetch(id: number, request: Request) {
+  try {
+    return await chrome.scripting.executeScript({
+      target: { tabId: id },
+      world: "MAIN",
+      func: pageFetch,
+      args: [request],
+    });
+  } catch {
+    // Injection may already have dispatched a write. Never retry it here.
+    throw new Fault(
+      request.method
+        ? "browser_execution_unknown_outcome"
+        : "browser_execution_failed",
+    );
+  }
 }
+const tabId = workTab({
+  store,
+  generation: () => generation,
+  verify: async (id, account) => {
+    const result = (await browserFetch(id, { path: "/me" }))[0]?.result;
+    if (result?.error) throw new Fault(result.error);
+    if (!result?.data) throw new Fault("empty_browser_response");
+    if (self(result.data) !== account) throw new Fault("account_changed");
+  },
+  invalidate: async () => {
+    const data = await chrome.storage.session.get(null);
+    const keys = Object.keys(data).filter(
+      (k) =>
+        k.startsWith("extraction:") ||
+        k.startsWith("post-url:") ||
+        (k.startsWith("cursor:") && (data[k] as any)?.state?.dom_session),
+    );
+    if (keys.length) await chrome.storage.session.remove(keys);
+  },
+});
 async function fetchRequest(r: Request) {
   const requestGeneration = generation;
   const blocked = await store.get("blockedUntil");
@@ -53,12 +83,9 @@ async function fetchRequest(r: Request) {
     setTimeout(r, Math.max(0, lastRequest + 1000 - Date.now())),
   );
   lastRequest = Date.now();
-  const out = await chrome.scripting.executeScript({
-    target: { tabId: await tabId() },
-    world: "MAIN",
-    func: pageFetch,
-    args: [r],
-  });
+  const id = await tabId();
+  if (generation !== requestGeneration) throw new Fault("cancelled");
+  const out = await browserFetch(id, r);
   if (generation !== requestGeneration) throw new Fault("cancelled");
   const result = out[0]?.result;
   if (result?.error) {
@@ -453,18 +480,32 @@ const engine = new Engine({
 });
 const cancelled = new Set<string>();
 let port: chrome.runtime.Port | undefined;
+let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+let reconnectDelay = 1000;
+let nativeError: string | undefined;
+function scheduleReconnect() {
+  if (reconnectTimer) return;
+  reconnectTimer = setTimeout(async () => {
+    reconnectTimer = undefined;
+    if (await store.get("connection")) connectHost();
+  }, reconnectDelay);
+  reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+}
 function connectHost() {
   if (port) return;
   try {
     port = chrome.runtime.connectNative(HOST);
+    const connectedPort = port;
     port.onMessage.addListener(async (msg) => {
+      reconnectDelay = 1000;
+      nativeError = undefined;
       if (msg?.cancel) {
         cancelled.add(msg.cancel);
         return;
       }
       if (!msg || typeof msg.id !== "string" || typeof msg.op !== "string")
         return;
-      const current = port;
+      const current = connectedPort;
       try {
         if (msg.protocol !== PROTOCOL || msg.hostVersion !== VERSION)
           throw new Fault(
@@ -482,29 +523,34 @@ function connectHost() {
           6 * 1024 * 1024
         )
           throw new Fault("response_too_large");
-        current?.postMessage({ id: msg.id, result });
+        if (port === current) current.postMessage({ id: msg.id, result });
       } catch (e) {
-        current?.postMessage({
-          id: msg.id,
-          error: {
-            ...(e instanceof Fault ? e.details : {}),
-            code: e instanceof Fault ? e.code : "operation_failed",
-            message:
-              e instanceof Fault
-                ? e.message
-                : "Operation failed validation or execution.",
-          },
-        });
+        if (port === current)
+          current.postMessage({
+            id: msg.id,
+            error: {
+              ...(e instanceof Fault ? e.details : {}),
+              code: e instanceof Fault ? e.code : "operation_failed",
+              message:
+                e instanceof Fault
+                  ? e.message
+                  : "Operation failed validation or execution.",
+            },
+          });
       } finally {
         cancelled.delete(msg.id);
       }
     });
     port.onDisconnect.addListener(() => {
-      void chrome.runtime.lastError;
-      port = undefined;
+      nativeError =
+        chrome.runtime.lastError?.message ?? "native_host_disconnected";
+      if (port === connectedPort) port = undefined;
+      scheduleReconnect();
     });
-  } catch {
+  } catch (e) {
+    nativeError = e instanceof Error ? e.message : "native_host_connect_failed";
     port = undefined;
+    scheduleReconnect();
   }
 }
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
@@ -534,6 +580,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       return {
         connection: await store.get("connection"),
         native: !!port,
+        nativeError,
         extensionId: chrome.runtime.id,
         version: chrome.runtime.getManifest().version,
         blockedUntil: await store.get("blockedUntil"),
@@ -610,14 +657,12 @@ chrome.alarms.onAlarm.addListener(async () => {
   if (await store.get("connection")) connectHost();
 });
 const initialized = (async () => {
-  if ((await store.get("schemaVersion")) !== VERSION) {
+  if ((await store.get("schemaVersion")) !== 1) {
     generation++;
     await chrome.storage.session.clear();
     await chrome.storage.local.remove("allowInboxChanges");
-    const connection = await store.get("connection");
-    if (connection)
-      await store.set("connection", { ...connection, paused: true });
-    await store.set("schemaVersion", VERSION);
+    // Schema migration is independent of release version; compatible updates keep the binding.
+    await store.set("schemaVersion", 1);
   }
   if (await store.get("connection")) connectHost();
 })();

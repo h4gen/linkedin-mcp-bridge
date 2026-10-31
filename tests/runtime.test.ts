@@ -364,7 +364,8 @@ it("migrates old drafts without dispatch and retains mutation receipts", async (
   );
   expect(status.version).toBe("0.5.0");
   expect(local.journal.old).toEqual(receipt);
-  expect(local.connection.paused).toBe(true);
+  expect(local.connection.paused).toBe(false);
+  expect(local.schemaVersion).toBe(1);
   expect(local.allowInboxChanges).toBeUndefined();
   expect(session).toEqual({});
   expect(dispatched).toBe(0);
@@ -385,4 +386,71 @@ it("migrates old drafts without dispatch and retains mutation receipts", async (
   expect(
     await fs.stat("dist/extension/review.html").catch(() => null),
   ).toBeNull();
+});
+
+it("doctor returns nonzero for an unusable session and zero for a usable one", async () => {
+  const home = await fs.mkdtemp(
+    path.join(
+      process.platform === "darwin" ? "/tmp" : os.tmpdir(),
+      "li-doctor-",
+    ),
+  );
+  const paths = platformPaths(
+    process.platform,
+    home,
+    path.join(home, "AppData", "Local"),
+    "com.hagen.linkedin_mcp_bridge",
+    false,
+  );
+  await fs.mkdir(paths.root, { recursive: true });
+  if (process.platform === "win32")
+    await fs.writeFile(
+      path.join(paths.root, "transport-token"),
+      "a".repeat(64),
+    );
+  const { VERSION } = await import("../src/version.js");
+  let connected = false;
+  const server = net.createServer((socket) => {
+    let input = "";
+    socket.on("data", (bytes) => {
+      input += bytes;
+      if (!input.includes("\n")) return;
+      const request = JSON.parse(input.trim());
+      socket.end(
+        JSON.stringify({
+          id: request.id,
+          result: {
+            version: VERSION,
+            connected,
+            error: connected ? undefined : "not_logged_in",
+          },
+        }) + "\n",
+      );
+    });
+  });
+  await new Promise<void>((resolve) =>
+    server.listen(paths.socketPath, resolve),
+  );
+  try {
+    for (const ready of [false, true]) {
+      connected = ready;
+      const child = spawn(process.execPath, ["dist/cli.js", "doctor"], {
+        env: {
+          ...process.env,
+          LINKEDIN_BRIDGE_HOME: home,
+          LOCALAPPDATA: path.join(home, "AppData", "Local"),
+        },
+      });
+      let stdout = "";
+      child.stdout.on("data", (b) => {
+        stdout += b;
+      });
+      const [code] = await once(child, "close");
+      expect(code).toBe(ready ? 0 : 1);
+      expect(JSON.parse(stdout).connected).toBe(ready);
+    }
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await fs.rm(home, { recursive: true, force: true });
+  }
 });

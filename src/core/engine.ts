@@ -97,13 +97,13 @@ export class Engine {
     const expected = await d.account();
     if (op === "health") {
       let usable = false;
-      let error: string | undefined;
+      let error: string | undefined = expected ? undefined : "disconnected";
       if (expected) {
         try {
           usable = self(await d.fetch({ path: "/me" })) === expected;
           if (!usable) error = "account_changed";
         } catch (e) {
-          error = e instanceof Fault ? e.code : "bridge_or_session_unavailable";
+          error = e instanceof Fault ? e.code : "browser_adapter_failed";
         }
       }
       return {
@@ -112,6 +112,15 @@ export class Engine {
         enabled_writes: [...writes],
         connected: usable,
         error,
+        connection: {
+          transport: "connected",
+          session: usable ? "ready" : "unavailable",
+          stage: !error
+            ? "ready"
+            : /tab_|browser_/.test(error)
+              ? "tab"
+              : "session",
+        },
         account_urn: expected ?? null,
         capabilities: capabilityStatus(usable),
         transport: "local_native_messaging",

@@ -26,13 +26,13 @@ Writes execute directly with exact targets and idempotency keys. Existing-thread
 
 Operation receipts survive updates for seven days. A pending/interrupted send is unknown, never automatically resent. `operation_get` can read known receipts without a live network session and attempts bounded reconciliation for unknown sends. Reconciliation uses the origin token and exact conversation, traversing older history or locating a new-recipient conversation. Missing evidence never proves failure.
 
-Read timeouts permit read retry; ambiguous writes require receipt inspection. Cursor loss requires restarting the query. Session/account errors require reconnecting. Rate-limit cooldowns parse seconds and HTTP dates. Pause/disconnect/data-clear invalidate queued work; already dispatched mutations cannot be recalled.
+Read timeouts permit read retry; ambiguous writes require receipt inspection. Cursor loss requires restarting the query. Lost work tabs recover automatically; expired login, explicit pause/disconnect and changed accounts remain specific actionable errors. Rate-limit cooldowns parse seconds and HTTP dates. Pause/disconnect/data-clear invalidate queued work; already dispatched mutations cannot be recalled.
 
 ## Compatibility and capability reporting
 
 0.3 removes the three extraction job tools and introduces `conversations_get` and output schemas for every operation. Profile and invitation results are compact typed views. Temporary 0.2 cursors/drafts are cleared on migration; content-free send receipts are retained. Original write inputs and fingerprints remain compatible.
 
-The capability registry is shared by dispatch, tool listing and release checking. All 27 operations are exposed. Current-build live acceptance remains separate from availability and passing unit tests. Updating to 0.4 clears temporary session state and the obsolete inbox permission, pauses the connection for reconnection, and retains seven-day mutation receipts. Old drafts are never dispatched automatically.
+The capability registry is shared by dispatch, tool listing and release checking. All 27 operations are exposed. Current-build live acceptance remains separate from availability and passing unit tests. Storage schema migration clears legacy temporary state and the obsolete inbox permission, preserves the connection/pause state, and retains seven-day mutation receipts. Old drafts are never dispatched automatically.
 
 ## 0.4.1 DOM execution and recovery
 

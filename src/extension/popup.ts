@@ -23,7 +23,7 @@ async function action(action: string) {
     }
     const s = await chrome.runtime.sendMessage({ action: "status" });
     status.textContent = s.connection
-      ? `${s.connection.paused ? "Paused" : "Connected"} · ${s.connection.account ?? "Checking account"}\nLocal MCP: ${s.native ? "available" : "not connected"} · Version ${s.version}`
+      ? `${s.connection.paused ? "Paused" : "Connected"} · ${s.connection.account ?? "Checking account"}\nLocal MCP: ${s.native ? "available" : "reconnecting"}${s.nativeError ? " · " + s.nativeError : ""} · Version ${s.version}`
       : "Not connected. Open LinkedIn and connect this tab.";
   } catch {
     status.textContent =

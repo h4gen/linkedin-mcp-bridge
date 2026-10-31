@@ -35,11 +35,11 @@ node dist/cli.js doctor
 
 The server command is the printed absolute Node path; arguments are the printed absolute `dist/cli.js` path followed by `mcp`. For a TOML-configured client, put these same values under `[mcp_servers.linkedin]` as `command` and `args`.
 
-One Chrome profile owns the connection at a time. Browser authentication is interactive; the agent must not bypass login. Keep the selected tab open. DOM tools may bring the dedicated work tab forward. Pause stops new work; reconnect to resume.
+One Chrome profile owns the connection at a time. Browser authentication is interactive; the agent must not bypass login. While Chrome is running, the bridge recreates a lost work tab on the next request and verifies the saved account. DOM tools may bring the dedicated work tab forward. Pause stops new work; reconnect to resume.
 
 ### Update and uninstall
 
-Stop the MCP connection, disconnect the extension, run `git pull --ff-only`, `npm ci`, `npm run build:store`, then `node dist/cli.js install`. Reconnect and run `doctor`. Extension and native host versions must match; retain the matching Git release when Chrome has not received the new extension yet.
+Run `git pull --ff-only`, `npm ci`, `npm run build:store`, then `node dist/cli.js install`. Restart the MCP client to load the updated server and run `doctor`. Compatible extension updates preserve the saved connection and any explicit pause; they do not require another Connect click. Extension and native host versions must match; retain the matching Git release when Chrome has not received the new extension yet.
 
 `node dist/cli.js uninstall` removes this installation's native registration and launcher. Remove the Chrome extension separately to clear browser storage. The checkout can then be removed.
 
@@ -133,3 +133,5 @@ See [validation](docs/validation.md) for historical live checks and current limi
 ## Market research
 
 [Market report, 30 October 2026](docs/research/2026-10-30/linkedin-market-research.docx) is historical research. The current product scope is primitive tools, Git installation and a public Chrome extension; report recommendations are not implementation requirements.
+
+Connection recovery is automatic after work-tab loss, worker restarts and brief native-host interruptions. Chrome must be running; an expired LinkedIn login or a changed account still needs attention. `doctor` exits nonzero when the connection is unusable. Health reports the specific session/tab error; transport failures report `native_host_unavailable`. A dispatched write is never replayed automatically after a disconnect.
