@@ -32,9 +32,10 @@ export async function composerOperation(
   const wait = async <T>(
     read: () => T | undefined,
     code = "composer_not_ready",
+    maxWaitMs = 10000,
   ): Promise<T> => {
     const until = Math.min(
-      Date.now() + 10000,
+      Date.now() + maxWaitMs,
       a.execution_deadline ?? Infinity,
     );
     for (;;) {
@@ -287,28 +288,37 @@ export async function composerOperation(
     if (!countMatch) fail("scheduled_list_shape_changed");
     const count = Number(countMatch![1]);
     if (count === 0) return [];
-    const rows = await wait(() => {
-      if (!currentList()) return undefined;
-      const currentCount = (d.innerText ?? d.textContent ?? "").match(
-        /Scheduled \((\d+)\)/,
-      )?.[1];
-      if (Number(currentCount) !== count) fail("scheduled_list_changed");
-      const mounted = [
-        ...d.querySelectorAll<HTMLElement>('[id^="ScheduledPostRowSlot_"]'),
-      ];
-      if (
-        mounted.length !== count ||
-        mounted.some(
-          (row) =>
-            !row.querySelector('[role="listitem"] p')?.textContent?.trim() ||
-            ![...row.querySelectorAll("p")].some((p) =>
-              /^Posting .+ at .+[AP]M$/.test(p.textContent ?? ""),
-            ),
+    const rows = await wait(
+      () => {
+        if (!currentList()) return undefined;
+        // The native list is lazy-mounted; bring its own scroll surface into view
+        // so IntersectionObserver can hydrate rows even after scripted navigation.
+        d.querySelector<HTMLElement>(
+          '[data-testid="lazy-column"]',
+        )?.scrollIntoView({ block: "nearest" });
+        const currentCount = (d.innerText ?? d.textContent ?? "").match(
+          /Scheduled \((\d+)\)/,
+        )?.[1];
+        if (Number(currentCount) !== count) fail("scheduled_list_changed");
+        const mounted = [
+          ...d.querySelectorAll<HTMLElement>('[id^="ScheduledPostRowSlot_"]'),
+        ];
+        if (
+          mounted.length !== count ||
+          mounted.some(
+            (row) =>
+              !row.querySelector('[role="listitem"] p')?.textContent?.trim() ||
+              ![...row.querySelectorAll("p")].some((p) =>
+                /^Posting .+ at .+[AP]M$/.test(p.textContent ?? ""),
+              ),
+          )
         )
-      )
-        return undefined;
-      return mounted;
-    }, "scheduled_list_incomplete");
+          return undefined;
+        return mounted;
+      },
+      "scheduled_list_incomplete",
+      30000,
+    );
     const items: Record<string, any>[] = [];
     for (const row of rows) {
       const nativeId = row.id.match(
@@ -561,6 +571,18 @@ export async function composerOperation(
     return {
       bridge_error: e instanceof Error ? e.message : "composer_failed",
       dispatch_state: dispatched ? "dispatched" : "not_dispatched",
+      ...(e instanceof Error && e.message === "scheduled_list_incomplete"
+        ? {
+            details: {
+              candidate_count: document.querySelectorAll(
+                'dialog[open] [id^="ScheduledPostRowSlot_"]',
+              ).length,
+              matching_count: document.querySelectorAll(
+                'dialog[open] [id^="ScheduledPostRowSlot_"] [role="listitem"] p',
+              ).length,
+            },
+          }
+        : {}),
     };
   } finally {
     if ((window as any).__liBridgeComposerNavigation === a.execution_session)

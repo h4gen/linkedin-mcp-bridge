@@ -40,6 +40,7 @@ function ui(initial = "", staleAfterSave = false, trustedInsert = false) {
       return this.parentElement;
     },
   });
+  w.HTMLElement.prototype.scrollIntoView = () => {};
   let saved = initial,
     published = 0,
     saves = 0;
