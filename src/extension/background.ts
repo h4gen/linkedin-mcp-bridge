@@ -568,6 +568,14 @@ const engine = new Engine({
           },
         );
     }
+    async function navigateBeforeDispatch(url: string) {
+      try {
+        await navigate(url);
+      } catch (e) {
+        if (e instanceof Fault) e.details.dispatch_state = "not_dispatched";
+        throw e;
+      }
+    }
     if (op === "conversation_delete") {
       const target = a.verified_target;
       if (!target || target.entityUrn !== a.conversation_urn)
@@ -578,8 +586,7 @@ const engine = new Engine({
         !url.startsWith("https://www.linkedin.com/messaging/thread/")
       )
         throw new Fault("conversation_location_unresolved");
-      if ((await chrome.tabs.get(id)).url !== url)
-        await chrome.tabs.update(id, { url });
+      await navigateBeforeDispatch(url);
     }
     if (["invitation_respond", "invitation_withdraw"].includes(op)) {
       if (!a.verified_target?.profile?.profile_url)
@@ -587,8 +594,7 @@ const engine = new Engine({
       const url =
         "https://www.linkedin.com/mynetwork/invitation-manager/" +
         (op === "invitation_withdraw" ? "sent/" : "received/");
-      if ((await chrome.tabs.get(id)).url !== url)
-        await chrome.tabs.update(id, { url });
+      await navigateBeforeDispatch(url);
     }
     if (
       [
@@ -601,7 +607,7 @@ const engine = new Engine({
         (await chrome.tabs.get(id)).url ?? "",
       )
     )
-      await chrome.tabs.update(id, { url: "https://www.linkedin.com/feed/" });
+      await navigateBeforeDispatch("https://www.linkedin.com/feed/");
     for (
       let attempt = 0;
       (await chrome.tabs.get(id)).status !== "complete";

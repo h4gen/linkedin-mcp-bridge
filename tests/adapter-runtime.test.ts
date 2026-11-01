@@ -64,6 +64,8 @@ async function harness(
     session?: any;
     fetch?: (request: any) => any;
     page?: (url: string) => string;
+    navigationDelay?: number;
+    onMount?: (window: any) => void;
   } = {},
 ) {
   const dom = new JSDOM("<main></main>", {
@@ -123,6 +125,7 @@ async function harness(
     },
   });
   const tab: any = { id: 10, url: w.location.href, status: "complete" };
+  let pendingAdapterInjections = 0;
   function searchPage() {
     w.document.body.innerHTML =
       '<button id="sort" aria-label="Filter by Sort by">Sort</button><button id="date" aria-label="Filter by Date posted">Date</button><main>' +
@@ -174,6 +177,17 @@ async function harness(
     tabs: {
       get: async () => ({ ...tab }),
       update: async (_id: number, opts: any) => {
+        if (opts.url && options.navigationDelay) {
+          tab.pendingUrl = opts.url;
+          setTimeout(() => {
+            Object.assign(tab, opts);
+            delete tab.pendingUrl;
+            dom.reconfigure({ url: opts.url });
+            w.document.body.innerHTML = options.page?.(opts.url) ?? "";
+            options.onMount?.(w);
+          }, options.navigationDelay);
+          return { ...tab };
+        }
         Object.assign(tab, opts);
         if (opts.url) {
           dom.reconfigure({ url: opts.url });
@@ -193,6 +207,7 @@ async function harness(
         )
           throw Error("No document");
         if (opts.files) {
+          if (tab.pendingUrl) pendingAdapterInjections++;
           for (const file of opts.files)
             w.eval(await fs.readFile("dist/extension/" + file, "utf8"));
           return [{ documentId, result: undefined }];
@@ -280,6 +295,7 @@ async function harness(
       documentId = crypto.randomUUID();
     },
     scrolls: () => scrolls,
+    pendingAdapterInjections: () => pendingAdapterInjections,
     interruptFilter: () => {
       interactDuringFilter = true;
     },
@@ -648,4 +664,54 @@ it("keeps author-post lookup usable after an Inbox identity refresh", async () =
   });
   expect(result.error).toBeUndefined();
   expect(result.result.items).toHaveLength(1);
+});
+
+it("waits for an invitation destination even while Chrome reports the old document complete", async () => {
+  let present = true,
+    dispatches = 0;
+  const h = await harness({
+    navigationDelay: 20,
+    fetch: () => ({
+      data: {
+        elements: present
+          ? [
+              {
+                invitation: {
+                  entityUrn: "urn:li:fs_relInvitation:123",
+                  toMember: {
+                    dashEntityUrn: "urn:li:fsd_profile:friend",
+                    firstName: "Friend",
+                    publicIdentifier: "friend",
+                  },
+                },
+              },
+            ]
+          : [],
+        paging: { total: present ? 1 : 0 },
+      },
+    }),
+    page: () =>
+      '<main><div><a href="/in/friend/">Friend</a><button id="withdraw" aria-label="Withdraw invitation sent to Friend">Withdraw</button></div></main>',
+    onMount: (w) => {
+      w.document.getElementById("withdraw").onclick = () => {
+        const dialog = w.document.createElement("dialog");
+        dialog.open = true;
+        dialog.innerHTML =
+          '<button aria-label="Withdraw invitation sent to Friend">Withdraw</button>';
+        dialog.querySelector("button").onclick = () => {
+          dispatches++;
+          present = false;
+          dialog.remove();
+        };
+        w.document.body.append(dialog);
+      };
+    },
+  });
+  const response = await h.request("invitation_withdraw", {
+    invitation_urn: "urn:li:fs_relInvitation:123",
+    idempotency_key: "pending-navigation-withdraw",
+  });
+  expect(h.pendingAdapterInjections()).toBe(0);
+  expect(response.result?.status).toBe("confirmed");
+  expect(dispatches).toBe(1);
 });
