@@ -2,7 +2,7 @@
 
 Bring your LinkedIn inbox, people research and posts into your AI agent. Find earlier conversations, understand a person before replying, and prepare or schedule text posts.
 
-**0.8.0 — public Store installation is not available yet.** The listing is a draft. The setup below is the public-release flow; local testers can use the separate development instructions. macOS and native Windows are supported with Chrome, Codex or Claude Code.
+**0.8.1 — public Store installation is not available yet.** The listing is a draft. The setup below is the public-release flow; local testers can use the separate development instructions. macOS and native Windows are supported with Chrome, Codex or Claude Code.
 
 ## Start with the Chrome extension
 

@@ -3,7 +3,8 @@ import { chromium } from "playwright";
 import { createServer } from "node:http";
 import { readFile, mkdir } from "node:fs/promises";
 import assert from "node:assert/strict";
-const out = "artifacts/setup-0.8.0";
+const version = JSON.parse(await readFile("package.json", "utf8")).version;
+const out = "artifacts/setup-" + version;
 await mkdir(out, { recursive: true });
 const files = new Map(
   await Promise.all(
@@ -37,9 +38,9 @@ try {
   const page = await browser.newPage({
     viewport: { width: 1280, height: 1000 },
   });
-  await page.addInitScript(() => {
+  await page.addInitScript((version) => {
     window.fixture = {
-      version: "0.8.0",
+      version,
       channel: "development",
       extensionId: "a".repeat(32),
       setupIntent: "auto",
@@ -66,11 +67,15 @@ try {
         },
       },
     };
-  });
+  }, version);
   await page.goto(`http://127.0.0.1:${server.address().port}/setup.html`);
   await page.getByRole("button", { name: /Copy setup instructions/ }).click();
   assert.match(await page.evaluate(() => window.copied), /Codex/);
-  assert.match(await page.evaluate(() => window.copied), /v0.8.0/);
+  assert.ok(
+    (await page.evaluate(() => window.copied)).includes(
+      "Required release: v" + version + ";",
+    ),
+  );
   await page.getByLabel("Your AI client").selectOption("claude");
   await page.getByRole("button", { name: /Copy setup instructions/ }).click();
   assert.match(await page.evaluate(() => window.copied), /Claude Code/);

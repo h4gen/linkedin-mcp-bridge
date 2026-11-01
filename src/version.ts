@@ -1,4 +1,4 @@
-export const VERSION = "0.8.0";
+export const VERSION = "0.8.1";
 export const PROTOCOL = 1;
 export const CHANNEL =
   process.env.BRIDGE_CHANNEL === "pilot" ? "pilot" : "development";
