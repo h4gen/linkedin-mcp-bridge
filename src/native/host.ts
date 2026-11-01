@@ -1,4 +1,4 @@
-import { VERSION, PROTOCOL } from "../version.js";
+import { VERSION, PROTOCOL, CHANNEL } from "../version.js";
 import { StringDecoder } from "node:string_decoder";
 import net from "node:net";
 import fs from "node:fs/promises";
@@ -161,6 +161,17 @@ process.stdin.on("data", (chunk) => {
   try {
     for (const m of decoder.push(chunk)) {
       const msg = m as any;
+      if (msg?.type === "hello") {
+        process.stdout.write(
+          encodeNativeMessage({
+            type: "hello",
+            protocol: PROTOCOL,
+            hostVersion: VERSION,
+            channel: CHANNEL,
+          }),
+        );
+        continue;
+      }
       const owner = owners.get(msg.id);
       if (!owner) continue;
       clearTimeout(owner.timer);

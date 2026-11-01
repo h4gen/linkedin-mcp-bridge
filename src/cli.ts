@@ -12,6 +12,13 @@ import {
   Operation,
 } from "./core/contracts.js";
 import { call } from "./native/client.js";
+import {
+  agentInstructions,
+  REPOSITORY,
+  RELEASE_REF,
+  STORE_URL,
+} from "./setup.js";
+import { STORE_EXTENSION_ID } from "./version.js";
 import { install, uninstall } from "./installer.js";
 async function main() {
   const command = process.argv[2] ?? "mcp";
@@ -23,19 +30,47 @@ async function main() {
     console.log(JSON.stringify(await uninstall(), null, 2));
     return;
   }
+  if (command === "instructions") {
+    const client = process.argv[3];
+    if (client !== "codex" && client !== "claude")
+      throw Error("Usage: instructions codex|claude [EXTENSION_ID]");
+    console.log(
+      agentInstructions(client, process.argv[4] ?? STORE_EXTENSION_ID),
+    );
+    return;
+  }
   if (command === "doctor") {
-    const health = await call("health", {});
-    if (health.version !== VERSION)
-      throw Error(
-        `version_mismatch: CLI ${VERSION}, connected extension ${health.version}. Reload/update the extension, reconnect, then run doctor again.`,
+    try {
+      const health = await call("health", {});
+      if (health.version !== VERSION)
+        throw Error(
+          `version_mismatch: CLI ${VERSION}, connected extension ${health.version}. Use the matching extension/server release, restart the MCP client, then run doctor again. No Connect click is required.`,
+        );
+      console.log(JSON.stringify(health, null, 2));
+      if (!health.connected) process.exitCode = 1;
+    } catch (e) {
+      console.log(
+        JSON.stringify(
+          {
+            connected: false,
+            version: VERSION,
+            error: e instanceof Error ? e.message : "connection_unavailable",
+            extension_url: STORE_URL,
+            installation_guide:
+              REPOSITORY + "/blob/" + RELEASE_REF + "/docs/INSTALL_AGENT.md",
+            next: "Check Chrome and the extension's settings. Install the matching local server if missing; sign in to LinkedIn if requested. An unreachable transport alone does not establish whether Chrome is closed or the extension is missing.",
+          },
+          null,
+          2,
+        ),
       );
-    console.log(JSON.stringify(health, null, 2));
-    if (!health.connected) process.exitCode = 1;
+      process.exitCode = 1;
+    }
     return;
   }
   if (command !== "mcp")
     throw Error(
-      "Usage: linkedin-mcp-bridge [mcp | doctor | install EXTENSION_ID | uninstall]",
+      "Usage: linkedin-mcp-bridge [mcp | doctor | install [EXTENSION_ID] | instructions codex|claude [EXTENSION_ID] | uninstall]",
     );
   const server = new McpServer(
     {

@@ -6,7 +6,13 @@ import { HOST, root, manifestPath, registryKey } from "./native/paths.js";
 import { execFileSync } from "node:child_process";
 import { launcherText } from "./native/platform.js";
 import { prepareAccess } from "./native/access.js";
-import { STORE_EXTENSION_ID } from "./version.js";
+import { REPOSITORY, RELEASE_REF, STORE_URL } from "./setup.js";
+import {
+  VERSION,
+  CHANNEL,
+  PUBLISHED_VERSION,
+  STORE_EXTENSION_ID,
+} from "./version.js";
 export function manifest(id: string, launcher: string) {
   if (!/^[a-p]{32}$/.test(id))
     throw Error("Expected a Chrome extension ID (32 letters a-p).");
@@ -28,6 +34,28 @@ export async function install(id: string = STORE_EXTENSION_ID) {
     process.platform === "win32" ? "native-host.cmd" : "native-host.sh",
   );
   const spec = manifest(id, launcher);
+  const previous = await fs.readFile(manifestPath, "utf8").catch((e) => {
+    if (e.code !== "ENOENT") throw e;
+    return undefined;
+  });
+  if (previous) {
+    let old;
+    try {
+      old = JSON.parse(previous);
+    } catch {
+      throw Error(
+        "existing_installation_conflict: Native registration is not valid JSON; inspect it before replacing it.",
+      );
+    }
+    if (
+      old.name !== spec.name ||
+      JSON.stringify(old.allowed_origins) !==
+        JSON.stringify(spec.allowed_origins)
+    )
+      throw Error(
+        "existing_installation_conflict: This channel is registered to another extension. Keep it intact; inspect that installation before changing it.",
+      );
+  }
   await prepareAccess();
   const host = join(dirname(fileURLToPath(import.meta.url)), "host.js");
   await fs.access(host);
@@ -57,10 +85,71 @@ export async function install(id: string = STORE_EXTENSION_ID) {
         linkedin: { command: process.execPath, args: [cli, "mcp"] },
       },
     },
-    next: "Install the Chrome extension, connect your LinkedIn tab, then run doctor.",
+    version: VERSION,
+    channel: CHANNEL,
+    release_ref: RELEASE_REF,
+    extension_url: STORE_URL,
+    published_version: PUBLISHED_VERSION || null,
+    installation_guide:
+      REPOSITORY + "/blob/" + RELEASE_REF + "/docs/INSTALL_AGENT.md",
+    client_commands: {
+      codex: [
+        "codex",
+        "mcp",
+        "add",
+        "linkedin",
+        "--",
+        process.execPath,
+        cli,
+        "mcp",
+      ],
+      claude: [
+        "claude",
+        "mcp",
+        "add",
+        "--transport",
+        "stdio",
+        "--scope",
+        "user",
+        "linkedin",
+        "--",
+        process.execPath,
+        cli,
+        "mcp",
+      ],
+    },
+    next: "Register the selected client using its command above. Open Chrome with the extension and sign in to LinkedIn; it connects automatically. Restart the client if needed, then run doctor and verify tools in that client.",
+    store_note: PUBLISHED_VERSION
+      ? "Use the server release matching the installed extension, not arbitrary main."
+      : "The Store listing is not public yet. The public Store-first installation cannot be completed until publication. For pre-release testing only, load the matching dist/extension unpacked and register its actual ID.",
   };
 }
 export async function uninstall() {
+  const current = await fs.readFile(manifestPath, "utf8").catch((e) => {
+    if (e.code !== "ENOENT") throw e;
+    return undefined;
+  });
+  if (current) {
+    const spec = JSON.parse(current);
+    const expected = join(
+      root,
+      process.platform === "win32" ? "native-host.cmd" : "native-host.sh",
+    );
+    const currentHost = join(
+      dirname(fileURLToPath(import.meta.url)),
+      "host.js",
+    );
+    if (
+      spec.name !== HOST ||
+      spec.path !== expected ||
+      (await fs.readFile(expected, "utf8")) !==
+        launcherText(process.platform, process.execPath, currentHost)
+    )
+      throw Error(
+        "installation_owned_by_other_checkout: Use the currently registered installation to uninstall.",
+      );
+  }
+
   if (process.platform === "win32") {
     let registered = "";
     try {

@@ -9,6 +9,9 @@ const channel =
 const release = JSON.parse(await readFile("store/release.json", "utf8"));
 const version = JSON.parse(await readFile("package.json", "utf8")).version;
 const define = {
+  "process.env.BRIDGE_PUBLISHED_VERSION": JSON.stringify(
+    release.published_version || "",
+  ),
   "process.env.BRIDGE_STORE_EXTENSION_ID": JSON.stringify(
     release.store_extension_id || "",
   ),
@@ -31,7 +34,7 @@ await build({
   define,
   entryPoints: [
     "src/extension/background.ts",
-    "src/extension/popup.ts",
+    "src/extension/setup.ts",
     "src/extension/page-adapters.ts",
   ],
   outdir: "dist/extension",
@@ -56,7 +59,8 @@ await writeFile(
       permissions: ["storage", "scripting", "nativeMessaging", "alarms"],
       host_permissions: ["https://www.linkedin.com/*"],
       background: { service_worker: "background.js" },
-      action: { default_popup: "popup.html" },
+      action: { default_title: "LinkedIn MCP settings" },
+      options_ui: { page: "setup.html", open_in_tab: true },
       icons: { 16: "icon16.png", 48: "icon48.png", 128: "icon128.png" },
       content_security_policy: {
         extension_pages: "script-src 'self'; object-src 'self'",
@@ -67,7 +71,7 @@ await writeFile(
   ),
 );
 for (const file of [
-  "popup.html",
+  "setup.html",
   "ui.css",
   "icon16.png",
   "icon48.png",

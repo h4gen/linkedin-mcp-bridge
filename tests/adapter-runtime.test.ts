@@ -261,7 +261,7 @@ async function harness(
   await new Promise((resolve) =>
     popup(
       { action: "status" },
-      { id: "extension", url: chrome.runtime.getURL("popup.html") },
+      { id: "extension", url: chrome.runtime.getURL("setup.html") },
       resolve,
     ),
   );

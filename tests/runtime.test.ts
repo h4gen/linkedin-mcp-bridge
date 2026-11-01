@@ -99,7 +99,17 @@ it("installs isolated native manifest and round-trips a real native/socket frame
       ["dist/cli.js", "install", "a".repeat(32)],
       { env, stdio: ["ignore", "pipe", "pipe"] },
     );
+    let installOutput = "";
+    installer.stdout!.on("data", (b) => (installOutput += b));
     expect((await once(installer, "exit"))[0]).toBe(0);
+    const installed = JSON.parse(installOutput);
+    expect(installed.published_version).toBeNull();
+    expect(installed.client_commands.codex.slice(-3)).toEqual([
+      process.execPath,
+      path.resolve("dist/cli.js"),
+      "mcp",
+    ]);
+    expect(installed.client_commands.claude).toContain("user");
     const reinstall = spawn(
       process.execPath,
       ["dist/cli.js", "install", "a".repeat(32)],
@@ -109,6 +119,33 @@ it("installs isolated native manifest and round-trips a real native/socket frame
     const manifest = JSON.parse(await fs.readFile(paths.manifestPath, "utf8"));
     const launcher = await fs.readFile(manifest.path, "utf8");
     expect(launcher).toContain(path.join("dist", "host.js"));
+    const conflict = spawn(
+      process.execPath,
+      ["dist/cli.js", "install", "b".repeat(32)],
+      { env, stdio: "ignore" },
+    );
+    expect((await once(conflict, "exit"))[0]).toBe(1);
+    expect(JSON.parse(await fs.readFile(paths.manifestPath, "utf8"))).toEqual(
+      manifest,
+    );
+    expect(await fs.readFile(manifest.path, "utf8")).toBe(launcher);
+    await fs.writeFile(
+      manifest.path,
+      launcher + "\n# owned by another checkout\n",
+    );
+    const staleUninstall = spawn(
+      process.execPath,
+      ["dist/cli.js", "uninstall"],
+      {
+        env,
+        stdio: "ignore",
+      },
+    );
+    expect((await once(staleUninstall, "exit"))[0]).toBe(1);
+    expect(await fs.readFile(paths.manifestPath, "utf8")).toContain(
+      manifest.name,
+    );
+    await fs.writeFile(manifest.path, launcher);
     host = spawn(process.execPath, ["dist/host.js"], {
       env,
       stdio: ["pipe", "pipe", "pipe"],
@@ -361,7 +398,7 @@ it("migrates old drafts without dispatch and retains mutation receipts", async (
       URLSearchParams,
     },
   );
-  const sender = { id: "extension", url: chrome.runtime.getURL("popup.html") };
+  const sender = { id: "extension", url: chrome.runtime.getURL("setup.html") };
   const status: any = await new Promise((resolve) =>
     listener({ action: "status" }, sender, resolve),
   );
@@ -383,7 +420,7 @@ it("migrates old drafts without dispatch and retains mutation receipts", async (
       () => {},
     ),
   ).toBeUndefined();
-  const popup = await fs.readFile("dist/extension/popup.html", "utf8");
+  const popup = await fs.readFile("dist/extension/setup.html", "utf8");
   expect(popup).not.toContain('id="review"');
   expect(popup).toContain('data-action="clear"');
   expect(

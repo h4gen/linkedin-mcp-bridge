@@ -18,6 +18,7 @@ jobs:
       - run: npm run format:check
       - run: npx playwright install chromium
       - run: node scripts/browser-smoke.mjs
+      - run: node scripts/setup-smoke.mjs
       - run: npm run package
       - run: npm run release:check
       - uses: actions/upload-artifact@v4

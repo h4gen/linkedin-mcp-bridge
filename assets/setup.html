@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>LinkedIn MCP · Setup</title><link rel="stylesheet" href="ui.css"></head>
+<body><main>
+<header><img src="icon48.png" width="32" height="32" alt=""><span>LinkedIn MCP <span class="muted">/ AI Connector</span></span></header>
+<section class="hero" aria-labelledby="title">
+<p class="eyebrow" id="step">LET YOUR AGENT HANDLE THE SETUP</p>
+<h1 id="title">LinkedIn, connected<br>to your AI.</h1>
+<p id="description" class="lead" role="status" aria-live="polite">Copy the instructions into your agent. It handles installation and checks the connection for you.</p>
+<div id="client-choice"><label for="client">Your AI client</label><select id="client"><option value="codex">Codex</option><option value="claude">Claude Code</option></select></div>
+<button id="primary" class="primary">Copy setup instructions <span aria-hidden="true">↗</span></button>
+<p id="feedback" class="feedback" role="status" aria-live="polite"></p>
+<p class="note">Your agent receives the LinkedIn content you request and can carry out requested actions. Its AI provider may process that content. <a href="https://github.com/h4gen/linkedin-mcp-bridge/blob/main/store/privacy.md" target="_blank" rel="noreferrer">Data &amp; privacy</a></p>
+</section>
+<details id="settings"><summary>Settings &amp; help</summary><div class="settings-body">
+<div class="setting"><span>LinkedIn connection</span><button id="toggle" data-action="pause">Pause</button></div>
+<div class="setting"><span>Set up another agent</span><button id="copy-setup">Copy instructions</button></div>
+<p class="small">Choose the client above before copying. A new chat or client restart may be needed after your agent finishes installation.</p>
+<p><a href="https://github.com/h4gen/linkedin-mcp-bridge" target="_blank" rel="noreferrer">Installation guide</a> <span aria-hidden="true">·</span> <a href="https://github.com/h4gen/linkedin-mcp-bridge/issues" target="_blank" rel="noreferrer">Get help</a></p>
+<details id="advanced"><summary>Advanced</summary><div class="advanced-body">
+<p class="small">Disconnect stops access until you enable it again. Clearing local data also removes saved duplicate-send protection.</p>
+<div class="buttons"><button data-action="disconnect">Disconnect</button><button data-action="clear">Clear local data</button><button id="copy-remove">Copy uninstall instructions</button></div>
+<button id="copy-diagnostics">Copy diagnostics</button><pre id="diagnostics"></pre>
+</div></details>
+</div></details>
+<footer>Independent software. Not affiliated with LinkedIn.</footer>
+</main><script src="setup.js"></script></body></html>

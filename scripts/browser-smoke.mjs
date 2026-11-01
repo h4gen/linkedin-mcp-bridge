@@ -124,17 +124,22 @@ try {
           chrome.runtime.lastError?.message || "disconnected";
       });
       nativePort.onMessage.addListener((msg) => {
+        if (msg.type === "hello") globalThis.nativeHello = msg;
         if (msg.op === "health")
           nativePort.postMessage({
             id: msg.id,
             result: { version, connected: false, capabilities: [] },
           });
       });
+      nativePort.postMessage({ type: "hello" });
     },
     { hostName, version },
   );
   await page.waitForTimeout(1000);
   assert.equal(await page.evaluate(() => globalThis.nativeError), null);
+  const hello = await page.evaluate(() => globalThis.nativeHello);
+  assert.equal(hello?.hostVersion, version);
+  assert.equal(hello?.channel, "development");
   const cli = spawn(process.execPath, ["dist/cli.js", "doctor"], {
     env,
     stdio: ["ignore", "pipe", "pipe"],

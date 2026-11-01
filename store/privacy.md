@@ -12,9 +12,9 @@ Requested results travel from the LinkedIn tab through Chrome Native Messaging a
 
 ## Storage and controls
 
-The selected account/tab remains locally until disconnected or cleared. Temporary pagination state expires after 30 minutes and is removed during periodic cleanup; session storage also clears when Chrome ends the session. Content-free mutation receipts are retained locally for seven days. Results already delivered to the MCP client are governed by that client's retention policy and are not erased by clearing the extension.
+Once the local server is available, the extension automatically binds the LinkedIn account signed in to its work tab. That account/tab remains locally until disconnected or cleared. Account changes are not silently adopted. Temporary pagination state expires after 30 minutes and is removed during periodic cleanup; session storage also clears when Chrome ends the session. Content-free mutation receipts are retained locally for seven days. Results already delivered to the MCP client are governed by that client's retention policy and are not erased by clearing the extension.
 
-Pause stops new operations; it cannot undo a request already dispatched to LinkedIn. Disconnect removes the binding. The extension popup can clear local data; clearing receipts also removes duplicate-send protection for previous operation keys. Uninstalling the extension removes its Chrome storage. The separate local MCP bridge can be unregistered and removed independently.
+Pause stops new operations; it cannot undo a request already dispatched to LinkedIn. Disconnect removes the binding. The extension settings page can clear local data; clearing receipts also removes duplicate-send protection for previous operation keys. Uninstalling the extension removes its Chrome storage. The separate local MCP bridge can be unregistered and removed independently.
 
 ## Limited use and security
 

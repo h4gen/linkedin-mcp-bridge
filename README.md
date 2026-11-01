@@ -1,143 +1,54 @@
 # LinkedIn MCP – AI Connector for Claude & Codex
 
-32 primitive LinkedIn tools for local AI agents: inbox and message history, people research, invitations, feed interactions, native text drafts and scheduling. The agent composes these tools; this project does not implement workflows, a CRM or an inbox index.
+Bring your LinkedIn inbox, people research and posts into your AI agent. Find earlier conversations, understand a person before replying, and prepare or schedule text posts.
 
-**0.7.2 — inbox identity repair; Chrome Web Store submission pending.** Installation from Git supports macOS and native Windows with Google Chrome and Node.js 22+. Both platforms pass CI, including native registration, process round-trips and an isolated Chromium/native-messaging smoke test. Live LinkedIn checks were performed on macOS. Linux/WSL and direct web-chat connections are outside this release.
+**0.8.0 — public Store installation is not available yet.** The listing is a draft. The setup below is the public-release flow; local testers can use the separate development instructions. macOS and native Windows are supported with Chrome, Codex or Claude Code.
 
-LinkedIn credentials stay in Chrome. Requested content goes to your selected MCP client and may go to its AI provider. No hosted relay or product telemetry. Writes execute directly after target and idempotency checks; there is no extension approval queue.
+## Start with the Chrome extension
 
-## Install from Git (for agents)
+1. Install the extension when its Store release is available. It opens a setup page automatically.
+2. Choose **Codex** or **Claude Code**, click **Copy setup instructions**, and paste into your agent.
+3. Let your agent install and configure the local server. Sign in to LinkedIn if asked. The extension connects automatically.
+4. Continue in your agent. If it has not loaded the new tools yet, start a new chat or restart the client as instructed.
 
-Repository: https://github.com/h4gen/linkedin-mcp-bridge
+No terminal commands, JSON editing, extension-ID lookup or Connect button are needed from you. Click the extension icon whenever you want settings or help.
 
-1. Check `git --version`, `node --version` (22+) and `npm --version`. Use native Windows Node with native Windows Chrome, not WSL.
-2. Clone into a durable directory; do not delete or move it after setup:
+## Starting from this repository?
 
-```sh
-git clone https://github.com/h4gen/linkedin-mcp-bridge.git
-cd linkedin-mcp-bridge
-npm ci
-npm run build:store
-```
+Give your agent this request:
 
-3. Install the Chrome Web Store extension once its link is published here. During development, use `chrome://extensions` → Developer mode → Load unpacked → `dist/extension`, then copy its ID.
-4. Register the native host as the current user:
+> Install LinkedIn MCP from https://github.com/h4gen/linkedin-mcp-bridge for the AI client I'm using. Read docs/INSTALL_AGENT.md and store/release.json first. Use the version that matches the installed Chrome extension, or the published Store version if I don't have the extension yet. Preserve my other MCP servers. Verify the setup with read-only checks, and tell me any remaining sign-in or client-restart step.
 
-```sh
-node dist/cli.js install
-```
+The agent checks Store availability and gives you the exact extension link when it is published. If you already installed the local server, the extension detects it and skips that step. The Store ID is `pibhcinkiadfplcaefllaeappkpnpfjm`; an assigned ID alone does not mean the listing is published.
 
-The assigned Store ID is `pibhcinkiadfplcaefllaeappkpnpfjm`; the store build uses it by default. The Store listing is currently a draft and is not yet publicly installable. To override the ID for testing, use `node dist/cli.js install EXTENSION_ID`. The installer prints absolute paths and ready-to-use `mcpServers.linkedin` JSON. Configure your local client's stdio MCP server using that output. Do not guess executable paths. No elevated privileges or notarized package is needed. 5. Open LinkedIn in Chrome, open the extension, acknowledge the data flow and connect the tab. Then check:
+## What you can ask your agent
 
-```sh
-node dist/cli.js doctor
-```
+- Find a person's earlier conversations, read long messages and prepare a reply with context.
+- Search posts about a topic, explore comments and reactions, then research the people involved.
+- Check profiles, author posts and connection or pending-invitation status.
+- Save a native text draft, schedule a post or cancel a scheduled post.
 
-The server command is the printed absolute Node path; arguments are the printed absolute `dist/cli.js` path followed by `mcp`. For a TOML-configured client, put these same values under `[mcp_servers.linkedin]` as `command` and `args`.
+The agent combines 32 individual tools. There are no built-in campaigns, lead scores, CRM records or always-on reply monitoring. Results can be partial; your agent can request further available pages. No direct ChatGPT website connection is included.
 
-One Chrome profile owns the connection at a time. Browser authentication is interactive; the agent must not bypass login. While Chrome is running, the bridge recreates a lost work tab on the next request and verifies the saved account. DOM tools may bring the dedicated work tab forward. Pause stops new work; reconnect to resume.
+## Settings and troubleshooting
 
-### Update and uninstall
+The extension icon opens the same simple setup/settings page. It shows the next useful step: let your agent finish setup, sign in to LinkedIn, resume a deliberate pause, or copy repair instructions. Recovery is automatic while Chrome is running. A changed account is never silently substituted.
 
-Run `git pull --ff-only`, `npm ci`, `npm run build:store`, then `node dist/cli.js install`. Restart the MCP client to load the updated server and run `doctor`. Compatible extension updates preserve the saved connection and any explicit pause; they do not require another Connect click. Extension and native host versions must match; retain the matching Git release when Chrome has not received the new extension yet.
+Settings contain Pause/Resume and setup instructions for another agent. Advanced settings contain Disconnect, local-data clearing, uninstall instructions and content-free diagnostics. Clearing local data also clears saved duplicate-send protection.
 
-`node dist/cli.js uninstall` removes this installation's native registration and launcher. Remove the Chrome extension separately to clear browser storage. The checkout can then be removed.
+For updates, copy the current extension's instructions to your agent. It installs the matching Git release, not arbitrary latest main. To remove the product, use **Copy uninstall instructions** in Advanced settings; remove the extension separately through Chrome.
 
-For development, `npm run build` selects the development native host; use the generated extension with that same build. `npm run build:store` selects the separate store host. Never mix the two builds.
+## Data and actions
 
-## Agent usage
+Your agent receives the LinkedIn content you request and can perform requested actions. Its AI provider may process that content. LinkedIn credentials stay in Chrome; there is no hosted relay or product telemetry. Writes execute directly without an extension approval queue. [Data and privacy](store/privacy.md).
 
-Read MCP server instructions and `health` first. Use returned account and target IDs, inspect coverage and continue bounded pagination. For inbox prioritization, combine conversation pages with selected message histories. For contact context, combine profile reads with relevant conversations. These are examples of composition, not built-in workflows.
+## For agents and local testers
 
-`conversations_search` matches participant/title/preview, not message-body history. The agent can read histories ad hoc. Summaries, follow-up reasoning and notes belong to the agent or the user's existing systems.
+- [Exact installation, repair and uninstall instructions](docs/INSTALL_AGENT.md)
+- [Tool contracts, behavior and development reference](docs/REFERENCE.md)
+- [Validation and current limitations](docs/validation.md)
+- [Store draft status](store/SUBMISSION.md)
 
-See [0.7 primitive contracts and migration](docs/primitives-0.7.md) for compact read responses, text windows, exact relationship/conversation lookup and scoped comment replies. Existing MCP processes must restart to discover the five new tools; the browser connection stays bound.
+Before publication, local testers build the selected candidate with `npm ci` and `npm run build`, load `dist/extension` through Chrome's **Load unpacked**, then use that extension's copied instructions. Register its actual ID with `node dist/cli.js install EXTENSION_ID`. Do not use the assigned Store ID for an unpacked build. A development build and a Store/pilot build use separate native registrations.
 
-## Tools
-
-All names have a `linkedin_` prefix. First call `health`, then supply its `account_urn` to every account operation.
-
-| Area        | Tools                                                                                                                                                                                 |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Inbox       | `conversations_list`, `conversations_search`, `conversations_get`, `conversations_find`, `messages_list`, `message_get`, `message_send`, `conversation_update`, `conversation_delete` |
-| People      | `profile_get`, `profile_posts_list`, `relationship_get`, `people_search`, `invitations_list`, `invitation_send`, `invitation_respond`, `invitation_withdraw`                          |
-| Feed        | `feed_list`, `posts_search`, `post_get`, `post_like`, `post_comment`, `comments_list`                                                                                                 |
-| Planning    | `post_draft_create`, `post_schedule`, `scheduled_posts_list`, `scheduled_post_cancel`                                                                                                 |
-| GTM         | `people_search_filters`, `reactions_list`, `post_resolve`                                                                                                                             |
-| Diagnostics | `health`, `operation_get`                                                                                                                                                             |
-
-Lists default to 20, max 50. LinkedIn Inbox requests are capped at 20 per backend page because live requests for 50 return an unusable response; use the cursor to continue. Pass the returned opaque `next_cursor` as `cursor` with the **same arguments**. Cursors expire after 30 minutes, are bound to account, filters and operation, and reset with the browser session. Lists are live, not immutable snapshots. Deduplicate by entity URN when traversing a changing inbox. `conversations_search` searches participant/title/preview content in each fetched page; follow its cursor to search older pages. It is not full historical message search.
-
-Inbox/history reads use HTTP only and never intentionally open a conversation or mark it read. Attachment metadata can appear in normalized read results; uploading or downloading attachment content is not implemented.
-
-### Native drafts and scheduling
-
-`post_create` has been removed. `post_draft_create` saves a personal text-only post as a native LinkedIn draft and verifies it by reopening it. It refuses to replace any existing draft. `post_schedule` schedules text in LinkedIn using an ISO `scheduled_at` with explicit timezone, whole-minute precision, at least ten minutes and at most three months ahead. LinkedIn owns the schedule; no local background publisher is installed.
-
-`scheduled_posts_list` returns native scheduled posts with account-bound `scheduled_ref` values. Pass one to `scheduled_post_cancel` to remove exactly the matching text/time entry. Unknown layouts, ambiguous entries and mismatched accounts fail closed. Planning currently targets the observed English LinkedIn composer. Scheduling does not fall back to immediate publication.
-
-Planning receipts expose `outcome`: `draft_saved`, `scheduled`, or `schedule_cancelled`. Unknown outcomes can be reconciled with `operation_get` or the original key, without repeating the mutation. Schedule references contain hashes and timestamps, not post bodies, and expire seven days after the scheduled time on the next operation. Clear local data removes them immediately.
-
-### Writes and uncertain results
-
-Every write requires `idempotency_key`. Use the same key for a retry of the same operation; changing its payload produces `idempotency_conflict`. Receipts survive service-worker/native-host restarts for seven days. After seven days a key is no longer protected: check LinkedIn before replaying an old action.
-
-`message_send` requires either `conversation_urn` or `recipient_urn`, plus exact `expected_participant_urns` excluding yourself. Existing-conversation validation first checks an exact conversation entity in the history response, then traverses Inbox, Archive and Spam within the operation deadline. It fails closed if participants cannot be verified. There is no fixed 260-thread limit. New recipient sends require one exact profile URN. Group replies use the exact participant set; group creation is excluded.
-
-Writes execute immediately through the connected account. There is no extension review queue or per-operation approval. `operation_get` reads persisted execution receipts, and the same key replays the receipt without dispatching again. Live acceptance is reported separately from availability.
-
-Statuses:
-
-- `confirmed`: a created entity receipt or verified DOM state was observed.
-- `unknown_outcome`: the action may have happened. Do not submit a new key or switch adapters. Inspect LinkedIn or use `operation_get`.
-- `failed_before_dispatch`: no mutation was dispatched, although a read/precondition failed.
-
-`operation_get` can reconcile an uncertain existing-thread message if its origin token appears in bounded older-history traversal. No matching token is **not** proof of non-delivery. Read/unread and archive/unarchive changes also get a bounded list-based state check after dispatch. Other uncertain operations remain uncertain until checked in LinkedIn. HTTP success without an identifiable receipt/state is deliberately not reported as verified success.
-
-Calls serialize across MCP clients in the extension. HTTP requests have at least one second spacing and a 15-second fetch timeout. Queued calls expire after 60 seconds. Cancellation prevents queued work and checks before dispatch; an in-flight browser operation may finish and its receipt remains available. No automatic write retries or HTTP-to-DOM mutation fallbacks. An explicit same-key call may retry a recorded `failed_before_dispatch` after fresh target checks. Receipts include `dispatch_state`, `attempt_count`, and up to ten prior attempt summaries. Legacy DOM failures are recoverable only when the original pre-click failure and the still-present exact target can be verified; other unknown outcomes remain non-retryable.
-
-### DOM operation boundaries
-
-The DOM adapter uses only packaged operations, exact target URNs, unique visible controls and English/German labels. It never accepts caller-supplied selectors or scripts. `post_resolve` accepts only validated LinkedIn post URLs. A missing/ambiguous target fails rather than clicking an unrelated control.
-
-Feed pagination is a bounded live scroll. `post_resolve` resolves a rendered card's `scan_key` through its scoped control menu and binds its exact identity to that card. A share ID is not advertised as a verified public permalink. Read reactions/comments on the resolved card; if no matching card exists, post reads navigate only the work tab when a supported activity location or observed permalink is available. No arbitrary navigation URL is accepted.
-
-`comments_list` expands comments/replies and returns bounded, deduplicated pages with author profiles and truncation indicators. `reactions_list` opens only the selected post's visible reaction dialog and retains that dialog for cursor continuation. Both remain partial because LinkedIn may rank or omit entries. Reply parent IDs are supplied only when the DOM establishes the relationship.
-
-`people_search` supports `filters.connection_degrees` (`1`, `2`, `3`), `location_ids` and `company_ids`. `people_search_filters` takes `kind: location|company` and a name query to resolve numeric values through LinkedIn's public typeahead. No Sales Navigator requests are made.
-
-Collection jobs were removed in 0.3. Use direct cursor pages. DOM reads use a dedicated LinkedIn work tab and bring it forward to avoid background timer throttling. Navigating or clicking controls in that tab invalidates its traversal cursor; API reads do not. A consumed cursor replays its cached page. Session cursors expire after 30 minutes and share a 5 MiB storage budget. See [interface contract](docs/interface-patterns.md).
-
-The registry exposes all 32 operations in development and pilot builds. `health` reports current-build acceptance separately from availability. `store:check` requires current-runtime evidence for every capability and the publishing prerequisites; acceptance does not gate individual calls.
-
-## Development and packaging
-
-```sh
-npm run typecheck
-npm test                 # builds actual bundles before testing
-npm run package          # dist/linkedin-extension.zip
-```
-
-Tests cover strict tool boundaries, native framing/fragmentation, actual MCP stdio registration, actual MV3 bundle startup, installer isolation, native/socket roundtrip, account and recipient mismatches, opaque cursor binding, mutation persistence and ambiguous outcomes. No live writes occur during tests.
-
-`dist/linkedin-extension.zip` is the extension upload artifact. Store listing, privacy notice and reviewer instructions are in `store/`. `npm run release:check` validates the local build; `npm run store:check` separately checks the store ID, screenshots, privacy URL and runtime-bound acceptance. No signed companion is required.
-
-Remove the local host using `node dist/cli.js uninstall`. Remove the Chrome extension separately to erase its local data. Receipts contain payload hashes, target/account IDs, operation IDs, timestamps and statuses, not message bodies. Reads are transient MCP responses, not an inbox database. As with other local MCP tools, clients on the same OS account are trusted; other OS users cannot access the private socket directory.
-
-## Release checks
-
-`npm run check` runs type checking and automated tests with simulated writes. CI runs on macOS and Windows. `npm run package` builds the development extension ZIP; `npm run package:store` builds the store-channel ZIP.
-
-`npm run release:check` checks local build consistency. `npm run store:check` additionally requires a clean source tree, real store ID, public privacy URL, UI screenshots and runtime-bound capability/installation evidence. Passing automated tests does not claim live LinkedIn acceptance. The runtime fingerprint includes source, assets, dependencies and build scripts; documentation-only commits do not invalidate it.
-
-See [validation](docs/validation.md) for historical live checks and current limitations. The release metadata deliberately reports missing external publication requirements rather than fabricating them.
-
-## Market research
-
-[Market report, 30 October 2026](docs/research/2026-10-30/linkedin-market-research.docx) is historical research. The current product scope is primitive tools, Git installation and a public Chrome extension; report recommendations are not implementation requirements.
-
-Connection recovery is automatic after work-tab loss, worker restarts and brief native-host interruptions. Chrome must be running; an expired LinkedIn login or a changed account still needs attention. `doctor` exits nonzero when the connection is unusable. Health reports the specific session/tab error; transport failures report `native_host_unavailable`. A dispatched write is never replayed automatically after a disconnect.
-
-Read-primitive repair contracts and compatibility notes: [0.7.1 repairs](docs/repairs-0.7.1.md).
-
-Inbox-to-profile identity repair: [0.7.2 contracts and migration](docs/repairs-0.7.2.md).
+The repository's instructions are sufficient for a local agent to handle shell work. The human still completes account sign-in and any client/OS permission prompt that requires personal interaction. Store submission and real platform acceptance are tracked separately from automated tests.

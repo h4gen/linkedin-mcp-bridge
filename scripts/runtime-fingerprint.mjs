@@ -23,7 +23,10 @@ export async function runtimeFingerprint(base = ".") {
     await readFile(join(base, "store/release.json"), "utf8"),
   );
   hash.update(
-    JSON.stringify({ store_extension_id: release.store_extension_id }),
+    JSON.stringify({
+      store_extension_id: release.store_extension_id,
+      published_version: release.published_version ?? null,
+    }),
   );
   return hash.digest("hex");
 }

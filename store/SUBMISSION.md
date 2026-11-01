@@ -1,10 +1,10 @@
-# Chrome Web Store draft — 0.7.2 listing refresh
+# Chrome Web Store draft — 0.8.0 setup redesign
 
-The listing copy and four of the five explainer graphics were updated locally on 2026-11-01 to reflect the 0.7.2 capability set. This is a targeted refresh of the existing positioning and visual style, not a new product direction. The title, publishing graphic, icon and both promo tiles are unchanged. The portal update is pending: the existing Store session expired and Google now requires the account owner's passkey. No new package upload, submission or publication has been performed. The last verified portal package remains the 0.6.0 draft; the previous 0.7.0 upload was unconfirmed after renewed sign-in.
+Historical listing refresh: the listing copy and four of the five explainer graphics were updated locally on 2026-11-01 to reflect the 0.7.2 capability set. This is a targeted refresh of the existing positioning and visual style, not a new product direction. The title, publishing graphic, icon and both promo tiles are unchanged. The portal update is pending: the existing Store session expired and Google now requires the account owner's passkey. No new package upload, submission or publication has been performed. The last verified portal package remains the 0.6.0 draft; the previous 0.7.0 upload was unconfirmed after renewed sign-in.
 
 Historical local package (0.7.1, not the current 0.7.2 build): `artifacts/store-0.7.1/linkedin-extension.zip`, SHA-256 `5da2854c2f0f99b63d1b3ea0b69792a63657092807886a806bd647fd8aa19fb9`. Pilot-channel build metadata and `store-check.json` are alongside it. Historical runtime fingerprint: `e426d1d858b43ef34703c9c49618929191f34cfd06af780441ecc382d6230a78`.
 
-Current 0.7.2 runtime fingerprint: `2e2b5e2093b0f2319f448cc5e43e9f738fa7fce103889cbec4df60526fc28eb0`. Its acceptance manifest credits ten read/diagnostic capabilities and both installation platforms; the remaining capabilities still need current-runtime evidence for submission. The broader 0.7.1 acceptance remains historical. This content refresh changes no executable code and performs no LinkedIn writes. See `docs/validation.md` and `docs/repairs-0.7.2.md` for the exact acceptance scope.
+Historical 0.7.2 runtime fingerprint: `2e2b5e2093b0f2319f448cc5e43e9f738fa7fce103889cbec4df60526fc28eb0`. Its acceptance manifest credits ten read/diagnostic capabilities and both installation platforms; the remaining capabilities still need current-runtime evidence for submission. The broader 0.7.1 acceptance remains historical. This content refresh changes no executable code and performs no LinkedIn writes. See `docs/validation.md` and `docs/repairs-0.7.2.md` for the exact acceptance scope.
 
 - Draft: https://chrome.google.com/webstore/devconsole/ca8c63eb-664b-4353-ac7c-af776311ddff/pibhcinkiadfplcaefllaeappkpnpfjm/edit
 - Assigned extension ID: `pibhcinkiadfplcaefllaeappkpnpfjm`.
@@ -46,7 +46,9 @@ The existing ivory/navy/cobalt art direction is preserved. Exact built-in image_
 
 ## Current execution and acceptance contract
 
-Version 0.7.2 exposes 32 composable primitives. Writes execute directly with account checks, exact target validation, idempotency and persisted operation receipts. There is no extension approval queue or review page. Unknown dispatched writes are never automatically repeated. Messaging uses the dedicated messaging API with exact conversation identities, not the feed chat overlay. Post creation supports native drafts and scheduling; there is no immediate publish tool.
+Version 0.8.0 replaces the popup with one setup/settings page, copied agent installation instructions and automatic first connection. Deliberate pause/disconnect is retained across updates. Store availability is explicitly `published_version: null` until publication is verified. Current-runtime acceptance must be regenerated; historical 0.7.x proofs are not reused. The five gallery explainers remain unchanged by this UI increment.
+
+Version 0.8.0 exposes 32 composable primitives. Writes execute directly with account checks, exact target validation, idempotency and persisted operation receipts. There is no extension approval queue or review page. Unknown dispatched writes are never automatically repeated. Messaging uses the dedicated messaging API with exact conversation identities, not the feed chat overlay. Post creation supports native drafts and scheduling; there is no immediate publish tool.
 
 Public-facing acceptance content must be meaningful and specific to its actual context, as required by the repository's `AGENTS.md`. Authorized temporary comments and likes must be removed or reversed after verification. Private evidence stays in ignored local artifacts.
 

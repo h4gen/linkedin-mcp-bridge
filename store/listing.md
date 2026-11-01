@@ -31,9 +31,9 @@ For example, ask your agent to:
 These are tasks your agent can compose, not built-in campaigns or a CRM. Reads are bounded and paginated. Unavailable profile sections, uncertain relationship states and incomplete results are identified; missing results are not proof that nothing exists. There is no always-on reply monitoring or automatic outreach sequence.
 
 SETUP AND CONTROL
-Requires macOS or native Windows, Chrome, Node.js 22+, the Git-installed local MCP server, a supported local MCP client and your own signed-in LinkedIn session. Your local agent can install the server from the repository below. This is not a direct connector for ChatGPT's website. Sales Navigator and attachment uploads are not included.
+Requires macOS or native Windows, Chrome, Node.js 22+, the Git-installed local MCP server, a supported local MCP client and your own signed-in LinkedIn session. On first install, a setup page lets you copy instructions into Codex or Claude Code. Your agent installs the matching local server and configures the connection for you. Sign in to LinkedIn if needed; the extension connects automatically. This is not a direct connector for ChatGPT's website. Sales Navigator and attachment uploads are not included.
 
-Once connected, the extension can recover its work tab and local connection while Chrome is running. It preserves an explicit pause or disconnect. Requested writes execute directly through the connected account without an extension approval queue; operation receipts help avoid duplicate sends after interruptions.
+The extension settings let you pause or disconnect. Once connected, it can recover its work tab and local connection while Chrome is running. It preserves an explicit pause or disconnect. Requested writes execute directly through the connected account without an extension approval queue; operation receipts help avoid duplicate sends after interruptions.
 
 Requested LinkedIn content passes through the local MCP bridge to your configured MCP client. That client may transfer it to its AI provider. We do not operate a cloud relay or collect product telemetry. You can pause, disconnect and clear local data.
 

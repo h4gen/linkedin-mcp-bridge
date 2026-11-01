@@ -1,3 +1,5 @@
+import { setupController } from "./setup-controller.js";
+import { CHANNEL } from "../version.js";
 import {
   rememberIdentity,
   profileReference,
@@ -82,6 +84,16 @@ async function documentReady(id: number, url: string) {
     return false;
   }
 }
+async function invalidateWorkDocument() {
+  const data = await chrome.storage.session.get(null);
+  const keys = Object.keys(data).filter(
+    (k) =>
+      k.startsWith("extraction:") ||
+      k.startsWith("post-url:") ||
+      (k.startsWith("cursor:") && (data[k] as any)?.state?.dom_session),
+  );
+  if (keys.length) await chrome.storage.session.remove(keys);
+}
 const tabId = workTab({
   ready: documentReady,
   store,
@@ -92,16 +104,7 @@ const tabId = workTab({
     if (!result?.data) throw new Fault("empty_browser_response");
     if (self(result.data) !== account) throw new Fault("account_changed");
   },
-  invalidate: async () => {
-    const data = await chrome.storage.session.get(null);
-    const keys = Object.keys(data).filter(
-      (k) =>
-        k.startsWith("extraction:") ||
-        k.startsWith("post-url:") ||
-        (k.startsWith("cursor:") && (data[k] as any)?.state?.dom_session),
-    );
-    if (keys.length) await chrome.storage.session.remove(keys);
-  },
+  invalidate: invalidateWorkDocument,
 });
 async function fetchRequest(r: Request, check = () => {}) {
   check();
@@ -855,11 +858,40 @@ let port: chrome.runtime.Port | undefined;
 let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 let reconnectDelay = 1000;
 let nativeError: string | undefined;
+let nativeReady = false;
+let hostVersion: string | undefined;
+const setup = setupController({
+  store,
+  generation: () => generation,
+  ready: () => nativeReady,
+  invalidate: invalidateWorkDocument,
+  readSelf: async (id) => {
+    if ((await store.get("blockedUntil")) > Date.now())
+      throw new Fault("rate_limited");
+    const result = (await browserFetch(id, { path: "/me" }))[0]?.result;
+    if (result?.error) {
+      if (result.error === "rate_limited" || result.error === "session_blocked")
+        await store.set(
+          "blockedUntil",
+          retryAt(result.retry_after, Date.now()),
+        );
+      throw new Fault(result.error);
+    }
+    if (!result?.data) throw new Fault("empty_browser_response");
+    return result.data;
+  },
+});
+async function shouldConnectHost() {
+  return (
+    !!(await store.get("connection")) ||
+    (await store.get("setupIntent")) === "auto"
+  );
+}
 function scheduleReconnect() {
   if (reconnectTimer) return;
   reconnectTimer = setTimeout(async () => {
     reconnectTimer = undefined;
-    if (await store.get("connection")) connectHost();
+    if (await shouldConnectHost()) connectHost();
   }, reconnectDelay);
   reconnectDelay = Math.min(reconnectDelay * 2, 30000);
 }
@@ -868,9 +900,28 @@ function connectHost() {
   try {
     port = chrome.runtime.connectNative(HOST);
     const connectedPort = port;
+    const helloTimeout = setTimeout(() => {
+      if (port === connectedPort && !nativeReady)
+        nativeError = "native_handshake_unavailable";
+    }, 5000);
     const active = new Set<string>();
     const cancelled = new Set<string>();
     port.onMessage.addListener(async (msg) => {
+      if (port !== connectedPort) return;
+      if (msg?.type === "hello") {
+        clearTimeout(helloTimeout);
+        hostVersion = msg.hostVersion;
+        nativeReady =
+          msg.hostVersion === VERSION &&
+          msg.protocol === PROTOCOL &&
+          msg.channel === CHANNEL;
+        nativeError = nativeReady ? undefined : "companion_version_mismatch";
+        if (nativeReady) {
+          reconnectDelay = 1000;
+          await setup.reconcile();
+        }
+        return;
+      }
       reconnectDelay = 1000;
       nativeError = undefined;
       if (msg?.cancel) {
@@ -886,7 +937,7 @@ function connectHost() {
         if (msg.protocol !== PROTOCOL || msg.hostVersion !== VERSION)
           throw new Fault(
             "companion_version_mismatch",
-            "Install the matching companion version " + VERSION,
+            "Install the matching local server version " + VERSION,
           );
         const result = await engine.run(
           msg.op,
@@ -919,11 +970,15 @@ function connectHost() {
       }
     });
     port.onDisconnect.addListener(() => {
+      clearTimeout(helloTimeout);
+      if (port !== connectedPort) return;
+      nativeReady = false;
       nativeError =
         chrome.runtime.lastError?.message ?? "native_host_disconnected";
       if (port === connectedPort) port = undefined;
       scheduleReconnect();
     });
+    port.postMessage?.({ type: "hello" });
   } catch (e) {
     nativeError = e instanceof Error ? e.message : "native_host_connect_failed";
     port = undefined;
@@ -931,10 +986,10 @@ function connectHost() {
   }
 }
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
-  // Popup only. No content-script bridge or externally_connectable surface.
+  // Own settings surface only. No content-script bridge or externally_connectable surface.
   if (
     sender.id !== chrome.runtime.id ||
-    sender.url !== chrome.runtime.getURL("popup.html")
+    !["setup.html"].some((page) => sender.url === chrome.runtime.getURL(page))
   )
     return;
   (async () => {
@@ -947,57 +1002,58 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       port = undefined;
       await chrome.storage.session.clear();
       await chrome.storage.local.clear();
+      await store.set("setupIntent", "off");
+      await store.set("schemaVersion", 2);
+      await store.set("identitySchemaVersion", 1);
+      nativeReady = false;
+      setup.reset();
       return { cleared: true };
     }
-    if (msg.action === "open-work-tab") {
-      await chrome.tabs.update(await tabId(), { active: true });
+    if (msg.action === "check-setup") {
+      await setup.reconcile();
+      return { checked: true };
+    }
+    if (msg.action === "resume" || msg.action === "use-current-account") {
+      generation++;
+      await invalidateDocument();
+      const c = await store.get("connection");
+      if (msg.action === "use-current-account")
+        await store.remove("connection");
+      else if (c) await store.set("connection", { ...c, paused: false });
+      await store.set("setupIntent", "auto");
+      setup.reset();
+      connectHost();
+      await setup.reconcile();
+      return { enabled: true };
+    }
+    if (msg.action === "open-linkedin") {
+      let id = await store.get("workTabId");
+      let tab = id
+        ? await chrome.tabs.get(id).catch(() => undefined)
+        : undefined;
+      if (!tab?.url?.startsWith("https://www.linkedin.com/")) {
+        tab = await chrome.tabs.create({
+          url: "https://www.linkedin.com/feed/",
+          active: true,
+        });
+        await store.set("workTabId", tab.id);
+      } else await chrome.tabs.update(tab.id!, { active: true });
       return { opened: true };
     }
     if (msg.action === "status")
       return {
         connection: await store.get("connection"),
         native: !!port,
+        nativeReady,
+        hostVersion,
+        channel: CHANNEL,
+        setupIntent: await store.get("setupIntent"),
+        setupError: setup.error(),
         nativeError,
         extensionId: chrome.runtime.id,
         version: chrome.runtime.getManifest().version,
         blockedUntil: await store.get("blockedUntil"),
       };
-    if (msg.action === "connect") {
-      generation++;
-      const [tab] = await chrome.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-      if (!tab?.id || !tab.url?.startsWith("https://www.linkedin.com/"))
-        throw new Fault("open_linkedin_tab");
-      await store.set("connection", { tabId: tab.id, paused: false });
-      try {
-        const account = self(await fetchRequest({ path: "/me" }));
-        const previous = await store.get("workTabId");
-        const existing = previous
-          ? await chrome.tabs.get(previous).catch(() => undefined)
-          : undefined;
-        const work = existing?.url?.startsWith("https://www.linkedin.com/")
-          ? existing
-          : await chrome.tabs.create({
-              url: "https://www.linkedin.com/feed/",
-              active: false,
-              windowId: tab.windowId,
-            });
-        if (!work.id) throw new Fault("work_tab_unavailable");
-        await store.set("workTabId", work.id);
-        await store.set("connection", {
-          tabId: work.id,
-          account,
-          paused: false,
-        });
-        connectHost();
-        return { account };
-      } catch (e) {
-        await store.remove("connection");
-        throw e;
-      }
-    }
     if (msg.action === "pause") {
       generation++;
       await invalidateDocument();
@@ -1006,6 +1062,9 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       return { paused: true };
     }
     if (msg.action === "disconnect") {
+      await store.set("setupIntent", "off");
+      nativeReady = false;
+      setup.reset();
       generation++;
       await invalidateDocument();
       await store.remove("connection");
@@ -1031,10 +1090,19 @@ chrome.alarms.onAlarm.addListener(async () => {
     )
       await chrome.storage.session.remove(k);
   // Connection recovery must not wait behind a busy operation queue.
-  if (await store.get("connection")) connectHost();
+  if (await shouldConnectHost()) connectHost();
+  if (nativeReady && !(await store.get("connection"))) await setup.reconcile();
   await engine.expireReceipts();
 });
 const initialized = (async () => {
+  if ((await store.get("setupIntent")) === undefined) {
+    const oldSchema = await store.get("schemaVersion");
+    const c = await store.get("connection");
+    await store.set(
+      "setupIntent",
+      c || oldSchema === undefined ? "auto" : "off",
+    );
+  }
   if ((await store.get("schemaVersion")) !== 2) {
     generation++;
     await chrome.storage.session.clear();
@@ -1050,5 +1118,30 @@ const initialized = (async () => {
     if (keys.length) await chrome.storage.session.remove(keys);
     await store.set("identitySchemaVersion", 1);
   }
-  if (await store.get("connection")) connectHost();
+  if (await shouldConnectHost()) connectHost();
 })();
+
+chrome.runtime.onInstalled?.addListener(async (details) => {
+  await initialized;
+  if (details.reason === "install" && !(await store.get("setupOpened"))) {
+    await store.set("setupOpened", true);
+    await setup.openPage();
+  }
+});
+chrome.action?.onClicked.addListener(() => {
+  void setup.openPage();
+});
+let lastSetupCheck = 0;
+chrome.tabs?.onUpdated?.addListener((id, change) => {
+  if (change.status !== "complete") return;
+  void (async () => {
+    await initialized;
+    if (
+      id !== (await store.get("workTabId")) ||
+      Date.now() - lastSetupCheck < 5000
+    )
+      return;
+    lastSetupCheck = Date.now();
+    await setup.reconcile();
+  })();
+});
