@@ -7,7 +7,7 @@ The authenticated Chrome Web Store portal now contains **0.8.2 as a draft**. The
 - Runtime source: `737e1a1f5e778b2afc4e6e11a2e0bfbc205dcb4e`, tag `v0.8.2`.
 - Runtime fingerprint: `055ed9687d3f8adc41dc919acc2345e803fa50b6a0788ee271a8c45d4d5d9393`.
 - Pilot ZIP: `artifacts/store-0.8.2/linkedin-extension.zip`.
-- ZIP SHA-256: `d393886417508866c82f8f3a4874e0be20ff777af255adf8675351c7fcba3654`.
+- Uploaded ZIP SHA-256: `d393886417508866c82f8f3a4874e0be20ff777af255adf8675351c7fcba3654`. The subsequent canonical verification rebuild at the path above has SHA-256 `6426d2918725606bbdae2e8e9756b00538bb153c10ab213605053c8a5958654c`; ZIP timestamps differ, executable fingerprint is unchanged.
 - Logo source/provenance: `store/brand/logo-master.png` and `store/brand/README.md`; extension icons at 16, 48 and 128 pixels.
 - Local Codex configuration now references the durable Git-installed 0.8.2 checkout. Its doctor reports connected, version 0.8.2. Existing client processes may still need restarting.
 
