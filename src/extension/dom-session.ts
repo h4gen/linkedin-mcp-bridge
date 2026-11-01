@@ -33,7 +33,15 @@ export function beginDomSession(token: string) {
       );
     for (const type of ["popstate", "hashchange"])
       window.addEventListener(type, () => {
-        if (w.__liBridgeTraversal?.path) invalidate("path_changed");
+        // The composer owns feed <-> compose transitions while it executes.
+        // Trusted user input still invalidates above; a full document loses the token.
+        const ownedComposerTransition =
+          w.__liBridgeComposerNavigation === w.__liBridgeSession &&
+          !!w.__liBridgeSession &&
+          location.hostname === "www.linkedin.com" &&
+          /^\/(feed\/?|sharing\/compose\/?)$/.test(location.pathname);
+        if (w.__liBridgeTraversal?.path && !ownedComposerTransition)
+          invalidate("path_changed");
       });
   }
 }

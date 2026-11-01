@@ -1,6 +1,10 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { JSDOM } from "jsdom";
 import { createHash } from "node:crypto";
+import {
+  beginDomSession,
+  bindDomSession,
+} from "../src/extension/dom-session.js";
 import { composerOperation } from "../src/extension/composer.js";
 import { scheduleTime } from "../src/core/post-planning.js";
 import { Engine } from "../src/core/engine.js";
@@ -101,6 +105,44 @@ it("saves and reopens a native draft, never activating Post", async () => {
   expect(f.saved()).toBe(args.text);
   expect(f.published()).toBe(0);
   expect(f.saves()).toBe(2);
+});
+it("keeps the composer session through its own route transitions", async () => {
+  const f = ui();
+  beginDomSession("planning");
+  bindDomSession("planning");
+  f.doc.addEventListener("click", (event) => {
+    if (!(event.target as Element).closest("button")) return;
+    window.history.replaceState({}, "", "/sharing/compose");
+    window.dispatchEvent(new window.PopStateEvent("popstate"));
+  });
+  const result = await composerOperation(
+    "post_draft_create",
+    { ...args, execution_session: "planning" },
+    {},
+  );
+  expect(result).toMatchObject({ verified: true, outcome: "draft_saved" });
+  expect(f.published()).toBe(0);
+  expect((window as any).__liBridgeComposerNavigation).toBeUndefined();
+});
+it("cancels composer navigation outside its two owned routes", async () => {
+  const f = ui();
+  beginDomSession("planning");
+  bindDomSession("planning");
+  f.doc.addEventListener("click", () => {
+    window.history.replaceState({}, "", "/messaging/");
+    window.dispatchEvent(new window.PopStateEvent("popstate"));
+  });
+  expect(
+    await composerOperation(
+      "post_draft_create",
+      { ...args, execution_session: "planning" },
+      {},
+    ),
+  ).toMatchObject({ dispatch_state: "not_dispatched" });
+  expect((window as any).__liBridgeSession).toBeUndefined();
+  expect((window as any).__liBridgeComposerNavigation).toBeUndefined();
+  expect(f.saves()).toBe(0);
+  expect(f.published()).toBe(0);
 });
 it("preserves an existing draft without any save or publish", async () => {
   const f = ui("My existing draft");

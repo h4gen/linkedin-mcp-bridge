@@ -91,6 +91,10 @@ export async function composerOperation(
     if (/^(Post|Posten|Veröffentlichen|Publish)(\s+now)?$/i.test(label(el)))
       fail("direct_publication_forbidden");
     if (mutation) dispatched = true;
+    // LinkedIn uses history navigation when closing its own composer dialogs.
+    // This narrow owner token never suppresses trusted user-interaction cancellation.
+    if (a.execution_session)
+      (window as any).__liBridgeComposerNavigation = a.execution_session;
     el.click();
   };
   const hash = async (s: string) =>
@@ -530,5 +534,8 @@ export async function composerOperation(
       bridge_error: e instanceof Error ? e.message : "composer_failed",
       dispatch_state: dispatched ? "dispatched" : "not_dispatched",
     };
+  } finally {
+    if ((window as any).__liBridgeComposerNavigation === a.execution_session)
+      delete (window as any).__liBridgeComposerNavigation;
   }
 }
