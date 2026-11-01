@@ -602,3 +602,24 @@ it("never marks a dispatched schedule retryable when its verification read fails
   );
   expect(writes).toBe(1);
 });
+
+it("reads scheduled rows after LinkedIn replaces the loading dialog", async () => {
+  const f = ui();
+  const initial = f.doc.createElement("dialog");
+  initial.open = true;
+  initial.innerHTML =
+    '<div data-sdui-screen="x.ShareSchedulePostList">Scheduled (1)</div>';
+  f.doc.body.append(initial);
+  setTimeout(() => {
+    const hydrated = initial.cloneNode(true) as HTMLDialogElement;
+    hydrated.innerHTML +=
+      '<div id="ScheduledPostRowSlot_urn:li:share:123_gen2"><p>Posting Sun, Nov 8, 2026 at 4:08 PM</p><div role="listitem"><p>Useful scheduled text</p></div></div>';
+    initial.replaceWith(hydrated);
+  }, 20);
+  const result = await composerOperation("scheduled_posts_list", {}, {});
+  expect(result.items).toHaveLength(1);
+  expect(result.items[0]).toMatchObject({
+    native_id: "urn:li:share:123",
+    text: "Useful scheduled text",
+  });
+}, 15000);

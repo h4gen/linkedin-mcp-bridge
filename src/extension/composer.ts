@@ -265,8 +265,21 @@ export async function composerOperation(
     );
   };
   const readList = async (d: HTMLElement) => {
+    // SDUI can replace the loading dialog while hydrating its rows. Never keep
+    // polling a detached snapshot, and never select an arbitrary duplicate.
+    const currentList = () => {
+      const candidates = dialogs().filter(
+        (x) => !!x.querySelector('[data-sdui-screen$="ShareSchedulePostList"]'),
+      );
+      if (candidates.length > 1) fail("scheduled_list_ambiguous");
+      if (!candidates.length) return false;
+      d = candidates[0];
+      return true;
+    };
     await wait(() =>
-      !d.querySelector('[role="progressbar"]') ? true : undefined,
+      currentList() && !d.querySelector('[role="progressbar"]')
+        ? true
+        : undefined,
     );
     const countMatch =
       d.innerText?.match(/Scheduled \((\d+)\)/) ??
@@ -275,6 +288,11 @@ export async function composerOperation(
     const count = Number(countMatch![1]);
     if (count === 0) return [];
     const rows = await wait(() => {
+      if (!currentList()) return undefined;
+      const currentCount = (d.innerText ?? d.textContent ?? "").match(
+        /Scheduled \((\d+)\)/,
+      )?.[1];
+      if (Number(currentCount) !== count) fail("scheduled_list_changed");
       const mounted = [
         ...d.querySelectorAll<HTMLElement>('[id^="ScheduledPostRowSlot_"]'),
       ];
