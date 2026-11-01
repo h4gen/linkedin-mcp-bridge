@@ -881,6 +881,17 @@ const setup = setupController({
     return result.data;
   },
 });
+let setupPending: Promise<void> | undefined;
+function reconcileSetup(): Promise<void> {
+  if (!setupPending) {
+    setupPending = engine
+      .maintain(() => setup.reconcile())
+      .finally(() => {
+        setupPending = undefined;
+      });
+  }
+  return setupPending;
+}
 async function shouldConnectHost() {
   return (
     !!(await store.get("connection")) ||
@@ -918,7 +929,7 @@ function connectHost() {
         nativeError = nativeReady ? undefined : "companion_version_mismatch";
         if (nativeReady) {
           reconnectDelay = 1000;
-          await setup.reconcile();
+          await reconcileSetup();
         }
         return;
       }
@@ -1010,7 +1021,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       return { cleared: true };
     }
     if (msg.action === "check-setup") {
-      await setup.reconcile();
+      await reconcileSetup();
       return { checked: true };
     }
     if (msg.action === "resume" || msg.action === "use-current-account") {
@@ -1023,7 +1034,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       await store.set("setupIntent", "auto");
       setup.reset();
       connectHost();
-      await setup.reconcile();
+      await reconcileSetup();
       return { enabled: true };
     }
     if (msg.action === "open-linkedin") {
@@ -1091,7 +1102,7 @@ chrome.alarms.onAlarm.addListener(async () => {
       await chrome.storage.session.remove(k);
   // Connection recovery must not wait behind a busy operation queue.
   if (await shouldConnectHost()) connectHost();
-  if (nativeReady && !(await store.get("connection"))) await setup.reconcile();
+  if (nativeReady && !(await store.get("connection"))) await reconcileSetup();
   await engine.expireReceipts();
 });
 const initialized = (async () => {
@@ -1142,6 +1153,6 @@ chrome.tabs?.onUpdated?.addListener((id, change) => {
     )
       return;
     lastSetupCheck = Date.now();
-    await setup.reconcile();
+    await reconcileSetup();
   })();
 });

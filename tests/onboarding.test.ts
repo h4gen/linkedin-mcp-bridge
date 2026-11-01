@@ -18,7 +18,11 @@ async function boot(local: Record<string, any> = {}) {
       for (const k of Object.keys(data)) delete data[k];
     },
   });
-  let message: any, installed: any, nativeMessage: any, alarm: any;
+  let message: any,
+    installed: any,
+    nativeMessage: any,
+    alarm: any,
+    updated: any;
   let gate: Promise<void> | undefined;
   let failure: string | undefined;
   let account = "urn:li:fsd_profile:me";
@@ -57,7 +61,7 @@ async function boot(local: Record<string, any> = {}) {
         return t;
       },
       update: async (id: number, o: any) => Object.assign(tabs.get(id), o),
-      onUpdated: { addListener() {} },
+      onUpdated: { addListener: (f: any) => (updated = f) },
     },
     scripting: {
       executeScript: async (o: any) => {
@@ -132,8 +136,37 @@ async function boot(local: Record<string, any> = {}) {
     account: (v: string) => {
       account = v;
     },
+    native: (msg: any) => nativeMessage(msg),
+    updated: (id: number) => updated(id, { status: "complete" }),
   };
 }
+it("queues setup recovery behind an active operation's temporary document transition", async () => {
+  const h = await boot();
+  await h.hello();
+  const id = h.local.connection.tabId;
+  const before = h.stats();
+  let release!: () => void;
+  h.delay(new Promise<void>((r) => (release = r)));
+  const operation = h.native({
+    id: "in-flight",
+    op: "health",
+    args: {},
+    protocol: PROTOCOL,
+    hostVersion: VERSION,
+    deadline: Date.now() + 60000,
+  });
+  await new Promise((r) => setTimeout(r, 10));
+  h.tabs.get(id).url = "about:blank";
+  h.updated(id);
+  await new Promise((r) => setTimeout(r, 10));
+  const during = h.stats();
+  h.tabs.get(id).url = "https://www.linkedin.com/feed/";
+  release();
+  await operation;
+  await h.action("check-setup");
+  expect(during.created).toBe(before.created);
+  expect(h.local.connection.tabId).toBe(id);
+});
 it("fresh install opens one setup page, detects the host and binds LinkedIn without a Connect action", async () => {
   const h = await boot();
   await h.installed("install");

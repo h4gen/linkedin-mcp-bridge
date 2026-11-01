@@ -53,6 +53,13 @@ export interface Deps {
 export class Engine {
   private tail: Promise<unknown> = Promise.resolve();
   constructor(private d: Deps) {}
+  // Background account recovery shares the operation queue, so it cannot
+  // replace a work tab during an operation's intentional document transition.
+  maintain<T>(work: () => Promise<T>): Promise<T> {
+    const task = this.tail.then(work);
+    this.tail = task.catch(() => {});
+    return task;
+  }
   run(
     op: string,
     input: unknown,
