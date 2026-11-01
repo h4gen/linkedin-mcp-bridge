@@ -20,7 +20,7 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
-function ui(initial = "", staleAfterSave = false) {
+function ui(initial = "", staleAfterSave = false, trustedInsert = false) {
   let stale = false;
   const dom = new JSDOM('<button id="start">Start a post</button>', {
     url: "https://www.linkedin.com/feed/",
@@ -44,10 +44,23 @@ function ui(initial = "", staleAfterSave = false) {
     published = 0,
     saves = 0;
   const doc = w.document;
+  const inputListeners: EventListener[] = [];
+  const addListener = doc.addEventListener.bind(doc);
+  doc.addEventListener = ((type: string, listener: any, ...rest: any[]) => {
+    if (type === "input") inputListeners.push(listener);
+    return addListener(type as any, listener, ...rest);
+  }) as typeof doc.addEventListener;
   doc.execCommand = vi.fn((_command, _ui, value) => {
     const node = w.getSelection()?.getRangeAt(0).commonAncestorContainer;
     if (!node) return false;
     node.textContent = value ?? "";
+    if (trustedInsert)
+      for (const listener of inputListeners)
+        listener({
+          isTrusted: true,
+          type: "input",
+          target: node,
+        } as unknown as Event);
     return true;
   });
   function open() {
@@ -143,6 +156,20 @@ it("cancels composer navigation outside its two owned routes", async () => {
   expect((window as any).__liBridgeComposerNavigation).toBeUndefined();
   expect(f.saves()).toBe(0);
   expect(f.published()).toBe(0);
+});
+it("distinguishes synchronous execCommand input from user input", async () => {
+  const f = ui("", false, true);
+  beginDomSession("planning");
+  bindDomSession("planning");
+  expect(
+    await composerOperation(
+      "post_draft_create",
+      { ...args, execution_session: "planning" },
+      {},
+    ),
+  ).toMatchObject({ verified: true });
+  expect(f.published()).toBe(0);
+  expect((window as any).__liBridgeOwnedInput).toBeUndefined();
 });
 it("preserves an existing draft without any save or publish", async () => {
   const f = ui("My existing draft");

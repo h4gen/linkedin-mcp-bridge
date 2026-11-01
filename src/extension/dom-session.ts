@@ -27,7 +27,14 @@ export function beginDomSession(token: string) {
       document.addEventListener(
         type,
         (event) => {
-          if (event.isTrusted) invalidate("user_interaction");
+          const owned = w.__liBridgeOwnedInput;
+          const synchronousAdapterInput =
+            event.type === "input" &&
+            owned?.target === event.target &&
+            owned?.token === w.__liBridgeSession &&
+            !!w.__liBridgeSession;
+          if (event.isTrusted && !synchronousAdapterInput)
+            invalidate("user_interaction");
         },
         true,
       );

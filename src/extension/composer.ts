@@ -216,8 +216,18 @@ export async function composerOperation(
       range.selectNodeContents(e);
       selection?.removeAllRanges();
       selection?.addRange(range);
-      if (!document.execCommand("insertText", false, text))
-        fail("composer_input_failed");
+      // Chromium emits a trusted input event synchronously from execCommand.
+      // Exempt only this exact target during the synchronous call, never user input.
+      (window as any).__liBridgeOwnedInput = {
+        token: a.execution_session,
+        target: e,
+      };
+      try {
+        if (!document.execCommand("insertText", false, text))
+          fail("composer_input_failed");
+      } finally {
+        delete (window as any).__liBridgeOwnedInput;
+      }
     }
     e.dispatchEvent(
       new InputEvent("input", {
