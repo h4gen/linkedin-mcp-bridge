@@ -1,4 +1,23 @@
-# Chrome Web Store draft — 0.8.0 setup redesign
+# Chrome Web Store draft — 0.8.2
+
+## Current verified state — 2026-11-01
+
+The authenticated Chrome Web Store portal now contains **0.8.2 as a draft**. The package page explicitly reports version 0.8.2 and “This item is not published yet”. The refreshed description, new linked-conversation logo and all five current explainers were saved. Both existing promotional tiles are retained. No submission for review or publication has been performed.
+
+- Runtime source: `737e1a1f5e778b2afc4e6e11a2e0bfbc205dcb4e`, tag `v0.8.2`.
+- Runtime fingerprint: `055ed9687d3f8adc41dc919acc2345e803fa50b6a0788ee271a8c45d4d5d9393`.
+- Pilot ZIP: `artifacts/store-0.8.2/linkedin-extension.zip`.
+- ZIP SHA-256: `d393886417508866c82f8f3a4874e0be20ff777af255adf8675351c7fcba3654`.
+- Logo source/provenance: `store/brand/logo-master.png` and `store/brand/README.md`; extension icons at 16, 48 and 128 pixels.
+- Local Codex configuration now references the durable Git-installed 0.8.2 checkout. Its doctor reports connected, version 0.8.2. Existing client processes may still need restarting.
+
+The final runtime passes 264 automated tests, typecheck, formatting, release consistency, built setup UI checks and native transport smoke. CI run 41322253889 passes on macOS and Windows. All 21 read/diagnostic primitives passed fresh live calls on this fingerprint. Invitation send and withdrawal also passed fresh dispatches; sent invitations and scheduled posts were empty at the final read.
+
+**Submission gate remains blocked for nine fresh write-dispatch proofs.** All eleven writes passed current-runtime idempotent replay with confirmed receipts and no additional side effects. Nine original dispatches occurred on earlier 0.8.2 candidates. Those receipts remain useful evidence but are not relabeled as fresh final-runtime dispatches. The pending operations are message_send, conversation_update, conversation_delete, invitation_respond, post_like, post_comment, post_draft_create, post_schedule and scheduled_post_cancel. `npm run store:check` preserves these blockers. The private acceptance manifest credits 23/32 capabilities and both installation platforms. Preparing the portal draft does not waive this gate.
+
+The authorized private message, invitation acceptance and one old unanswered sales-conversation deletion were confirmed. Temporary outgoing invitations, public comment/reaction, native draft and scheduled posts were cleaned up. No immediate post was published. A new reply from the cooperating contact was not fabricated or claimed. Private traces remain local in ignored artifacts; public documentation contains no private conversation export.
+
+The sections below are historical records, not the current portal or release status.
 
 Historical listing refresh: the listing copy and four of the five explainer graphics were updated locally on 2026-11-01 to reflect the 0.7.2 capability set. This is a targeted refresh of the existing positioning and visual style, not a new product direction. The title, publishing graphic, icon and both promo tiles are unchanged. The portal update is pending: the existing Store session expired and Google now requires the account owner's passkey. No new package upload, submission or publication has been performed. The last verified portal package remains the 0.6.0 draft; the previous 0.7.0 upload was unconfirmed after renewed sign-in.
 

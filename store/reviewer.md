@@ -1,6 +1,6 @@
 # Reviewer instructions
 
-Public Chrome extension with a separate Git-installed MCP server for macOS and native Windows. Follow the repository README to clone, install dependencies and build with `npm run build:store`. Register the exact store extension ID using `node dist/cli.js install EXTENSION_ID`. Configure the local MCP client from the printed JSON. There is no bundled installer or signed companion.
+Public Chrome extension with a separate Git-installed MCP server for macOS and native Windows. Use release `v0.8.2` from https://github.com/h4gen/linkedin-mcp-bridge. Clone that tag, run `npm ci`, then build with `npm run build:store` (Node.js 22+). Register the exact store extension ID using `node dist/cli.js install EXTENSION_ID`. Configure the local MCP client from the printed JSON. There is no bundled installer or signed companion.
 
 1. Install the extension and Git-based server as above, then run `node dist/cli.js doctor`. Use your own account. No credentials are included.
 2. Sign in to your own LinkedIn account. The extension opens its setup page on first install. Select Codex or Claude Code and copy the setup instructions into that client. There is no consent checkbox or Connect button; the local server and LinkedIn sign-in are detected automatically. The extension creates a dedicated LinkedIn work tab and brings it forward for UI actions. No account credentials are supplied in the package.
