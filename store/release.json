@@ -5,15 +5,12 @@
   "store_extension_id": "pibhcinkiadfplcaefllaeappkpnpfjm",
   "screenshots": [
     "store/explainers/upload/inbox-1280x800.png",
-    "store/explainers/upload/research-1280x800.png",
-    "store/explainers/upload/people-1280x800.png",
     "store/explainers/upload/feed-1280x800.png",
+    "store/explainers/upload/people-1280x800.png",
+    "store/explainers/upload/research-1280x800.png",
     "store/explainers/upload/publishing-1280x800.png"
   ],
   "acceptance_manifest": "artifacts/acceptance-0.7.2.json",
-  "platforms": [
-    "macOS",
-    "Windows"
-  ],
+  "platforms": ["macOS", "Windows"],
   "repository_url": "https://github.com/h4gen/linkedin-mcp-bridge"
 }
