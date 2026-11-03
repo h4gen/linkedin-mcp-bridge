@@ -2,6 +2,12 @@
 
 This is the canonical installation contract for a local **Codex or Claude Code** agent on macOS or native Windows. The user should only paste your setup instructions, sign in to LinkedIn when necessary, and restart their client if it cannot reload its configuration. Do not require terminal commands, JSON editing, extension IDs or a Connect click from the user. Respect your client's permission controls.
 
+## Published installation
+
+The [Chrome extension is available now](https://chromewebstore.google.com/detail/pibhcinkiadfplcaefllaeappkpnpfjm) at version **0.8.2** (verified 2026-11-03). Use server tag `v0.8.2`, build with `npm run build:store`, and register Store extension ID `pibhcinkiadfplcaefllaeappkpnpfjm`. The internal build-channel name is `pilot`; it is also the channel used by the public Store extension.
+
+The immutable `v0.8.2` source was tagged before Store approval. Its installer may print `published_version: null` and a pre-publication `store_note`. These are a cached release-time snapshot, not a failed registration. The current canonical `store/release.json` and public Store listing establish availability. Keep the exact tag and Store channel; do not switch to an unpacked development build or modify the tag to remove that notice.
+
 ## Inputs and prerequisites
 
 Use the exact release, build channel and extension ID in the copied extension instructions. A release is an immutable `v<version>` tag; an explicitly supplied full candidate commit is also valid for pre-release acceptance. Do not substitute current `main`. If the requested ref is absent, stop with that precise failure rather than silently installing a different version.
@@ -25,7 +31,7 @@ Check the OS, `git --version`, `node --version` (22 or newer), `npm --version`, 
 
 ## Browser and client completion
 
-Open Chrome. For a public release, install the extension at `https://chromewebstore.google.com/detail/pibhcinkiadfplcaefllaeappkpnpfjm`. The first-install page explains setup and the local server is detected automatically. If LinkedIn is not signed in, the user completes sign-in in Chrome. No extra consent checkbox, Connect click or extension-ID lookup is required.
+Open Chrome. For a public release, install the extension from the [Chrome Web Store](https://chromewebstore.google.com/detail/pibhcinkiadfplcaefllaeappkpnpfjm). The first-install page explains setup and the local server is detected automatically. If LinkedIn is not signed in, the user completes sign-in in Chrome. No extra consent checkbox, Connect click or extension-ID lookup is required.
 
 Keep explicit pause/disconnect intact. If the user wants access restored, direct them to Resume/Enable connection in settings. If another Chrome profile owns the local transport, do not steal it by killing processes or altering its registration. A changed LinkedIn account requires the user's choice in settings.
 

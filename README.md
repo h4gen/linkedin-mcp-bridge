@@ -2,11 +2,15 @@
 
 Bring your LinkedIn inbox, people research and posts into your AI agent. Find earlier conversations, understand a person before replying, and prepare or schedule text posts.
 
-**0.8.2 — public Store installation is not available yet.** The listing is a draft. The setup below is the public-release flow; local testers can use the separate development instructions. macOS and native Windows are supported with Chrome, Codex or Claude Code.
+**[Install from the Chrome Web Store](https://chromewebstore.google.com/detail/pibhcinkiadfplcaefllaeappkpnpfjm)** · [Agent setup instructions](docs/INSTALL_AGENT.md) · [Release v0.8.2](https://github.com/h4gen/linkedin-mcp-bridge/releases/tag/v0.8.2)
+
+Available now: **0.8.2**. Works on macOS and native Windows with Chrome and a local MCP client such as Codex or Claude Code. The extension and local server are both required.
+
+[![Find people. Reply faster. Plan posts.](store/graphics-v2/upload/promo-small-440x280.png)](https://chromewebstore.google.com/detail/pibhcinkiadfplcaefllaeappkpnpfjm)
 
 ## Start with the Chrome extension
 
-1. Install the extension when its Store release is available. It opens a setup page automatically.
+1. [Install the Chrome extension](https://chromewebstore.google.com/detail/pibhcinkiadfplcaefllaeappkpnpfjm). It opens a setup page automatically.
 2. Choose **Codex** or **Claude Code**, click **Copy setup instructions**, and paste into your agent.
 3. Let your agent install and configure the local server. Sign in to LinkedIn if asked. The extension connects automatically.
 4. Continue in your agent. If it has not loaded the new tools yet, start a new chat or restart the client as instructed.
@@ -19,7 +23,7 @@ Give your agent this request:
 
 > Install LinkedIn MCP from https://github.com/h4gen/linkedin-mcp-bridge for the AI client I'm using. Read docs/INSTALL_AGENT.md and store/release.json first. Use the version that matches the installed Chrome extension, or the published Store version if I don't have the extension yet. Preserve my other MCP servers. Verify the setup with read-only checks, and tell me any remaining sign-in or client-restart step.
 
-The agent checks Store availability and gives you the exact extension link when it is published. If you already installed the local server, the extension detects it and skips that step. The Store ID is `pibhcinkiadfplcaefllaeappkpnpfjm`; an assigned ID alone does not mean the listing is published.
+Your agent installs the server release matching the extension and directs you to the [Chrome Web Store](https://chromewebstore.google.com/detail/pibhcinkiadfplcaefllaeappkpnpfjm) if the extension is missing. If you already installed the local server, the extension detects it and skips that step.
 
 ## What you can ask your agent
 
@@ -47,8 +51,8 @@ Your agent receives the LinkedIn content you request and can perform requested a
 - [Exact installation, repair and uninstall instructions](docs/INSTALL_AGENT.md)
 - [Tool contracts, behavior and development reference](docs/REFERENCE.md)
 - [Validation and current limitations](docs/validation.md)
-- [Store draft status](store/SUBMISSION.md)
+- [Store publication and release history](store/SUBMISSION.md)
 
-Before publication, local testers build the selected candidate with `npm ci` and `npm run build`, load `dist/extension` through Chrome's **Load unpacked**, then use that extension's copied instructions. Register its actual ID with `node dist/cli.js install EXTENSION_ID`. Do not use the assigned Store ID for an unpacked build. A development build and a Store/pilot build use separate native registrations.
+For development only, local testers build the selected candidate with `npm ci` and `npm run build`, load `dist/extension` through Chrome's **Load unpacked**, then use that extension's copied instructions. Register its actual ID with `node dist/cli.js install EXTENSION_ID`. Do not use the assigned Store ID for an unpacked build. A development build and a Store/pilot build use separate native registrations.
 
 The repository's instructions are sufficient for a local agent to handle shell work. The human still completes account sign-in and any client/OS permission prompt that requires personal interaction. Store submission and real platform acceptance are tracked separately from automated tests.

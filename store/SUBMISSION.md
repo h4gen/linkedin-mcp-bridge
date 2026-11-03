@@ -1,6 +1,12 @@
-# Chrome Web Store draft — 0.8.2
+# Chrome Web Store publication — 0.8.2
 
-## Current verified state — 2026-11-01
+## Public release verified — 2026-11-03
+
+[Install LinkedIn MCP from the Chrome Web Store](https://chromewebstore.google.com/detail/pibhcinkiadfplcaefllaeappkpnpfjm). The public listing displays **Add to Chrome**, version **0.8.2**, and **Updated 2 November 2026**. Its description, five explainer slides, GitHub support link and GitHub privacy link are publicly visible. `published_version` now records `0.8.2`; server source remains the immutable `v0.8.2` tag. The GitHub README, repository homepage and release page link back to the public listing.
+
+This records the user-reported publication, verified on the public listing. It does not retroactively pass the outstanding live-write evidence or alter the historical accepted build. Publication metadata on main changes its source fingerprint; historical runtime fingerprints remain historical. No new extension package is submitted by this documentation/link update.
+
+## Historical draft verification — 2026-11-01
 
 The authenticated Chrome Web Store portal now contains **0.8.2 as a draft**. The package page explicitly reports version 0.8.2 and “This item is not published yet”. The refreshed description, new linked-conversation logo and all five current explainers were saved. Both existing promotional tiles are retained. No submission for review or publication has been performed.
 

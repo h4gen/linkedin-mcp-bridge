@@ -103,7 +103,11 @@ it("installs isolated native manifest and round-trips a real native/socket frame
     installer.stdout!.on("data", (b) => (installOutput += b));
     expect((await once(installer, "exit"))[0]).toBe(0);
     const installed = JSON.parse(installOutput);
-    expect(installed.published_version).toBeNull();
+    expect(installed.published_version).toBe("0.8.2");
+    expect(installed.extension_url).toBe(
+      "https://chromewebstore.google.com/detail/pibhcinkiadfplcaefllaeappkpnpfjm",
+    );
+    expect(installed.store_note).not.toContain("not public yet");
     expect(installed.client_commands.codex.slice(-3)).toEqual([
       process.execPath,
       path.resolve("dist/cli.js"),
