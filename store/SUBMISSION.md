@@ -1,5 +1,9 @@
 # Chrome Web Store publication — 0.8.2
 
+## Local 0.8.3 candidate — not submitted
+
+0.8.3 repairs comment confirmation and adds read-only reconciliation of durable comment receipts. The public Store version remains **0.8.2**. Local ZIP: `artifacts/store-0.8.3/linkedin-extension.zip`; SHA-256 `43fa525133da4282f1e640f4e2d335d953470f4f26926194bfceb6d30c4b6f38`. No portal upload, submission or new publication has occurred. Automated checks pass, including macOS/Windows CI; local activation and live capability acceptance remain pending. See `docs/comment-receipts.md` for the exact evidence and activation blocker. Existing listing copy and all five explainer graphics are unchanged.
+
 ## Public release verified — 2026-11-03
 
 [Install LinkedIn MCP from the Chrome Web Store](https://chromewebstore.google.com/detail/linkedin-mcp-%E2%80%93-ai-connect/pibhcinkiadfplcaefllaeappkpnpfjm). The public listing displays **Add to Chrome**, version **0.8.2**, and **Updated 2 November 2026**. Its description, five explainer slides, GitHub support link and GitHub privacy link are publicly visible. `published_version` now records `0.8.2`; server source remains the immutable `v0.8.2` tag. The GitHub README, repository homepage and release page link back to the public listing.
