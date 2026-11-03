@@ -2,7 +2,7 @@
 
 ## Public release verified — 2026-11-03
 
-[Install LinkedIn MCP from the Chrome Web Store](https://chromewebstore.google.com/detail/pibhcinkiadfplcaefllaeappkpnpfjm). The public listing displays **Add to Chrome**, version **0.8.2**, and **Updated 2 November 2026**. Its description, five explainer slides, GitHub support link and GitHub privacy link are publicly visible. `published_version` now records `0.8.2`; server source remains the immutable `v0.8.2` tag. The GitHub README, repository homepage and release page link back to the public listing.
+[Install LinkedIn MCP from the Chrome Web Store](https://chromewebstore.google.com/detail/linkedin-mcp-%E2%80%93-ai-connect/pibhcinkiadfplcaefllaeappkpnpfjm). The public listing displays **Add to Chrome**, version **0.8.2**, and **Updated 2 November 2026**. Its description, five explainer slides, GitHub support link and GitHub privacy link are publicly visible. `published_version` now records `0.8.2`; server source remains the immutable `v0.8.2` tag. The GitHub README, repository homepage and release page link back to the public listing.
 
 This records the user-reported publication, verified on the public listing. It does not retroactively pass the outstanding live-write evidence or alter the historical accepted build. Publication metadata on main changes its source fingerprint; historical runtime fingerprints remain historical. No new extension package is submitted by this documentation/link update.
 

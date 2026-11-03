@@ -1,7 +1,8 @@
 import { VERSION, CHANNEL, STORE_EXTENSION_ID } from "./version.js";
 export const REPOSITORY = "https://github.com/h4gen/linkedin-mcp-bridge";
 export const STORE_URL =
-  "https://chromewebstore.google.com/detail/" + STORE_EXTENSION_ID;
+  "https://chromewebstore.google.com/detail/linkedin-mcp-%E2%80%93-ai-connect/" +
+  STORE_EXTENSION_ID;
 export const RELEASE_REF = "v" + VERSION;
 export type SetupClient = "codex" | "claude";
 export function agentInstructions(

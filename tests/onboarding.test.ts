@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import fs from "node:fs/promises";
 import vm from "node:vm";
 import { VERSION, PROTOCOL } from "../src/version.js";
@@ -155,7 +155,9 @@ it("queues setup recovery behind an active operation's temporary document transi
     hostVersion: VERSION,
     deadline: Date.now() + 60000,
   });
-  await new Promise((r) => setTimeout(r, 10));
+  await vi.waitFor(() =>
+    expect(h.stats().fetches).toBeGreaterThan(before.fetches),
+  );
   h.tabs.get(id).url = "about:blank";
   h.updated(id);
   await new Promise((r) => setTimeout(r, 10));
