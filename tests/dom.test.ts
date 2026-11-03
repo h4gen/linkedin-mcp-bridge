@@ -63,7 +63,10 @@ it("uses the scoped SDUI root editor and waits for delayed source confirmation",
   document.querySelectorAll("button")[1].addEventListener("click", () => {
     const child = document.createElement("article");
     child.className = "comments-comment-entity";
-    child.setAttribute("data-id", "urn:li:comment:created");
+    child.setAttribute(
+      "data-id",
+      `urn:li:comment:(activity:123,${BigInt(Date.now()) << 22n})`,
+    );
     child.innerHTML =
       '<a href="/in/me/">Me</a><div class="comments-comment-entity__content">Test root</div>';
     setTimeout(
@@ -81,7 +84,7 @@ it("uses the scoped SDUI root editor and waits for delayed source confirmation",
     {},
   );
   expect(result.verified).toBe(true);
-  expect(result.receipt_id).toBe("urn:li:comment:created");
+  expect(result.receipt_id).toMatch(/^urn:li:comment:\(activity:123,/);
 });
 it("retains readable SDUI posts with a local scan key when LinkedIn omits their URN", async () => {
   page(
@@ -397,7 +400,10 @@ it("replies only below the exact stable parent despite identical comment text", 
       sent++;
       const child = dom.window.document.createElement("article");
       child.className = "comments-comment-entity";
-      child.setAttribute("data-id", "urn:li:comment:reply");
+      child.setAttribute(
+        "data-id",
+        `urn:li:comment:(activity:123,${BigInt(Date.now()) << 22n})`,
+      );
       child.innerHTML =
         '<a href="/in/me/">Me</a><div class="comments-comment-entity__content">Targeted reply</div>';
       parent.append(child);
@@ -415,7 +421,7 @@ it("replies only below the exact stable parent despite identical comment text", 
   );
   expect(r).toMatchObject({
     verified: true,
-    receipt_id: "urn:li:comment:reply",
+    receipt_id: expect.stringMatching(/^urn:li:comment:\(activity:123,/),
     parent_comment_id: "urn:li:comment:two",
   });
   expect(sent).toBe(1);

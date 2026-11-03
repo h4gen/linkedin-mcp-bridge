@@ -1,3 +1,10 @@
+import { commentHash, freshComment } from "../core/comment-proof.js";
+import {
+  COMMENT_SELECTOR,
+  commentId,
+  commentBody,
+  commentActor,
+} from "./comment-proof.js";
 import { bindDomSession } from "./dom-session.js";
 import {
   postRoots,
@@ -524,22 +531,94 @@ export async function domOperation(
     if (op === "post_comment") {
       const post = card();
       const root = postContext(a.post_urn).commentsRoot;
-      const selector =
-        '.comments-comment-item,.comments-comment-entity,[data-comment-urn],div[componentkey^="replaceableComment_"]';
-      const sourceId = (e: Element | null): string | null => {
-        if (!e) return null;
-        for (const attr of [
-          "componentkey",
-          "data-id",
-          "data-urn",
-          "data-comment-urn",
-          "id",
-        ]) {
-          const value = e.getAttribute(attr);
-          if (value && /urn:li:comment:/.test(value)) return value;
+      const selector = COMMENT_SELECTOR;
+      const sourceId = commentId;
+      const proof = a.comment_proof;
+      if (a.preflight) {
+        const before_ids = [...root.querySelectorAll(selector)]
+          .map(sourceId)
+          .filter(Boolean);
+        if (before_ids.length > 500) fail("comment_baseline_too_large");
+        return {
+          comment_proof: {
+            post_urn: a.post_urn,
+            actor_url: a.verified_actor?.profile_url,
+            text_hash: await commentHash(a.text),
+            before_ids,
+            observed_at: Date.now(),
+          },
+        };
+      }
+      const candidatesFor = async (evidence: any) => {
+        const candidates: Element[] = [];
+        if (
+          !evidence ||
+          evidence.post_urn !== a.post_urn ||
+          !evidence.actor_url ||
+          !Array.isArray(evidence.before_ids)
+        )
+          return candidates;
+        for (const e of postContext(a.post_urn).commentsRoot.querySelectorAll(
+          selector,
+        )) {
+          const id = sourceId(e),
+            body = commentBody(e);
+          if (
+            !id ||
+            body === undefined ||
+            !freshComment(id, evidence, Date.now()) ||
+            !commentActor(e, evidence.actor_url)
+          )
+            continue;
+          if ((await commentHash(body)) !== evidence.text_hash) continue;
+          const parentId = sourceId(e.parentElement?.closest(selector) ?? null);
+          if (
+            a.parent_comment_id &&
+            parentId !== a.parent_comment_id &&
+            (a.reconcile || parentId)
+          )
+            continue;
+          if (!a.parent_comment_id && parentId) continue;
+          candidates.push(e);
         }
-        return null;
+        return candidates;
       };
+      if (a.reconcile) {
+        if (!proof)
+          return { verified: false, reconciliation: "comment_proof_missing" };
+        let matches: Element[] = [];
+        for (let n = 0; n < 15; n++) {
+          if (
+            a.execution_session &&
+            (window as any).__liBridgeSession !== a.execution_session
+          )
+            fail("cancelled");
+          matches = await candidatesFor(proof);
+          if (
+            matches.length ||
+            (a.execution_deadline && Date.now() >= a.execution_deadline)
+          )
+            break;
+          await wait();
+        }
+        return {
+          verified: matches.length === 1,
+          receipt_id: matches.length === 1 ? sourceId(matches[0]) : undefined,
+          post_urn: a.post_urn,
+          ...(a.parent_comment_id
+            ? {
+                parent_comment_id: a.parent_comment_id,
+                parent_relation: matches.length === 1 ? "known" : "unknown",
+              }
+            : {}),
+          reconciliation:
+            matches.length > 1
+              ? "comment_confirmation_ambiguous"
+              : matches.length
+                ? "comment_identity_author_text_and_time"
+                : "no_matching_fresh_comment_observed",
+        };
+      }
       const ownControls = (scope: Element, pattern: RegExp) =>
         matchingControls(scope, pattern).filter(
           (e) => e.closest(selector) === scope,
@@ -573,6 +652,22 @@ export async function domOperation(
       const beforeIds = new Set(
         [...root.querySelectorAll(selector)].map(sourceId).filter(Boolean),
       );
+      const evidence = proof ?? {
+        post_urn: a.post_urn,
+        actor_url: a.verified_actor?.profile_url,
+        text_hash: await commentHash(a.text),
+        before_ids: [...beforeIds],
+        observed_at: Date.now(),
+      };
+      if (
+        proof &&
+        (proof.post_urn !== a.post_urn ||
+          proof.actor_url !== a.verified_actor?.profile_url ||
+          proof.text_hash !== (await commentHash(a.text)))
+      )
+        fail("comment_preflight_mismatch");
+      if (proof && [...beforeIds].some((id) => !proof.before_ids.includes(id)))
+        fail("comment_preflight_changed");
       const existingEditors = new Set([
         ...root.querySelectorAll('[contenteditable="true"]'),
       ]);
@@ -653,30 +748,10 @@ export async function domOperation(
         fail("cancelled");
       mutationStarted = true;
       submits[0].click();
-      const findReplies = () =>
-        [
-          ...postContext(a.post_urn).commentsRoot.querySelectorAll(selector),
-        ].filter((e) => {
-          const id = sourceId(e);
-          const body = e.querySelector(
-            '.comments-comment-item__main-content,.comments-comment-entity__content,[data-testid="expandable-text-box"]',
-          );
-          return (
-            id &&
-            !beforeIds.has(id) &&
-            body?.textContent?.trim() === a.text &&
-            !!a.verified_actor?.profile_url &&
-            [...e.querySelectorAll<HTMLAnchorElement>('a[href*="/in/"]')].some(
-              (link) =>
-                link.href.split(/[?#]/)[0].replace(/\/$/, "") ===
-                a.verified_actor.profile_url.replace(/\/$/, ""),
-            )
-          );
-        });
       let candidates: Element[] = [];
-      for (let n = 0; n < 8; n++) {
+      for (let n = 0; n < 15; n++) {
         await wait();
-        candidates = findReplies();
+        candidates = await candidatesFor(evidence);
         if (
           candidates.length ||
           (a.execution_deadline && Date.now() >= a.execution_deadline)

@@ -349,18 +349,31 @@ it("binds a comment receipt to its parent and never repeats an unknown reply", a
     parent_comment_id: "urn:li:comment:one",
     idempotency_key: "parent-key-one",
   };
+  f.dom.mockImplementation(async (_op?: any, args?: any) =>
+    args?.preflight
+      ? { comment_proof: { before_ids: [], observed_at: 1000 } }
+      : ({ verified: false } as any),
+  );
   const first = await f.engine.run("post_comment", a);
   expect(first.status).toBe("unknown_outcome");
   expect(first.parent_comment_id).toBe(a.parent_comment_id);
   await f.engine.run("post_comment", a);
-  expect(f.dom).toHaveBeenCalledTimes(1);
+  expect(
+    f.dom.mock.calls.filter(
+      (call: any) => !call[1].preflight && !call[1].reconcile,
+    ),
+  ).toHaveLength(1);
   await expect(
     f.engine.run("post_comment", {
       ...a,
       parent_comment_id: "urn:li:comment:two",
     }),
   ).rejects.toThrow("idempotency");
-  expect(f.dom).toHaveBeenCalledTimes(1);
+  expect(
+    f.dom.mock.calls.filter(
+      (call: any) => !call[1].preflight && !call[1].reconcile,
+    ),
+  ).toHaveLength(1);
 });
 
 it("rebuilds recipient identity from the exact messaging conversation after restart", async () => {

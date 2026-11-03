@@ -62,3 +62,48 @@ it("rechecks the unique reply text and exact author on the resolved document", (
     visibleCommentProof(id, "Reply", "https://www.linkedin.com/in/me/"),
   ).toBe(false);
 });
+
+import {
+  commentText,
+  commentHash,
+  freshComment,
+  commentCreatedAt,
+} from "../src/core/comment-proof.js";
+it("matches presentation whitespace but preserves URL and text content", async () => {
+  expect(await commentHash("Hello\n\nhttps://example.com/a")).toBe(
+    await commentHash("Hello \u00a0https://example.com/a"),
+  );
+  expect(await commentHash("Hello https://example.com/a")).not.toBe(
+    await commentHash("Hello https://example.com/b"),
+  );
+  expect(commentText(" Héllo\n世界 ")).toBe("Héllo 世界");
+});
+it("requires fresh native comment identity, excludes older and previously seen IDs", () => {
+  const id =
+    "replaceableComment_urn:li:comment:(activity:7513342471389573120,7523339271555158016)";
+  const time = Date.parse("2026-11-03T11:04:19.223Z");
+  expect(commentCreatedAt(id)).toBe(time);
+  expect(
+    freshComment(id, { before_ids: [], observed_at: time - 1000 }, time + 1000),
+  ).toBe(true);
+  expect(
+    freshComment(id, { before_ids: [], observed_at: time + 1 }, time + 1000),
+  ).toBe(false);
+  expect(
+    freshComment(
+      id,
+      {
+        before_ids: [id.replace("replaceableComment_", "")],
+        observed_at: time - 1000,
+      },
+      time + 1000,
+    ),
+  ).toBe(false);
+  expect(
+    freshComment(
+      "urn:li:comment:unknown",
+      { before_ids: [], observed_at: time - 1000 },
+      time + 1000,
+    ),
+  ).toBe(false);
+});

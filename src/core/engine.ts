@@ -1,3 +1,4 @@
+import { freshComment } from "./comment-proof.js";
 import { rememberIdentity } from "./profile-identity.js";
 import {
   conversationView,
@@ -231,6 +232,43 @@ export class Engine {
       }
       return row;
     };
+    const reconcileComment = async (row: Args) => {
+      if (!row.comment_proof) {
+        row.reconciliation = "legacy_comment_proof_missing";
+        return;
+      }
+      if (self(await d.fetch({ path: "/me" })) !== expected)
+        throw new Fault("account_changed");
+      const result = await d.dom(
+        "post_comment",
+        {
+          account_urn: expected,
+          post_urn: row.target,
+          parent_comment_id: row.parent_comment_id,
+          reconcile: true,
+          comment_proof: row.comment_proof,
+          execution_deadline: deadline,
+        },
+        {},
+      );
+      if (
+        result.verified === true &&
+        result.post_urn === row.target &&
+        result.receipt_id &&
+        freshComment(result.receipt_id, row.comment_proof, d.now()) &&
+        (!row.parent_comment_id ||
+          result.parent_comment_id === row.parent_comment_id)
+      ) {
+        row.status = "confirmed";
+        row.receipt_id = result.receipt_id;
+        row.reconciliation = "comment_identity_author_text_and_time";
+        if (row.parent_comment_id) row.parent_relation = "known";
+        delete row.error;
+      } else
+        row.reconciliation =
+          result.reconciliation ?? "no_matching_fresh_comment_observed";
+      await d.store.set("journal", journal);
+    };
     if (op === "operation_get") {
       const row = journal[key];
       if (!row) return { status: "not_found", retention_days: 7 };
@@ -279,8 +317,20 @@ export class Engine {
             e instanceof Fault ? e.code : "reconciliation_unavailable";
         }
       }
+      if (
+        row.operation === "post_comment" &&
+        ["pending", "unknown_outcome"].includes(row.status)
+      ) {
+        try {
+          await reconcileComment(row);
+        } catch (e) {
+          row.reconciliation =
+            e instanceof Fault ? e.code : "reconciliation_unavailable";
+        }
+      }
       return {
         ...row,
+        comment_proof: undefined,
         status: row.status === "pending" ? "unknown_outcome" : row.status,
       };
     }
@@ -316,6 +366,26 @@ export class Engine {
         if (previous.fingerprint !== scope)
           throw new Fault("idempotency_conflict");
         if (
+          op === "post_comment" &&
+          ["pending", "unknown_outcome"].includes(previous.status)
+        ) {
+          try {
+            await reconcileComment(previous);
+          } catch (e) {
+            previous.reconciliation =
+              e instanceof Fault ? e.code : "reconciliation_unavailable";
+          }
+          return {
+            ...previous,
+            comment_proof: undefined,
+            status:
+              previous.status === "pending"
+                ? "unknown_outcome"
+                : previous.status,
+            replayed: true,
+          };
+        }
+        if (
           planningWrites.has(op) &&
           ["pending", "unknown_outcome"].includes(previous.status)
         ) {
@@ -327,6 +397,7 @@ export class Engine {
           }
           return {
             ...previous,
+            comment_proof: undefined,
             status:
               previous.status === "pending"
                 ? "unknown_outcome"
@@ -341,6 +412,7 @@ export class Engine {
         )
           return {
             ...previous,
+            comment_proof: undefined,
             status:
               previous.status === "pending"
                 ? "unknown_outcome"
@@ -445,9 +517,28 @@ export class Engine {
         }
       }
       check();
+      const commentProof =
+        op === "post_comment"
+          ? (
+              await d.dom(
+                "post_comment",
+                {
+                  ...a,
+                  preflight: true,
+                  verified_actor: actor,
+                  execution_deadline: deadline,
+                },
+                {},
+              )
+            ).comment_proof
+          : undefined;
+      if (op === "post_comment" && !commentProof)
+        throw new Fault("comment_preflight_unavailable");
+      check();
       const origin = previous?.origin_token ?? d.uuid();
       const row: Args = {
         operation: op,
+        ...(commentProof ? { comment_proof: commentProof } : {}),
         version: VERSION,
         attempt_count: (previous?.attempt_count ?? (previous ? 1 : 0)) + 1,
         dispatch_state: "unknown",
@@ -527,6 +618,7 @@ export class Engine {
                 ...a,
                 verified_target: target,
                 verified_actor: actor,
+                ...(commentProof ? { comment_proof: commentProof } : {}),
                 execution_deadline: deadline,
                 resume_confirmation: resumeConfirmation,
               },
@@ -623,15 +715,24 @@ export class Engine {
           }
         }
         const id =
-          receipt(result, op) ??
-          (result?.verified === true ? result?.receipt_id : undefined);
+          op === "post_comment"
+            ? result.verified === true &&
+              result.post_urn === a.post_urn &&
+              result.receipt_id &&
+              freshComment(result.receipt_id, commentProof, d.now())
+              ? result.receipt_id
+              : undefined
+            : (receipt(result, op) ??
+              (result?.verified === true ? result?.receipt_id : undefined));
         if (op === "post_comment" && a.parent_comment_id) {
           row.parent_relation = result.parent_relation ?? "unknown";
           if (result.receipt_id) row.observed_reply_id = result.receipt_id;
           if (result.verification_error)
             row.verification_error = result.verification_error;
         }
-        row.status = id || verified ? "confirmed" : "unknown_outcome";
+        row.status = (op === "post_comment" ? !!id : id || verified)
+          ? "confirmed"
+          : "unknown_outcome";
         if (id) row.receipt_id = id;
         if (op === "message_send") {
           const entity = normalize(result ?? {}).entities.find(
@@ -672,7 +773,7 @@ export class Engine {
         if (dispatched) throw new Fault("interrupted_unknown_outcome");
         throw e;
       }
-      return row;
+      return { ...row, comment_proof: undefined };
     }
     let state: Args = {};
     let cursorRecord: Args | undefined;
