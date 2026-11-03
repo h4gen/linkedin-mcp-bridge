@@ -249,3 +249,70 @@ it("waits for a comment arriving after the previous verification window", async 
   ).toMatchObject({ verified: true });
   expect(sends).toBe(1);
 }, 15000);
+
+it("expands only a fresh own comment body before read-only reconciliation", async () => {
+  page();
+  const proof = {
+    post_urn: "urn:li:activity:123",
+    actor_url: "https://www.linkedin.com/in/me/",
+    text_hash: await commentHash(text),
+    before_ids: [],
+    observed_at: start,
+  };
+  const row = add(
+    start,
+    'Hello <a href="https://www.linkedin.com/safety/go/?url=https%3A%2F%2Fexample.com%2Flong-link">https://example.com/long-link</a><button aria-hidden="true" data-testid="expandable-text-button">… more</button>',
+  );
+  row.querySelector("div")!.setAttribute("data-testid", "expandable-text-box");
+  // The observed SDUI button disappears when the body is expanded. A link preview
+  // outside the body must not contribute text to the receipt hash.
+  row.insertAdjacentHTML(
+    "beforeend",
+    '<a href="https://example.com/long-link">Example preview title</a>',
+  );
+  const older = add(
+    start - 10000,
+    '<span data-testid="expandable-text-box">Hello<button data-testid="expandable-text-button">… more</button></span>',
+  );
+  const other = add(
+    start,
+    '<span data-testid="expandable-text-box">Hello<button data-testid="expandable-text-button">… more</button></span>',
+    "other",
+  );
+  const olderClick = vi.spyOn(older.querySelector("button")!, "click");
+  const otherClick = vi.spyOn(other.querySelector("button")!, "click");
+  const expand = vi.fn(() => row.querySelector("button")!.remove());
+  row.querySelector("button")!.addEventListener("click", expand);
+  const submit = vi.spyOn(
+    document.querySelectorAll("[data-urn] > button")[1] as HTMLElement,
+    "click",
+  );
+  const result = domOperation(
+    "post_comment",
+    { post_urn: proof.post_urn, reconcile: true, comment_proof: proof },
+    {},
+  );
+  await vi.runAllTimersAsync();
+  expect(await result).toMatchObject({ verified: true, receipt_id: id(start) });
+  expect(expand).toHaveBeenCalledTimes(1);
+  expect(olderClick).not.toHaveBeenCalled();
+  expect(otherClick).not.toHaveBeenCalled();
+  expect(submit).not.toHaveBeenCalled();
+});
+
+it("reports disabled post comments before dispatch", async () => {
+  page();
+  document.querySelector("button")!.disabled = true;
+  const submit = vi.spyOn(document.querySelectorAll("button")[1], "click");
+  await expect(
+    domOperation(
+      "post_comment",
+      { post_urn: "urn:li:activity:123", text, preflight: true },
+      {},
+    ),
+  ).resolves.toMatchObject({
+    bridge_error: "post_comments_disabled",
+    dispatch_state: "not_dispatched",
+  });
+  expect(submit).not.toHaveBeenCalled();
+});

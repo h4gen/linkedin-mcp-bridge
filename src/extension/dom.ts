@@ -534,6 +534,23 @@ export async function domOperation(
       const selector = COMMENT_SELECTOR;
       const sourceId = commentId;
       const proof = a.comment_proof;
+      if (!a.reconcile && !a.parent_comment_id) {
+        const controls = [
+          ...post.querySelectorAll<HTMLButtonElement>('button,[role="button"]'),
+        ].filter(
+          (e) =>
+            visible(e) &&
+            /^(Comment|Kommentieren)$/i.test(
+              (e.getAttribute("aria-label") ?? e.textContent ?? "").trim(),
+            ),
+        );
+        if (
+          controls.length === 1 &&
+          (controls[0].disabled ||
+            controls[0].getAttribute("aria-disabled") === "true")
+        )
+          fail("post_comments_disabled");
+      }
       if (a.preflight) {
         const before_ids = [...root.querySelectorAll(selector)]
           .map(sourceId)
@@ -549,6 +566,7 @@ export async function domOperation(
           },
         };
       }
+      const expanded = new Set<string>();
       const candidatesFor = async (evidence: any) => {
         const candidates: Element[] = [];
         if (
@@ -561,15 +579,45 @@ export async function domOperation(
         for (const e of postContext(a.post_urn).commentsRoot.querySelectorAll(
           selector,
         )) {
-          const id = sourceId(e),
-            body = commentBody(e);
+          const id = sourceId(e);
           if (
             !id ||
-            body === undefined ||
             !freshComment(id, evidence, Date.now()) ||
             !commentActor(e, evidence.actor_url)
           )
             continue;
+          const body = commentBody(e);
+          if (body === undefined) {
+            // Observed SDUI collapses complete comment bodies with this exact
+            // read-more control. Open only a fresh own comment, once, with a cap.
+            const expanders = [
+              ...e.querySelectorAll<HTMLElement>(
+                '[data-testid="expandable-text-box"] button[data-testid="expandable-text-button"]',
+              ),
+            ].filter(
+              (b) =>
+                b.closest(selector) === e &&
+                visible(b) &&
+                /^(?:…|\.{3})?\s*(?:more|mehr|see more|mehr anzeigen)$/i.test(
+                  b.textContent?.trim() ?? "",
+                ),
+            );
+            if (
+              expanders.length === 1 &&
+              !expanded.has(id) &&
+              expanded.size < 20 &&
+              (!a.execution_deadline || Date.now() < a.execution_deadline)
+            ) {
+              if (
+                a.execution_session &&
+                (window as any).__liBridgeSession !== a.execution_session
+              )
+                fail("cancelled");
+              expanded.add(id);
+              expanders[0].click();
+            }
+            continue;
+          }
           if ((await commentHash(body)) !== evidence.text_hash) continue;
           const parentId = sourceId(e.parentElement?.closest(selector) ?? null);
           if (
