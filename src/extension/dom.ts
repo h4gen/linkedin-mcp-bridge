@@ -658,8 +658,12 @@ export async function domOperation(
               sorts.length === 1 &&
               (!a.execution_deadline || Date.now() < a.execution_deadline)
             ) {
-              sorts[0].click();
-              await wait();
+              // A previous interrupted verification can leave this menu open.
+              // Do not toggle it closed when resuming the read-only lookup.
+              if (sorts[0].getAttribute("aria-expanded") !== "true") {
+                sorts[0].click();
+                await wait();
+              }
               const options = [
                 ...document.querySelectorAll<HTMLElement>(
                   '[role="menu"] [role="menuitem"]',
