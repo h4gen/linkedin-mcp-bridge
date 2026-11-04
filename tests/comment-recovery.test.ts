@@ -316,3 +316,42 @@ it("reports disabled post comments before dispatch", async () => {
   });
   expect(submit).not.toHaveBeenCalled();
 });
+
+it("finds a hidden fresh comment through the scoped most-recent sort without sending", async () => {
+  page();
+  const proof = {
+    post_urn: "urn:li:activity:123",
+    actor_url: "https://www.linkedin.com/in/me/",
+    text_hash: await commentHash(text),
+    observed_at: start,
+    before_ids: [],
+  };
+  const root = document.querySelector("[data-urn]")!;
+  const sort = document.createElement("button");
+  sort.textContent = "Most relevant";
+  root.append(sort);
+  sort.onclick = () => {
+    const menu = document.createElement("div");
+    menu.setAttribute("role", "menu");
+    menu.innerHTML =
+      '<div role="menuitem">Most recent See all comments, the most recent comments are first</div>';
+    menu.querySelector<HTMLElement>('[role="menuitem"]')!.onclick = () => {
+      sort.textContent = "Most recent";
+      menu.remove();
+      add(start);
+    };
+    document.body.append(menu);
+  };
+  const submit = vi.spyOn(
+    document.querySelectorAll("[data-urn] > button")[1] as HTMLElement,
+    "click",
+  );
+  const result = domOperation(
+    "post_comment",
+    { post_urn: proof.post_urn, reconcile: true, comment_proof: proof },
+    {},
+  );
+  await vi.runAllTimersAsync();
+  expect(await result).toMatchObject({ verified: true, receipt_id: id(start) });
+  expect(submit).not.toHaveBeenCalled();
+});

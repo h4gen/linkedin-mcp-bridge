@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { afterEach, expect, it } from "vitest";
 import { JSDOM } from "jsdom";
 import vm from "node:vm";
@@ -75,6 +76,8 @@ async function harness(
   windows.push(dom);
   const w = dom.window as any;
   w.crypto.randomUUID = () => crypto.randomUUID();
+  w.TextEncoder = TextEncoder;
+  Object.defineProperty(w.crypto, "subtle", { value: crypto.subtle });
   w.Element.prototype.getClientRects = () => [{}];
   const clicks: Array<(event: any) => void> = [];
   const add = w.document.addEventListener.bind(w.document);
@@ -715,3 +718,71 @@ it("waits for an invitation destination even while Chrome reports the old docume
   expect(response.result?.status).toBe("confirmed");
   expect(dispatches).toBe(1);
 });
+
+it.each([true, false])(
+  "reconciles across empty session storage with a verified stored post URL: %s",
+  async (valid) => {
+    const now = Date.now() - 86400000;
+    const target = "urn:li:share:123";
+    const url = "https://www.linkedin.com/feed/update/urn:li:share:123/";
+    const id = `replaceableComment_urn:li:comment:(activity:123,${BigInt(now + 1000) << 22n})`;
+    const hash = [
+      ...new Uint8Array(
+        await crypto.subtle.digest(
+          "SHA-256",
+          new TextEncoder().encode("Useful reply"),
+        ),
+      ),
+    ]
+      .map((x) => x.toString(16).padStart(2, "0"))
+      .join("");
+    const row = {
+      operation: "post_comment",
+      account_urn: account,
+      target,
+      status: "unknown_outcome",
+      created_at: now,
+      attempt_count: 1,
+      dispatch_state: "dispatched",
+      comment_proof: {
+        post_urn: target,
+        post_url: valid
+          ? url
+          : "https://www.linkedin.com/feed/update/urn:li:share:999/",
+        actor_url: "https://www.linkedin.com/in/me/",
+        text_hash: hash,
+        observed_at: now,
+        before_ids: [],
+      },
+    };
+    const journalKey = createHash("sha256")
+      .update(`${account}:recovery`)
+      .digest("hex");
+    const h = await harness({
+      local: { journal: { [journalKey]: row } },
+      page: () =>
+        `<main><div data-urn="${target}"><article data-comment-urn="${id}"><a href="/in/me/">Me</a><div class="comments-comment-entity__content">Useful reply</div></article></div></main>`,
+    });
+    const result = await h.request("operation_get", {
+      idempotency_key: "recovery",
+    });
+    if (valid) {
+      expect(result.result.reconciliation).toBe(
+        "comment_identity_author_text_and_time",
+      );
+      expect(result.result).toMatchObject({
+        status: "confirmed",
+        receipt_id: id,
+        attempt_count: 1,
+      });
+      expect(h.local.journal[journalKey].status).toBe("confirmed");
+      expect(h.tab.url).toBe(url);
+    } else {
+      expect(result.result).toMatchObject({
+        status: "unknown_outcome",
+        reconciliation: "post_location_unresolved",
+      });
+      expect(h.tab.url).toBe("https://www.linkedin.com/feed/");
+    }
+  },
+);

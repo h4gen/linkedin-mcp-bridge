@@ -11,6 +11,7 @@ import {
   postIdentity,
   postIdentities,
   postContext,
+  postUrlIdentity,
   waitForPost,
 } from "./post-context.js";
 // This entire function is injected into the connected LinkedIn tab. Never accepts
@@ -559,6 +560,9 @@ export async function domOperation(
         return {
           comment_proof: {
             post_urn: a.post_urn,
+            ...(postUrlIdentity(location.href) === a.post_urn
+              ? { post_url: location.href }
+              : {}),
             actor_url: a.verified_actor?.profile_url,
             text_hash: await commentHash(a.text),
             before_ids,
@@ -567,6 +571,7 @@ export async function domOperation(
         };
       }
       const expanded = new Set<string>();
+      let expansionCount = 0;
       const candidatesFor = async (evidence: any) => {
         const candidates: Element[] = [];
         if (
@@ -605,7 +610,7 @@ export async function domOperation(
             if (
               expanders.length === 1 &&
               !expanded.has(id) &&
-              expanded.size < 20 &&
+              expansionCount < 20 &&
               (!a.execution_deadline || Date.now() < a.execution_deadline)
             ) {
               if (
@@ -614,6 +619,7 @@ export async function domOperation(
               )
                 fail("cancelled");
               expanded.add(id);
+              expansionCount++;
               expanders[0].click();
             }
             continue;
@@ -642,6 +648,36 @@ export async function domOperation(
           )
             fail("cancelled");
           matches = await candidatesFor(proof);
+          if (!matches.length && n === 2) {
+            const scope = postContext(a.post_urn).commentsRoot;
+            const sorts = matchingControls(
+              scope,
+              /^(Most relevant|Relevanteste|Relevanteste Kommentare)$/i,
+            );
+            if (
+              sorts.length === 1 &&
+              (!a.execution_deadline || Date.now() < a.execution_deadline)
+            ) {
+              sorts[0].click();
+              await wait();
+              const options = matchingControls(
+                document,
+                /^(Most recent|Neueste)(?:\s|$)/i,
+              ).filter((e) => !!e.closest('[role="menu"]'));
+              if (options.length === 1) {
+                options[0].click();
+                expanded.clear(); // The native sort replaces comment body nodes.
+                await wait();
+                if (
+                  matchingControls(
+                    postContext(a.post_urn).commentsRoot,
+                    /^(Most recent|Neueste)$/i,
+                  ).length !== 1
+                )
+                  fail("comment_sort_not_confirmed");
+              } else fail("comment_sort_unavailable");
+            }
+          }
           if (
             matches.length ||
             (a.execution_deadline && Date.now() >= a.execution_deadline)

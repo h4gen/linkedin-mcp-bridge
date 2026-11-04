@@ -1,3 +1,4 @@
+import { postUrlIdentity } from "./post-context.js";
 import { setupController } from "./setup-controller.js";
 import { CHANNEL } from "../version.js";
 import {
@@ -644,6 +645,11 @@ const engine = new Engine({
     ) {
       const url =
         (await store.get("post-url:" + a.post_urn)) ??
+        (a.reconcile &&
+        a.comment_proof?.post_urn === a.post_urn &&
+        postUrlIdentity(a.comment_proof?.post_url ?? "") === a.post_urn
+          ? a.comment_proof.post_url
+          : undefined) ??
         (a.post_urn.startsWith("urn:li:activity:")
           ? "https://www.linkedin.com/feed/update/" + a.post_urn + "/"
           : undefined);

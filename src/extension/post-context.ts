@@ -14,7 +14,7 @@ export function postUrlIdentity(value: string): string | null {
   )
     return null;
   try {
-    const url = new URL(value, location.href);
+    const url = new URL(value, "https://www.linkedin.com/");
     if (url.origin !== "https://www.linkedin.com") return null;
     const path = decodeURIComponent(url.pathname);
     const direct = path.match(
