@@ -1075,6 +1075,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
         nativeError,
         extensionId: chrome.runtime.id,
         version: chrome.runtime.getManifest().version,
+        versionName: chrome.runtime.getManifest().version_name,
         blockedUntil: await store.get("blockedUntil"),
       };
     if (msg.action === "pause") {

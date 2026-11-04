@@ -15,6 +15,7 @@ function render(s: any) {
   const previousView = next;
   state = s;
   const c = s.connection;
+  el("build-version").textContent = `Version ${s.versionName ?? s.version}`;
   let title = "LinkedIn, connected to your AI.",
     description =
       "Copy the instructions into your agent. It handles installation and checks the connection for you.",
@@ -95,6 +96,7 @@ function render(s: any) {
   el("diagnostics").textContent = JSON.stringify(
     {
       version: s.version,
+      versionName: s.versionName,
       channel: s.channel,
       hostVersion: s.hostVersion,
       nativeReady: s.nativeReady,

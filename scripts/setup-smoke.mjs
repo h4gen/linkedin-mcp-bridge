@@ -4,6 +4,9 @@ import { createServer } from "node:http";
 import { readFile, mkdir } from "node:fs/promises";
 import assert from "node:assert/strict";
 const version = JSON.parse(await readFile("package.json", "utf8")).version;
+const versionName = JSON.parse(
+  await readFile("dist/extension/manifest.json", "utf8"),
+).version_name;
 const out = "artifacts/setup-" + version;
 await mkdir(out, { recursive: true });
 const files = new Map(
@@ -38,36 +41,41 @@ try {
   const page = await browser.newPage({
     viewport: { width: 1280, height: 1000 },
   });
-  await page.addInitScript((version) => {
-    window.fixture = {
-      version,
-      channel: "development",
-      extensionId: "a".repeat(32),
-      setupIntent: "auto",
-      nativeReady: false,
-    };
-    window.calls = [];
-    window.copied = "";
-    Object.defineProperty(navigator, "clipboard", {
-      value: {
-        writeText: async (text) => {
-          window.copied = text;
+  await page.addInitScript(
+    ({ version, versionName }) => {
+      window.fixture = {
+        version,
+        versionName,
+        channel: "development",
+        extensionId: "a".repeat(32),
+        setupIntent: "auto",
+        nativeReady: false,
+      };
+      window.calls = [];
+      window.copied = "";
+      Object.defineProperty(navigator, "clipboard", {
+        value: {
+          writeText: async (text) => {
+            window.copied = text;
+          },
         },
-      },
-    });
-    window.chrome = {
-      runtime: {
-        id: "a".repeat(32),
-        sendMessage: async (msg) => {
-          window.calls.push(msg.action);
-          if (msg.action === "status") return window.fixture;
-          if (msg.action === "pause") window.fixture.connection.paused = true;
-          if (msg.action === "resume") window.fixture.connection.paused = false;
-          return {};
+      });
+      window.chrome = {
+        runtime: {
+          id: "a".repeat(32),
+          sendMessage: async (msg) => {
+            window.calls.push(msg.action);
+            if (msg.action === "status") return window.fixture;
+            if (msg.action === "pause") window.fixture.connection.paused = true;
+            if (msg.action === "resume")
+              window.fixture.connection.paused = false;
+            return {};
+          },
         },
-      },
-    };
-  }, version);
+      };
+    },
+    { version, versionName },
+  );
   await page.goto(`http://127.0.0.1:${server.address().port}/setup.html`);
   await page.getByRole("button", { name: /Copy setup instructions/ }).click();
   assert.match(await page.evaluate(() => window.copied), /Codex/);
@@ -90,6 +98,10 @@ try {
     window.dispatchEvent(new Event("focus"));
   });
   await page.getByRole("heading", { name: "Ready for your agent." }).waitFor();
+  assert.equal(
+    await page.locator("#build-version").innerText(),
+    `Version ${versionName}`,
+  );
   assert.equal(await page.locator("#primary").isVisible(), false);
   assert.equal(await page.locator("#client-choice").isVisible(), false);
   await page.screenshot({ path: out + "/ready.png", fullPage: true });

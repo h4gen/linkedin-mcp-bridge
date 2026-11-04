@@ -334,7 +334,7 @@ it("finds a hidden fresh comment through the scoped most-recent sort without sen
     const menu = document.createElement("div");
     menu.setAttribute("role", "menu");
     menu.innerHTML =
-      '<div role="menuitem">Most recent See all comments, the most recent comments are first</div>';
+      '<div role="menuitem"><p>Most recent</p><p>See all comments, the most recent comments are first</p></div>';
     menu.querySelector<HTMLElement>('[role="menuitem"]')!.onclick = () => {
       sort.textContent = "Most recent";
       menu.remove();

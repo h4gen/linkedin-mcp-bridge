@@ -8,6 +8,8 @@ const channel =
     : "development";
 const release = JSON.parse(await readFile("store/release.json", "utf8"));
 const version = JSON.parse(await readFile("package.json", "utf8")).version;
+const fingerprint = await runtimeFingerprint();
+const versionName = `${version} · build ${fingerprint.slice(0, 8)}`;
 const define = {
   "process.env.BRIDGE_PUBLISHED_VERSION": JSON.stringify(
     release.published_version || "",
@@ -53,6 +55,7 @@ await writeFile(
         "LinkedIn MCP – AI Connector for Claude & Codex" +
         (channel === "pilot" ? "" : " Dev"),
       version,
+      version_name: versionName,
       description:
         "Connect LinkedIn to Claude and Codex via a local MCP server. Manage your inbox, research people, draft and schedule posts.",
       minimum_chrome_version: "120",
@@ -81,9 +84,5 @@ for (const file of [
 
 await writeFile(
   "dist/build.json",
-  JSON.stringify(
-    { version, channel, fingerprint: await runtimeFingerprint() },
-    null,
-    2,
-  ) + "\n",
+  JSON.stringify({ version, channel, fingerprint }, null, 2) + "\n",
 );

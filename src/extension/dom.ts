@@ -660,11 +660,28 @@ export async function domOperation(
             ) {
               sorts[0].click();
               await wait();
-              const options = matchingControls(
-                document,
-                /^(Most recent|Neueste)(?:\s|$)/i,
-              ).filter((e) => !!e.closest('[role="menu"]'));
+              const options = [
+                ...document.querySelectorAll<HTMLElement>(
+                  '[role="menu"] [role="menuitem"]',
+                ),
+              ].filter(
+                (e) =>
+                  visible(e) &&
+                  e.getAttribute("aria-disabled") !== "true" &&
+                  /^(Most recent|Neueste)$/i.test(
+                    (
+                      e.querySelector("p")?.textContent ??
+                      e.textContent ??
+                      ""
+                    ).trim(),
+                  ),
+              );
               if (options.length === 1) {
+                if (
+                  a.execution_session &&
+                  (window as any).__liBridgeSession !== a.execution_session
+                )
+                  fail("cancelled");
                 options[0].click();
                 expanded.clear(); // The native sort replaces comment body nodes.
                 await wait();

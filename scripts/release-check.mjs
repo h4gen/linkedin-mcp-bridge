@@ -12,6 +12,10 @@ if (r.version !== version)
 const manifest = JSON.parse(
   await readFile("dist/extension/manifest.json", "utf8").catch(() => "{}"),
 );
+if (manifest.version_name !== `${version} · build ${fingerprint.slice(0, 8)}`)
+  failures.push(
+    "Visible extension build identifier does not match current source",
+  );
 if (manifest.version !== version)
   failures.push("Build extension first; version does not match");
 for (const file of ["dist/cli.js", "dist/host.js"])
