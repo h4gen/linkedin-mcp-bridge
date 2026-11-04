@@ -2,7 +2,7 @@
 
 ## Local 0.8.3 candidate — not submitted
 
-0.8.3 repairs comment confirmation and adds read-only reconciliation of durable comment receipts. The public Store version remains **0.8.2**. Local ZIP: `artifacts/store-0.8.3/linkedin-extension.zip`; SHA-256 `43fa525133da4282f1e640f4e2d335d953470f4f26926194bfceb6d30c4b6f38`. No portal upload, submission or new publication has occurred. Automated checks pass, including macOS/Windows CI; local activation and live capability acceptance remain pending. See `docs/comment-receipts.md` for the exact evidence and activation blocker. Existing listing copy and all five explainer graphics are unchanged.
+0.8.3 repairs comment confirmation and adds read-only reconciliation of durable comment receipts. The public Store version remains **0.8.2**. Local ZIP: `artifacts/store-0.8.3/linkedin-extension.zip`; SHA-256 `2df78ec20946a3c2376357931905eb0b290780159b8375865a3c8136cf8a00cd`. No portal upload, submission or new publication has occurred. 274 automated tests pass, including macOS/Windows CI. Initial live checks exposed a disabled-comment target and a collapsed-body verification gap; the final correction is built, with activation and remaining live capability acceptance pending. See `docs/comment-receipts.md` for the exact evidence and activation blocker. Existing listing copy and all five explainer graphics are unchanged.
 
 ## Public release verified — 2026-11-03
 
