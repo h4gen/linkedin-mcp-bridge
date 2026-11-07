@@ -13,7 +13,9 @@ The lease belongs to a browser session. A worker restart reuses the owned tab; a
 
 On build `80716c16`, the separate window preserved the selected tab and window during inbox, message, search, post and comment reads. After six minutes without MCP polling, inbox and post reads also completed with zero tab activations or window focus changes.
 
-Build `aab7d075` was retested on two posts with known reactions. Each initial read and each follow-up read through the retained dialog reported `reaction_content_not_loaded` with reason `reaction_list_empty_while_hidden`. An earlier inspection of one visible dialog had shown ten profile links. The hidden-page result therefore cannot establish how many people reacted. This retest did not collect a new focus measurement. Reading reaction identities in a hidden workspace remains a release blocker.
+Build `aab7d075` was retested on two posts with known reactions. Each initial read and each follow-up read through the retained dialog reported `reaction_content_not_loaded` with reason `reaction_list_empty_while_hidden`. An earlier inspection of one visible dialog had shown ten profile links. The hidden-page result therefore cannot establish how many people reacted. This retest did not collect a new focus measurement. That dialog-based retest failed release acceptance.
+
+The new page adapter from `7f8571e` read two pages each in a Dotun → Todd → Dotun sequence on macOS. All three traversals returned four distinct reactors, each repeated cursor returned identical items, and the second Dotun traversal matched the first. The two posts returned different people. A passive macOS observer recorded 393 samples over 85 seconds, with the work tab never selected in the front window and no observed tab, window or application switch. This observation was sampled. Chrome still reported background build `aab7d075` while injecting the new adapter, so the run is functional evidence and is not credited to whole-build Store acceptance.
 
 ## Release acceptance
 
