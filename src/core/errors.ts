@@ -45,6 +45,13 @@ export function adapterDiagnostics(details: Record<string, unknown> = {}) {
   const result: Record<string, string | number> = {};
   if (typeof details.reason === "string" && allowed.has(details.reason))
     result.reason = details.reason;
+  if (
+    typeof details.structured_source === "string" &&
+    /^(?:reaction_(?:activity_unresolved|response_shape_changed|target_unverified|profile_unresolved)|linkedin_http_[45]\d\d|transport_or_response_error|response_too_large)$/.test(
+      details.structured_source,
+    )
+  )
+    result.structured_source = details.structured_source;
   for (const key of ["candidate_count", "matching_count"])
     if (
       typeof details[key] === "number" &&

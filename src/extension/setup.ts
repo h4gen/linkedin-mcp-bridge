@@ -15,7 +15,6 @@ function render(s: any) {
   const previousView = next;
   state = s;
   const c = s.connection;
-  el("workspace-choice").hidden = s.channel !== "development";
   const select = el<HTMLSelectElement>("workspace-mode");
   if (!select.disabled) select.value = s.workspaceMode ?? "background_tab";
   el("workspace-reveal").hidden = !c || c.paused;

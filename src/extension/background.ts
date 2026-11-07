@@ -1145,10 +1145,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     }
     if (msg.action === "workspace-report" && probe) return probe.report();
     if (msg.action === "workspace-mode") {
-      if (
-        CHANNEL !== "development" ||
-        !["background_tab", "separate_window"].includes(msg.mode)
-      )
+      if (!["background_tab", "separate_window"].includes(msg.mode))
         throw new Fault("workspace_mode_unavailable");
       await engine.maintain(async () => {
         if ((await tabId.placement.mode()) === msg.mode) return;

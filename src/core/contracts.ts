@@ -301,7 +301,7 @@ export const descriptions: Record<Operation, string> = {
   post_resolve:
     "Resolve a feed entry's scan_key to a canonical post URN. Use a key from the current feed scan; stale or ambiguous entries fail rather than selecting another post.",
   post_get:
-    "Read one post using a canonical activity/ugcPost/share URN returned by feed_list or post_resolve. Use reactions_list/comments_list for paginated engagement; this may bring the work tab forward.",
+    "Read one post using a canonical activity/ugcPost/share URN returned by feed_list or post_resolve. Use reactions_list/comments_list for paginated engagement in the agent workspace.",
   post_like:
     "Like or unlike one exact post according to the liked boolean. Uses a canonical post_urn and idempotency_key, acts directly, and returns a receipt. Inspect unknown outcomes before retrying.",
   post_comment:

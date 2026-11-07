@@ -38,6 +38,8 @@ const client = new Client({
 });
 const knownPost =
   "https://www.linkedin.com/posts/dotunogunrinde_we-sit-down-to-prospect-next-thing-we-know-share-7515697692363161600-hXIQ/";
+const otherPost =
+  "https://www.linkedin.com/posts/tosaunders_a-linkedin-mcp-would-be-incredible-might-share-7513342470932520960-erF4/";
 let account,
   rows,
   lastSequence = -1;
@@ -161,11 +163,30 @@ try {
     const target = { post_urn: post.entityUrn };
     const full = await read("post_get", target);
     assert(full.text && full.entityUrn === post.entityUrn);
-    for (const op of ["comments_list", "reactions_list"])
+    assert((await read("comments_list", { ...target, limit: 2 })).items.length);
+    const identities = [];
+    for (const url of [knownPost, otherPost, knownPost]) {
+      const resolved = await read("post_resolve", { url });
+      const args = { post_urn: resolved.entityUrn, limit: 2 };
+      const page = await read("reactions_list", args);
+      assert.equal(page.items.length, 2);
+      assert(page.items.every((p) => p.profile_url && p.name));
+      identities.push(page.items.map((p) => p.id).sort());
+      assert(page.next_cursor);
+      const next = await read("reactions_list", {
+        ...args,
+        cursor: page.next_cursor,
+      });
       assert(
-        (await read(op, { ...target, limit: 2 })).items.length,
-        op + " had no evidence",
+        next.items.length &&
+          next.items.every((p) => !identities.at(-1).includes(p.id)),
       );
+    }
+    assert.notDeepEqual(
+      identities[0],
+      identities[1],
+      "known posts returned the same sample",
+    );
     const person = post.author_identity;
     const { profile } = await read(
       "profile_get",

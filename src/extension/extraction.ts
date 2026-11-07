@@ -1,3 +1,4 @@
+import { readReactions } from "./reactions.js";
 import { waitForPost, postUrlIdentity } from "./post-context.js";
 // Parsers adapted from the user's lead-extractor-for-linkedin-posts (1.1.10).
 // Runs from the statically packaged adapter bundle in an isolated world.
@@ -464,6 +465,26 @@ export async function extractionOperation(
       !!e.offsetParent &&
       !e.matches(':disabled,[aria-disabled="true"],[aria-busy="true"]');
     if (op === "reactions_list") {
+      let sourceError: string | undefined;
+      if (
+        state.reaction_activity ||
+        (!state.seen && typeof window.fetch === "function")
+      ) {
+        try {
+          const page = await readReactions(a.post_urn, root, a.limit, state);
+          if (page) return page;
+          sourceError = "reaction_activity_unresolved";
+        } catch (error) {
+          sourceError = (error as Error).message;
+          if (
+            state.reaction_activity ||
+            ["rate_limited", "session_blocked", "not_logged_in"].includes(
+              sourceError,
+            )
+          )
+            throw error;
+        }
+      }
       const routeAtOpen = postUrlIdentity(location.href);
       const prior = findReactionDialog();
       const trigger = findReactionTrigger(root);
@@ -533,6 +554,7 @@ export async function extractionOperation(
                   ? "reaction_list_empty_while_hidden"
                   : "reaction_list_empty",
             candidate_count: candidates,
+            structured_source: sourceError,
           },
         };
       }

@@ -2,7 +2,7 @@
 
 ## 0.8.4 development candidate — not submitted
 
-Removes automatic foreground activation from LinkedIn operations. The development settings offer a background tab or an unfocused separate window. Desktop focus and background execution require [live acceptance](../docs/quiet-workspace.md) before making a Store claim or selecting supported modes. Do not reuse a previous build's evidence.
+Removes automatic foreground activation from LinkedIn operations. The candidate offers a background tab or an unfocused separate window in Settings & help. Reaction reads can use a post-bound activity query without opening a reaction dialog. Desktop focus and background execution require [live acceptance](../docs/quiet-workspace.md) before making a Store claim or selecting supported modes. Do not reuse a previous build's evidence.
 
 ## Local 0.8.3 candidate — not submitted
 
