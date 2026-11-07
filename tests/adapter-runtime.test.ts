@@ -179,6 +179,7 @@ async function harness(
   const messages: any[] = [];
   const chrome: any = {
     storage: { local: area(local), session: area(session) },
+    windows: { getLastFocused: async () => ({ id: 1 }) },
     tabs: {
       create: async (opts: any) => Object.assign(tab, opts),
       get: async () => ({ ...tab }),

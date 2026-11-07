@@ -79,6 +79,7 @@ async function harness(
   let scriptError = false;
   const chrome: any = {
     storage: { local: area(local), session: area(session) },
+    windows: { getLastFocused: async () => ({ id: 1 }) },
     tabs: {
       get: vi.fn(async (id: number) => {
         if (!tabs.has(id)) throw Error(`No tab with id: ${id}.`);

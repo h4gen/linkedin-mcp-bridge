@@ -3,11 +3,11 @@
 The 0.8.4 development build removes the tab activation that used to precede every DOM operation. With Chrome open, the agent keeps its own LinkedIn tab. In **Settings & help → Agent workspace**, choose:
 
 - **Background tab** (default): create an inactive tab in an existing window.
-- **Separate window**: create a normal Chrome window without asking Chrome to focus it. Its LinkedIn tab can be selected inside that window while the user continues in a different window or app.
+- **Separate window**: choose **Open separate window** once to open the agent window. Subsequent operations use an inactive LinkedIn tab in that window. If the window is closed, the agent uses an inactive tab in an existing normal window until you choose to open the separate window again.
 
 **Show workspace** deliberately brings the agent tab into view. Changing the setting does not bring anything forward. It takes effect for the next operation after previously queued work. Chrome may keep an old workspace open; closing it is safe. The agent does not close other tabs in a window. Login and first-install setup are human interactions. When Chrome is closed, the agent does not launch it.
 
-The lease belongs to a browser session. A worker restart reuses the owned tab; a browser restart creates a new one and checks the account. An ID recovered from durable storage is not enough to take over someone's personal tab. Changing workspace invalidates document-bound cursors, but keeps account binding, API pagination, and send receipts. Dispatched writes are never replayed to recover from a slow, discarded or closed tab.
+Reloading a connected extension or reconnecting its native host does not request a work tab. On the next operation, the separate window can recover its inactive tab when the saved tab ID, the extension page in that window and the opener ID agree. If the user selects a work tab, the next operation leaves it alone and acquires an inactive one. An ID recovered from durable storage is not enough to take over someone's personal tab. Changing workspace invalidates document-bound cursors, but keeps account binding, API pagination, and send receipts. Dispatched writes are never replayed to recover from a slow, discarded or closed tab.
 
 ## Current macOS results
 

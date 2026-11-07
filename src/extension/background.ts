@@ -991,7 +991,7 @@ function connectHost() {
         nativeError = nativeReady ? undefined : "companion_version_mismatch";
         if (nativeReady) {
           reconnectDelay = 1000;
-          await reconcileSetup();
+          if (!(await store.get("connection"))) await reconcileSetup();
         }
         return;
       }
@@ -1030,6 +1030,7 @@ function connectHost() {
         if (msg.op === "health")
           result.workspace = {
             mode: await tabId.placement.mode(),
+            actual_mode: await tabId.placement.actualMode(),
             ready: result.connected,
             ...(probe?.enabled()
               ? { measurement_active: true, last: probe.last() }
@@ -1113,7 +1114,14 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       return { cleared: true };
     }
     if (msg.action === "check-setup") {
-      await reconcileSetup();
+      // The settings page also checks on load/focus. For a bound account,
+      // wait for a real operation before recreating a missing workspace.
+      const bound = await store.get("connection");
+      const mode = await tabId.placement.mode();
+      // A current-session lease can be repaired after a tab closes. On
+      // extension reload storage.session is empty; leave the browser alone.
+      if (!bound || (await store.get("workspace:" + mode)))
+        await reconcileSetup();
       return { checked: true };
     }
     if (msg.action === "resume" || msg.action === "use-current-account") {
@@ -1160,6 +1168,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       return {
         connection: await store.get("connection"),
         workspaceMode: await tabId.placement.mode(),
+        actualWorkspaceMode: await tabId.placement.actualMode(),
         measuring: probe?.enabled() ?? false,
         native: !!port,
         nativeReady,
@@ -1242,7 +1251,11 @@ const initialized = (async () => {
 
 chrome.runtime.onInstalled?.addListener(async (details) => {
   await initialized;
-  if (details.reason === "install" && !(await store.get("setupOpened"))) {
+  if (
+    details.reason === "install" &&
+    !(await store.get("connection")) &&
+    !(await store.get("setupOpened"))
+  ) {
     await store.set("setupOpened", true);
     await setup.openPage();
   }
@@ -1257,6 +1270,7 @@ chrome.tabs?.onUpdated?.addListener((id, change) => {
     await initialized;
     if (
       id !== (await store.get("workTabId")) ||
+      (await store.get("connection")) ||
       Date.now() - lastSetupCheck < 5000
     )
       return;

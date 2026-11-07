@@ -23,7 +23,10 @@ function fixture(ready?: (id: number, url: string) => Promise<boolean>) {
     create: vi.fn(async () => tab),
     reload: vi.fn(async () => {}),
   };
-  vi.stubGlobal("chrome", { tabs });
+  vi.stubGlobal("chrome", {
+    tabs,
+    windows: { getLastFocused: async () => ({ id: 1 }) },
+  });
   const verify = vi.fn(async () => {}),
     invalidate = vi.fn(async () => {});
   const ensure = workTab({
@@ -129,6 +132,7 @@ it("never adopts a personal LinkedIn tab when Chrome reuses yesterday's tab ID",
   );
   expect(await f.ensure()).toBe(2);
   expect(f.tabs.create).toHaveBeenCalledExactlyOnceWith({
+    windowId: 1,
     url: "https://www.linkedin.com/feed/",
     active: false,
   });
@@ -138,25 +142,50 @@ it("keeps the agent window unfocused, shares it across requests, and only reveal
   const f = fixture();
   f.data.workspaceMode = "separate_window";
   f.tab.windowId = 42;
+  const marker = "chrome-extension://test/workspace.html";
+  const anchor = { id: 7, windowId: 42, url: marker, active: true };
   const windows = {
-    create: vi.fn(async () => ({ id: 42, tabs: [f.tab] })),
+    getLastFocused: vi.fn(async () => ({ id: 1 })),
+    create: vi.fn(async () => ({ id: 42, tabs: [anchor] })),
     update: vi.fn(),
   };
-  const tabs = { ...f.tabs, update: vi.fn() };
-  vi.stubGlobal("chrome", { tabs, windows });
+  let created = false;
+  const tabs = {
+    ...f.tabs,
+    query: vi.fn(async () => (created ? [anchor] : [])),
+    update: vi.fn(),
+  };
+  vi.stubGlobal("chrome", { tabs, windows, runtime: { getURL: () => marker } });
   expect(await Promise.all([f.ensure(), f.ensure()])).toEqual([2, 2]);
-  expect(await f.ensure()).toBe(2);
-  expect(windows.create).toHaveBeenCalledExactlyOnceWith({
+  expect(await f.ensure.placement.actualMode()).toBe("background_tab");
+  expect(windows.create).not.toHaveBeenCalled();
+  expect(tabs.create).toHaveBeenCalledExactlyOnceWith({
+    windowId: 1,
     url: "https://www.linkedin.com/feed/",
+    active: false,
+  });
+  await f.ensure.placement.show(() => {});
+  expect(windows.create).toHaveBeenCalledExactlyOnceWith({
+    url: marker,
+    state: "minimized",
     focused: false,
     type: "normal",
   });
-  expect(tabs.create).not.toHaveBeenCalled();
-  expect(tabs.update).not.toHaveBeenCalled();
-  expect(windows.update).not.toHaveBeenCalled();
-  await f.ensure.placement.show(() => {});
+  expect(tabs.create).toHaveBeenLastCalledWith({
+    windowId: 42,
+    openerTabId: 7,
+    url: "https://www.linkedin.com/feed/",
+    active: false,
+  });
   expect(tabs.update).toHaveBeenCalledExactlyOnceWith(2, { active: true });
-  expect(windows.update).toHaveBeenCalledExactlyOnceWith(42, { focused: true });
+  expect(windows.update).toHaveBeenCalledExactlyOnceWith(42, {
+    state: "normal",
+    focused: true,
+  });
+  created = true;
+  expect(await f.ensure()).toBe(2);
+  expect(await f.ensure.placement.actualMode()).toBe("separate_window");
+  expect(windows.create).toHaveBeenCalledTimes(1);
 });
 
 it("replaces a previously timed-out navigation on the next request and bounds repeat replacements", async () => {
@@ -182,4 +211,43 @@ it("replaces a previously timed-out navigation on the next request and bounds re
     expect((await pending).code).toBe("work_tab_loading_timeout");
   }
   expect(f.tabs.create).toHaveBeenCalledTimes(1);
+});
+
+it("reuses an inactive LinkedIn tab after reload only with the extension page as its actual opener", async () => {
+  const f = fixture();
+  f.data.workspaceMode = "separate_window";
+  f.data.connection.tabId = 2;
+  const url = "chrome-extension://test/workspace.html",
+    anchor = { id: 7, windowId: 42, url };
+  Object.assign(f.tab, { windowId: 42, openerTabId: 7, active: false });
+  const tabs = { ...f.tabs, query: vi.fn(async () => [anchor]) };
+  const windows = { create: vi.fn(), update: vi.fn() };
+  vi.stubGlobal("chrome", { tabs, windows, runtime: { getURL: () => url } });
+  expect(await f.ensure()).toBe(2);
+  expect(tabs.create).not.toHaveBeenCalled();
+  delete f.data["workspace:separate_window"];
+  f.tab.openerTabId = 77;
+  await f.ensure();
+  expect(tabs.create).toHaveBeenCalledExactlyOnceWith({
+    windowId: 42,
+    openerTabId: 7,
+    url: "https://www.linkedin.com/feed/",
+    active: false,
+  });
+  expect(windows.create).not.toHaveBeenCalled();
+  expect(windows.update).not.toHaveBeenCalled();
+});
+it("leaves a human-selected work tab alone when the next agent operation begins", async () => {
+  const f = fixture();
+  f.data["workspace:background_tab"] = { id: 2 };
+  f.tab.active = true;
+  const replacement = { ...f.tab, active: false, id: 3 };
+  f.tabs.create.mockResolvedValue(replacement);
+  expect(await f.ensure()).toBe(3);
+  expect(f.tabs.create).toHaveBeenCalledExactlyOnceWith({
+    windowId: 1,
+    active: false,
+    url: "https://www.linkedin.com/feed/",
+  });
+  expect(f.verify).toHaveBeenCalledWith(3, "me");
 });

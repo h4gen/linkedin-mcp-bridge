@@ -49,6 +49,7 @@ async function boot(local: Record<string, any> = {}) {
       },
     },
     action: { onClicked: { addListener() {} } },
+    windows: { getLastFocused: async () => ({ id: 1 }) },
     tabs: {
       query: async () => [...tabs.values()],
       get: async (id: number) => {
@@ -266,4 +267,22 @@ it("invalidates old DOM state when setup recovery replaces a lost work tab", asy
   await h.action("check-setup");
   expect(h.session["cursor:dom"]).toBeUndefined();
   expect(h.session["cursor:api"]).toBeDefined();
+});
+
+it("keeps an existing account dormant across reload, host handshake and idle settings checks", async () => {
+  const h = await boot({
+    schemaVersion: 2,
+    identitySchemaVersion: 1,
+    setupIntent: "auto",
+    workspaceMode: "separate_window",
+    connection: { account: "urn:li:fsd_profile:me", tabId: 91, paused: false },
+  });
+  await h.installed("update");
+  await h.hello();
+  await h.action("check-setup");
+  await h.alarm();
+  expect(h.stats().fetches).toBe(0);
+  expect(h.stats().created).toBe(0);
+  expect((await h.action("status")).setupError).toBeFalsy();
+  expect(h.local.connection.tabId).toBe(91);
 });

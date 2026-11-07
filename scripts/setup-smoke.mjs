@@ -111,7 +111,8 @@ try {
   await page.screenshot({ path: out + "/ready.png", fullPage: true });
   await page.getByText("Settings & help", { exact: true }).click();
   await page.getByLabel("Agent workspace").selectOption("separate_window");
-  await page.getByText("Workspace updated.").waitFor();
+  await page.getByText(/your agent uses a background tab/).waitFor();
+  await page.getByRole("button", { name: "Open separate window" }).waitFor();
   assert.equal(
     await page.getByLabel("Agent workspace").inputValue(),
     "separate_window",

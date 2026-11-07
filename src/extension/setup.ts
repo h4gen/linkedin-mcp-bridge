@@ -17,6 +17,11 @@ function render(s: any) {
   const c = s.connection;
   const select = el<HTMLSelectElement>("workspace-mode");
   if (!select.disabled) select.value = s.workspaceMode ?? "background_tab";
+  el("show-workspace").textContent =
+    s.workspaceMode === "separate_window" &&
+    s.actualWorkspaceMode !== "separate_window"
+      ? "Open separate window"
+      : "Show workspace";
   el("workspace-reveal").hidden = !c || c.paused;
   el("workspace-measure").hidden = s.channel !== "development";
   el("workspace-measure").textContent = s.measuring
@@ -192,7 +197,9 @@ el("workspace-mode").addEventListener("change", async () => {
       mode: input.value,
     });
     el("workspace-feedback").textContent = r?.changed
-      ? "Workspace updated."
+      ? input.value === "separate_window"
+        ? "If the separate window is closed, your agent uses a background tab. Use the button below to open the window."
+        : "Workspace updated."
       : "Workspace could not be changed.";
   } catch {
     el("workspace-feedback").textContent = "Reload settings and try again.";

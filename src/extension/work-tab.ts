@@ -20,7 +20,10 @@ export function workTab(deps: {
     const check = () => {
       if (generation !== deps.generation()) throw new Fault("cancelled");
     };
-    const acquired = await placement.acquire(check);
+    const acquired = await placement.acquire(
+      check,
+      setup ? "setup" : "operation",
+    );
     let tab = acquired.tab;
     const replaced = acquired.created || tab.id !== connection?.tabId;
     if (replaced || (await deps.store.get("workTabId")) !== tab.id) {

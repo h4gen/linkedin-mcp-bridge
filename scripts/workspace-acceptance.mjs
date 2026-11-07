@@ -93,8 +93,10 @@ async function health() {
     "matching connected build required; no DOM calls executed",
   );
   assert(
-    h.workspace?.mode === mode && h.workspace?.measurement_active,
-    "select the requested mode and start focus measurement in Dev settings",
+    h.workspace?.mode === mode &&
+      h.workspace?.actual_mode === mode &&
+      h.workspace?.measurement_active,
+    "open the requested workspace and start focus measurement in Dev settings",
   );
   if (account) assert.equal(h.account_urn, account, "account changed");
   account = h.account_urn;

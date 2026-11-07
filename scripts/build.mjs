@@ -75,6 +75,7 @@ await writeFile(
 );
 for (const file of [
   "setup.html",
+  "workspace.html",
   "ui.css",
   "icon16.png",
   "icon48.png",

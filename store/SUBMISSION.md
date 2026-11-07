@@ -4,7 +4,9 @@
 
 Removes automatic foreground activation from LinkedIn operations. The candidate offers a background tab or an unfocused separate window in Settings & help. Reaction reads can use a post-bound activity query without opening a reaction dialog. Desktop focus and background execution require [live acceptance](../docs/quiet-workspace.md) before making a Store claim or selecting supported modes. Do not reuse a previous build's evidence.
 
-The reloaded `c4c954fb` candidate has live evidence for all 21 read operations and installation evidence on macOS and Windows. The focused reaction test passed in the macOS separate window. The longer run failed the focus criterion despite returning the expected data in all three passes. Eleven current-build write proofs and the four platform/mode acceptance reports remain outstanding. The package is local.
+The previous `c4c954fb` candidate has live evidence for all 21 read operations and installation evidence on macOS and Windows. The focused reaction test passed in the macOS separate window. The longer run failed the focus criterion despite returning the expected data in all three passes. Eleven current-build write proofs and the four platform/mode acceptance reports remain outstanding. The package is local.
+
+Build `1b84362e` defers workspace acquisition for an already bound account until an operation needs it. Only an explicit settings action can create a separate window. If it is closed, the agent uses an inactive tab in an existing browser window. Verify this fingerprint before recording new desktop focus or capability acceptance.
 
 ## Local 0.8.3 candidate — not submitted
 
