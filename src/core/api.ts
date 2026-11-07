@@ -3,7 +3,12 @@ import {
   profileUrn,
   publicIdentifier,
 } from "./profile-identity.js";
-import { newestFirst, exactPeer, personRef } from "./read-models.js";
+import {
+  newestFirst,
+  exactPeer,
+  personRef,
+  messageText,
+} from "./read-models.js";
 import { Args, Fault, Operation } from "./contracts.js";
 import { collection, normalize, restli } from "./normalize.js";
 export type Request = {
@@ -488,7 +493,7 @@ export function mutation(
   originToken: string,
 ): Request | undefined {
   const conversations = "/voyagerMessagingDashMessengerConversations";
-  if (op === "message_send")
+  if (op === "message_send" && a.conversation_urn && !a.recipient_urn)
     return {
       path: "/voyagerMessagingDashMessengerMessages?action=createMessage",
       method: "POST",
@@ -508,7 +513,6 @@ export function mutation(
           ),
         ),
         dedupeByClientGeneratedToken: false,
-        ...(a.recipient_urn ? { hostRecipientUrns: [a.recipient_urn] } : {}),
       },
     };
   if (op === "conversation_update") {
@@ -653,73 +657,199 @@ export async function reconcileMessage(
   row: Args,
   fetch: Fetcher,
   check: () => void,
+  hash?: (text: string) => Promise<string>,
 ): Promise<Args | undefined> {
-  async function* candidates(): AsyncGenerator<string> {
-    if (
-      row.conversation_urn ||
-      row.target?.startsWith("urn:li:msg_conversation:")
-    ) {
-      yield row.conversation_urn ?? row.target;
-      return;
-    }
-    if (!row.target?.startsWith("urn:li:fsd_profile:")) return;
-    for (const category of ["INBOX", "ARCHIVE", "SPAM"]) {
-      let state: Args = {};
-      const visited = new Set<string>();
-      for (;;) {
-        check();
-        const page = await readApi(
-          "conversations_list",
-          { account_urn: row.account_urn, category, limit: 20 },
-          state,
-          fetch,
+  const known =
+    row.conversation_urn ??
+    (row.target?.startsWith("urn:li:msg_conversation:") ? row.target : null);
+  const categories = ["INBOX", "ARCHIVE", "SPAM"];
+  const scan = (row.message_scan ??= {
+    category: known ? categories.length : 0,
+    cursor: {},
+    threads: known ? [known] : [],
+    before: null,
+  });
+  for (let reads = 0; reads < 3; reads++) {
+    check();
+    if (!known && !scan.tried_direct && row.message_proof?.thread_path) {
+      // Native routes and conversation URNs share a thread suffix. This only
+      // suggests a lookup: the source must return the exact entity and peer.
+      const id = decodeURIComponent(row.message_proof.thread_path).match(
+        /^\/messaging\/thread\/([\w+=-]+)\/?$/,
+      )?.[1];
+      scan.tried_direct = true; // Unavailable or stale direct hints fall back to the bounded mailbox scan.
+      if (id) {
+        const candidate =
+          "urn:li:msg_conversation:(" + row.account_urn + "," + id + ")";
+        const raw = await fetch(
+          graph("messages", {
+            deliveredAt: Date.now(),
+            conversationUrn: candidate,
+            countBefore: 1,
+            countAfter: 0,
+          }),
         );
-        for (const thread of page.items) {
-          if (exactPeer(thread, row.account_urn, row.target))
-            yield thread.entityUrn;
+        const thread = normalize(raw).entities.find(
+          (t) =>
+            t.entityUrn === candidate &&
+            exactPeer(t, row.account_urn, row.target),
+        );
+        if (thread) {
+          row.conversation_urn = candidate;
+          scan.threads = [candidate];
+          scan.category = categories.length;
         }
-        if (!page.next) break;
-        const key = JSON.stringify(page.next);
-        if (visited.has(key)) throw new Fault("pagination_stalled");
-        visited.add(key);
-        state = page.next;
       }
+      continue;
     }
-  }
-  const checked = new Set<string>();
-  for await (const conversation of candidates()) {
-    if (checked.has(conversation)) continue;
-    checked.add(conversation);
-    let before = Date.now();
-    for (;;) {
-      check();
-      const raw = await fetch(
-        graph("messages", {
-          deliveredAt: before,
-          conversationUrn: conversation,
-          countBefore: 50,
-          countAfter: 0,
-        }),
+    if (!scan.threads.length) {
+      if (scan.category >= categories.length) break;
+      const page = await readApi(
+        "conversations_list",
+        {
+          account_urn: row.account_urn,
+          category: categories[scan.category],
+          limit: 20,
+        },
+        scan.cursor,
+        fetch,
       );
-      const match = (raw.included ?? []).find(
-        (x: Args) =>
-          x.originToken === row.origin_token &&
-          /^urn:li:msg_message:/.test(x.entityUrn ?? ""),
+      const threads = page.items.filter((t: Args) =>
+        exactPeer(t, row.account_urn, row.target),
       );
-      if (match)
-        return { receipt_id: match.entityUrn, conversation_urn: conversation };
-      const page = collection(raw, "messages_list");
-      const times = page.items
-        .map((x) => x.deliveredAt)
-        .filter((x) => typeof x === "number");
-      const next = times.length ? Math.min(...times) + 1 : undefined;
-      if (page.items.length < 50 || !next || next < row.created_at - 60000)
-        break;
+      if (row.message_proof?.thread_path) {
+        const matches = threads.filter((t: Args) => {
+          const path = row.message_proof.thread_path.replace(/\/$/, "");
+          try {
+            if (t.conversationUrl) {
+              const url = new URL(t.conversationUrl);
+              return (
+                url.origin === "https://www.linkedin.com" &&
+                decodeURIComponent(url.pathname.replace(/\/$/, "")) ===
+                  decodeURIComponent(path)
+              );
+            }
+            const id = t.entityUrn?.match(/,([\w=+-]+)\)$/)?.[1];
+            return (
+              !!id && decodeURIComponent(path) === "/messaging/thread/" + id
+            );
+          } catch {
+            return false;
+          }
+        });
+        if (
+          matches.length === 1 &&
+          /^urn:li:msg_conversation:/.test(matches[0].entityUrn)
+        ) {
+          row.conversation_urn = matches[0].entityUrn;
+          scan.threads = [row.conversation_urn];
+          scan.cursor = {};
+          scan.category = categories.length;
+          continue;
+        }
+      }
+      scan.threads = [
+        ...new Set(
+          threads
+            .filter((t: Args) => !row.message_proof?.thread_path)
+            .map((t: Args) => t.entityUrn)
+            .filter(
+              (id: unknown) =>
+                typeof id === "string" &&
+                id.startsWith("urn:li:msg_conversation:"),
+            ),
+        ),
+      ];
+      if (page.next && page.next.nextCursor !== scan.cursor.nextCursor)
+        scan.cursor = page.next;
+      else {
+        if (page.next || page.partial) scan.incomplete = true;
+        scan.category++;
+        scan.cursor = {};
+      }
+      continue;
+    }
+    const conversation = scan.threads[0];
+    const before = scan.before ?? Date.now() + 1;
+    const raw = await fetch(
+      graph("messages", {
+        deliveredAt: before,
+        conversationUrn: conversation,
+        countBefore: 50,
+        countAfter: 0,
+      }),
+    );
+    const linkedThread = (m: Args) =>
+      m.conversationUrn ?? m.conversation?.entityUrn ?? m["*conversation"];
+    // Existing API writes have a unique client token. Never match by text for legacy rows.
+    const tokenHits = (raw.included ?? []).filter(
+      (m: Args) =>
+        row.origin_token &&
+        m.originToken === row.origin_token &&
+        /^urn:li:msg_message:/.test(m.entityUrn ?? "") &&
+        (!linkedThread(m) || linkedThread(m) === conversation),
+    );
+    if (!row.message_proof && tokenHits.length === 1)
+      return {
+        receipt_id: tokenHits[0].entityUrn,
+        conversation_urn: conversation,
+      };
+    const items = collection(raw, "messages_list").items;
+    for (const m of items) {
+      const proof = row.message_proof;
+      if (
+        !proof ||
+        !hash ||
+        !/^urn:li:msg_message:/.test(m.entityUrn ?? "") ||
+        (linkedThread(m) && linkedThread(m) !== conversation) ||
+        !(m.deliveredAt > proof.after && m.deliveredAt <= proof.until) ||
+        personRef(m.sender ?? m.from ?? {}).entityUrn !== row.account_urn ||
+        (await hash(messageText(m).replace(/\r\n/g, "\n"))) !== proof.digest
+      )
+        continue;
+      const candidate = {
+        receipt_id: m.entityUrn,
+        conversation_urn: conversation,
+      };
+      if (scan.match && scan.match.receipt_id !== m.entityUrn)
+        scan.ambiguous = true;
+      else scan.match = candidate;
+    }
+    const times = items
+      .map((m) => m.deliveredAt)
+      .filter((t) => typeof t === "number");
+    const next = times.length ? Math.min(...times) + 1 : undefined;
+    if (
+      items.length >= 50 &&
+      next &&
+      next >= (row.message_proof?.after ?? row.created_at - 60000)
+    ) {
       if (next >= before) throw new Fault("timestamp_boundary_unresolved");
-      before = next;
+      scan.before = next;
+    } else {
+      scan.before = null;
+      scan.threads.shift();
+      // The routing proof binds a free composer to this exact peer. Only a
+      // unique fresh outbound in a proven one-to-one conversation can confirm.
+      if (
+        scan.match &&
+        !scan.ambiguous &&
+        !scan.threads.length &&
+        (known || row.conversation_urn)
+      )
+        return scan.match;
     }
   }
-  return undefined; // Absence is never evidence that dispatch failed.
+  if (!scan.threads.length && scan.category >= categories.length) {
+    if (scan.match && !scan.ambiguous && !scan.incomplete) return scan.match;
+    row.reconciliation = scan.ambiguous
+      ? "multiple_matching_messages"
+      : scan.incomplete
+        ? "mailbox_coverage_incomplete"
+        : "no_matching_receipt_observed";
+    delete row.message_scan; // A future read may observe a delayed delivery.
+  } else row.reconciliation = "scan_in_progress";
+  return undefined;
 }
 
 export async function findInvitation(

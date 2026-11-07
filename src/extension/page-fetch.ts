@@ -37,7 +37,15 @@ export async function pageFetch(request: Request): Promise<any> {
       method: request.method ?? "GET",
       credentials: guest ? "omit" : "include",
       redirect: "error",
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(
+        Math.max(
+          1,
+          Math.min(
+            15000,
+            (request.execution_deadline ?? Infinity) - Date.now(),
+          ),
+        ),
+      ),
       headers: guest
         ? { accept: "application/json" }
         : {
@@ -51,7 +59,32 @@ export async function pageFetch(request: Request): Promise<any> {
         ? {}
         : { body: JSON.stringify(request.body) }),
     });
-    if (!r.ok)
+    if (!r.ok) {
+      let validation: string | undefined;
+      if (
+        r.status === 422 &&
+        request.method === "POST" &&
+        request.path ===
+          "/voyagerMessagingDashMessengerMessages?action=createMessage"
+      ) {
+        // Only explicit, structured validation/permission failures are conclusive.
+        // Free-form messages, numeric codes and a bare 422 never prove rejection.
+        try {
+          const length = Number(r.headers.get("content-length") ?? NaN);
+          if (Number.isFinite(length) && length > 0 && length <= 16384) {
+            const v = await r.json();
+            const reason = v.code ?? v.errorDetails?.code;
+            if (
+              [
+                "INVALID_RECIPIENT",
+                "INVALID_ARGUMENT",
+                "INSUFFICIENT_CREDITS",
+              ].includes(reason)
+            )
+              validation = reason;
+          }
+        } catch {}
+      }
       return {
         error:
           r.status === 429
@@ -59,8 +92,10 @@ export async function pageFetch(request: Request): Promise<any> {
             : !guest && [401, 403, 999].includes(r.status)
               ? "session_blocked"
               : "linkedin_http_" + r.status,
+        validation_reason: validation,
         retry_after: r.headers.get("retry-after"),
       };
+    }
     if (r.status === 204) return { data: {} };
     const text = await r.text();
     if (text.length > 4 * 1024 * 1024) return { error: "response_too_large" };

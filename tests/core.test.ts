@@ -1,3 +1,4 @@
+import { verifiedChat, withVerifiedChat } from "./message-thread-fixture.js";
 import { describe, it, expect, vi } from "vitest";
 import { Engine, Store } from "../src/core/engine.js";
 import { parse, schemas } from "../src/core/contracts.js";
@@ -34,7 +35,7 @@ function fixture() {
   const dom = vi.fn(async () => ({ verified: false }));
   const engine = new Engine({
     store,
-    fetch,
+    fetch: withVerifiedChat(fetch),
     dom,
     account: async () => account,
     now: () => now,
@@ -54,7 +55,7 @@ function fixture() {
 }
 const send = {
   account_urn: account,
-  recipient_urn: recipient,
+  conversation_urn: verifiedChat,
   expected_participant_urns: [recipient],
   text: "Hello",
   idempotency_key: "unique-key-1",
@@ -68,11 +69,11 @@ describe("contracts", () => {
     expect(() =>
       parse("message_send", {
         ...send,
-        conversation_urn: "urn:li:msg_conversation:x",
+        recipient_urn: recipient,
       }),
     ).toThrow();
     expect(() =>
-      parse("message_send", { ...send, recipient_urn: undefined }),
+      parse("message_send", { ...send, conversation_urn: undefined }),
     ).toThrow();
   });
   it("caps pages and validates all tool schemas", () => {
@@ -259,7 +260,14 @@ describe("transport and installer", () => {
     expect(request?.path).toBe(
       "/voyagerMessagingDashMessengerMessages?action=createMessage",
     );
-    expect((request?.body as any).hostRecipientUrns).toEqual([recipient]);
+    expect((request?.body as any).message.conversationUrn).toBe(verifiedChat);
+    expect(
+      mutation(
+        "message_send",
+        { ...send, conversation_urn: undefined, recipient_urn: recipient },
+        "origin",
+      ),
+    ).toBeUndefined();
   });
 });
 
@@ -416,3 +424,24 @@ it("rebuilds recipient identity from the exact messaging conversation after rest
   expect(f.data["identity:" + recipient].name).toBe("Peer");
   expect(f.dom).not.toHaveBeenCalled();
 });
+
+it.each([
+  ["INVALID_RECIPIENT", "rejected"],
+  [undefined, "unknown_outcome"],
+])(
+  "preserves a structured reject or ambiguous bare 422 without resending",
+  async (reason, status) => {
+    const { Fault } = await import("../src/core/contracts.js");
+    const f = fixture();
+    f.fetch.mockImplementation(async (r) => {
+      if (r.path === "/me") return me;
+      throw new Fault("linkedin_http_422", "linkedin_http_422", {
+        validation_reason: reason,
+      });
+    });
+    const first = await f.engine.run("message_send", send);
+    expect(first.status).toBe(status);
+    expect((await f.engine.run("message_send", send)).replayed).toBe(true);
+    expect(f.fetch.mock.calls.filter(([r]) => r.method)).toHaveLength(1);
+  },
+);

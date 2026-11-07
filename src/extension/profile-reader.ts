@@ -1,3 +1,4 @@
+import { composeRoute } from "./message-composer.js";
 const visible = (element: Element) => !!element.getClientRects().length;
 function profileActionEvidence(labels: string[]) {
   const evidence: Array<{ source: string; value: string }> = [];
@@ -137,13 +138,15 @@ export function profileReader(expectedUrl: string, expectedUrn: string) {
         : actionEvidence.some((e) => e.value === "connect_available")
           ? "not_connected"
           : "unknown";
-  const messaging = [...top.querySelectorAll<HTMLAnchorElement>("a[href]")]
-    .filter(visible)
-    .some(
-      (a) =>
-        a.pathname.includes("/messaging/compose/") &&
-        new URL(a.href).searchParams.get("profileUrn") === expectedUrn,
-    );
+  const routes = [
+    ...new Set(
+      [...top.querySelectorAll<HTMLAnchorElement>("a[href]")]
+        .filter(visible)
+        .map((a) => a.href)
+        .filter((href) => composeRoute(href, expectedUrn)),
+    ),
+  ];
+  const messaging = routes.length === 1;
   const current: string[] = [];
   const experienceHeading = headings.find((h) =>
     /^(Experience|Berufserfahrung)$/.test(h.textContent?.trim() ?? ""),
@@ -203,6 +206,7 @@ export function profileReader(expectedUrl: string, expectedUrn: string) {
           .at(-1) ?? null;
       return { status: text ? "available" : "unavailable", text };
     })(),
+    compose_url: messaging ? routes[0] : null,
     posts_url: posts.length === 1 ? posts[0].href : null,
     activity_url:
       links.find((a) =>

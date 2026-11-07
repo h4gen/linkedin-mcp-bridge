@@ -1,3 +1,4 @@
+import { verifiedChat, withVerifiedChat } from "./message-thread-fixture.js";
 import { describe, it, expect, vi } from "vitest";
 import { Engine, Store } from "../src/core/engine.js";
 import { readApi } from "../src/core/api.js";
@@ -18,7 +19,7 @@ function storage() {
 const account = "urn:li:fsd_profile:me";
 const send = {
   account_urn: account,
-  recipient_urn: "urn:li:fsd_profile:friend",
+  conversation_urn: verifiedChat,
   expected_participant_urns: ["urn:li:fsd_profile:friend"],
   text: "Grüße 👋",
   idempotency_key: "direct-write-test",
@@ -33,7 +34,7 @@ describe("direct writes", () => {
     );
     const engine = new Engine({
       store,
-      fetch,
+      fetch: withVerifiedChat(fetch),
       dom: vi.fn(),
       account: async () => account,
       now: () => 1,
@@ -160,7 +161,7 @@ it("verifies recipients from an exact conversation entity without scanning the i
               {
                 entityUrn: thread,
                 conversationParticipants: [
-                  { hostIdentityUrn: send.recipient_urn },
+                  { hostIdentityUrn: send.expected_participant_urns[0] },
                   { hostIdentityUrn: account },
                 ],
               },
@@ -169,7 +170,7 @@ it("verifies recipients from an exact conversation entity without scanning the i
   );
   const engine = new Engine({
     store,
-    fetch,
+    fetch: withVerifiedChat(fetch),
     dom: vi.fn(),
     account: async () => account,
     now: () => 1000,
@@ -294,7 +295,7 @@ it("does not repopulate journal state after a connection generation changes", as
   });
   const engine = new Engine({
     store,
-    fetch,
+    fetch: withVerifiedChat(fetch),
     dom: vi.fn(),
     account: async () => account,
     now: () => 1,
@@ -353,7 +354,7 @@ it("serializes receipt expiry behind an in-flight mutation", async () => {
   );
   const engine = new Engine({
     store,
-    fetch,
+    fetch: withVerifiedChat(fetch),
     dom: vi.fn(),
     account: async () => account,
     now: () => 1,

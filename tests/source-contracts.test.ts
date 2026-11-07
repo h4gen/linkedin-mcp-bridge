@@ -244,3 +244,102 @@ it("requires fresh state fields rather than trusting a partial conversation enti
   expect(r.read).toBe(true);
   expect(fetch).toHaveBeenCalledTimes(2);
 });
+
+it("resumes an old unknown recipient receipt past the first mailbox pages without issuing a write", async () => {
+  const { reconcileMessage } = await import("../src/core/api.js");
+  const peer = "urn:li:fsd_profile:peer",
+    own = "urn:li:fsd_profile:self",
+    conv = "urn:li:msg_conversation:thread";
+  const row: any = {
+    account_urn: own,
+    target: peer,
+    origin_token: "attempt-specific",
+    created_at: 1,
+  };
+  let mailbox = 0;
+  const fetch = vi.fn(async (r: any) => {
+    expect(r.method).toBeUndefined();
+    if (r.path.includes("messengerMessages."))
+      return {
+        data: { elements: [] },
+        included: [
+          {
+            originToken: row.origin_token,
+            entityUrn: "urn:li:msg_message:verified",
+            conversationUrn: conv,
+          },
+        ],
+      };
+    if (mailbox) expect(r.path).toContain("nextCursor:page" + mailbox);
+    mailbox++;
+    return {
+      data: {
+        elements:
+          mailbox === 5
+            ? [{ entityUrn: conv, participants: [{ hostIdentityUrn: peer }] }]
+            : [],
+        metadata: { nextCursor: "page" + mailbox },
+      },
+    };
+  });
+  expect(await reconcileMessage(row, fetch, () => {})).toBeUndefined();
+  expect(fetch).toHaveBeenCalledTimes(3);
+  expect(row.reconciliation).toBe("scan_in_progress");
+  expect(await reconcileMessage(structuredClone(row), fetch, () => {})).toEqual(
+    { receipt_id: "urn:li:msg_message:verified", conversation_urn: conv },
+  );
+});
+
+it("a native thread hint only confirms after an exact peer, sender, body and new stable message ID", async () => {
+  const { reconcileMessage } = await import("../src/core/api.js");
+  const own = "urn:li:fsd_profile:me",
+    peer = "urn:li:fsd_profile:peer",
+    thread = `urn:li:msg_conversation:(${own},2-xx==)`,
+    msg = "urn:li:msg_message:verified";
+  for (const wrong of [false, true]) {
+    const row: any = {
+      account_urn: own,
+      target: peer,
+      message_proof: {
+        after: 100,
+        until: 120,
+        digest: "hello",
+        thread_path: "/messaging/thread/2-xx%3D%3D/",
+      },
+    };
+    const fetch = vi.fn(async (r: any) => {
+      if (r.path.includes("messengerConversations"))
+        return { data: { elements: [] } };
+      if (r.path.includes("countBefore:1,"))
+        return {
+          data: { elements: [] },
+          included: [
+            {
+              entityUrn: thread,
+              participants: [{ hostIdentityUrn: wrong ? own : peer }],
+            },
+          ],
+        };
+      return {
+        data: {
+          elements: [
+            {
+              entityUrn: msg,
+              body: { text: "hello" },
+              sender: { hostIdentityUrn: own },
+              deliveredAt: 110,
+            },
+          ],
+        },
+      };
+    });
+    const proof = await reconcileMessage(
+      row,
+      fetch,
+      () => {},
+      async (x) => x,
+    );
+    if (wrong) expect(proof).toBeUndefined();
+    else expect(proof).toEqual({ receipt_id: msg, conversation_urn: thread });
+  }
+});

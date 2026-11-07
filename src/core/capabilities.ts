@@ -176,6 +176,7 @@ const mutation = row({
     "pending",
     "unknown_outcome",
     "failed_before_dispatch",
+    "rejected",
     "confirmed",
     "not_found",
   ]),
@@ -247,6 +248,17 @@ const definitions = {
         evidence: relationshipEvidence,
         connection_degree: z.enum(["1", "2", "3", "unknown"]),
         messaging_evidence: relationshipEvidence,
+        messaging_cost: z
+          .enum(["free", "credits_required", "unknown"])
+          .optional(),
+        cost_evidence: z
+          .object({
+            reason: z.string(),
+            observed_at: z.string(),
+            profile_urn: z.string(),
+          })
+          .strict()
+          .optional(),
         invitation_scan: z
           .object({ received: invitationScan, sent: invitationScan })
           .strict(),

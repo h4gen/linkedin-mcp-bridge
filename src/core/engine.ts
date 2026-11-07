@@ -274,6 +274,54 @@ export class Engine {
           result.reconciliation ?? "no_matching_fresh_comment_observed";
       await d.store.set("journal", journal);
     };
+    const reconcileDM = async (row: Args) => {
+      try {
+        const readDeadline = deadline - 2500;
+        const room = () => {
+          check();
+          if (d.now() + 3500 >= readDeadline)
+            throw new Fault("read_budget_exhausted");
+        };
+        const fetch: Fetcher = async (r) => {
+          room();
+          let timer: ReturnType<typeof setTimeout> | undefined;
+          // Navigation/recovery can take longer than fetch itself. Abandon only
+          // this read; never leave it free to mutate the receipt afterwards.
+          try {
+            return await Promise.race([
+              d.fetch({ ...r, execution_deadline: readDeadline }),
+              new Promise<never>((_, reject) => {
+                timer = setTimeout(
+                  () => reject(new Fault("read_budget_exhausted")),
+                  Math.max(1, readDeadline - d.now()),
+                );
+              }),
+            ]);
+          } finally {
+            clearTimeout(timer);
+          }
+        };
+        if (self(await fetch({ path: "/me" })) !== expected)
+          throw new Fault("account_changed");
+        const match = await reconcileMessage(row, fetch, room, d.hash);
+        if (match) {
+          Object.assign(row, match, {
+            status: "confirmed",
+            dispatch_state: "dispatched",
+            reconciliation: row.message_proof
+              ? "exact_peer_sender_text_time"
+              : "origin_token",
+          });
+          delete row.message_scan;
+          delete row.error;
+        }
+      } catch (e) {
+        row.reconciliation =
+          e instanceof Fault ? e.code : "reconciliation_unavailable";
+      }
+      row.next_step = row.status === "confirmed" ? undefined : "operation_get";
+      await d.store.set("journal", journal);
+    };
     if (op === "operation_get") {
       const row = journal[key];
       if (!row) return { status: "not_found", retention_days: 7 };
@@ -294,18 +342,7 @@ export class Engine {
         row.operation === "message_send" &&
         ["pending", "unknown_outcome"].includes(row.status)
       ) {
-        try {
-          if (self(await d.fetch({ path: "/me" })) !== expected)
-            throw new Fault("account_changed");
-          const match = await reconcileMessage(row, d.fetch, check);
-          if (match) {
-            Object.assign(row, match, { status: "confirmed" });
-            await d.store.set("journal", journal);
-          } else row.reconciliation = "no_matching_receipt_observed";
-        } catch (e) {
-          row.reconciliation =
-            e instanceof Fault ? e.code : "reconciliation_unavailable";
-        }
+        await reconcileDM(row);
       }
       if (
         row.operation === "conversation_delete" &&
@@ -335,6 +372,8 @@ export class Engine {
       }
       return {
         ...row,
+        message_proof: undefined,
+        message_scan: undefined,
         comment_proof: undefined,
         status: row.status === "pending" ? "unknown_outcome" : row.status,
       };
@@ -382,6 +421,8 @@ export class Engine {
           }
           return {
             ...previous,
+            message_proof: undefined,
+            message_scan: undefined,
             comment_proof: undefined,
             status:
               previous.status === "pending"
@@ -402,6 +443,8 @@ export class Engine {
           }
           return {
             ...previous,
+            message_proof: undefined,
+            message_scan: undefined,
             comment_proof: undefined,
             status:
               previous.status === "pending"
@@ -417,6 +460,8 @@ export class Engine {
         )
           return {
             ...previous,
+            message_proof: undefined,
+            message_scan: undefined,
             comment_proof: undefined,
             status:
               previous.status === "pending"
@@ -514,7 +559,7 @@ export class Engine {
         const identity = await d.identity(a.profile_urn);
         if (!identity?.name) throw new Fault("recipient_identity_unavailable");
       }
-      if (d.identity && op === "message_send") {
+      if (d.identity && op === "message_send" && !a.recipient_urn) {
         for (const urn of a.expected_participant_urns) {
           const identity = await d.identity(urn);
           if (!identity?.name)
@@ -522,6 +567,33 @@ export class Engine {
         }
       }
       check();
+      let preparedComposer: Args | undefined;
+      if (op === "message_send" && a.recipient_urn) {
+        const observation = await d.dom(
+          op,
+          {
+            recipient_urn: a.recipient_urn,
+            account_urn: expected,
+            preflight: true,
+            execution_deadline: deadline,
+          },
+          {},
+        );
+        if (
+          observation.cost !== "free" ||
+          observation.prepared_composer?.peer !== a.recipient_urn
+        )
+          throw new Fault(
+            observation.cost === "credits_required"
+              ? "message_credits_required"
+              : observation.reason === "recipient_mismatch"
+                ? "recipient_mismatch"
+                : "message_cost_unknown",
+            "Free delivery to this recipient could not be verified.",
+            { dispatch_state: "not_dispatched", reason: observation.reason },
+          );
+        preparedComposer = observation.prepared_composer;
+      }
       const commentProof =
         op === "post_comment"
           ? (
@@ -543,6 +615,16 @@ export class Engine {
       const origin = previous?.origin_token ?? d.uuid();
       const row: Args = {
         operation: op,
+        ...(preparedComposer
+          ? {
+              messaging_cost: "free",
+              message_proof: {
+                digest: await d.hash(a.text.replace(/\r\n/g, "\n")),
+                after: d.now(),
+                until: deadline + 60000,
+              },
+            }
+          : {}),
         ...(commentProof ? { comment_proof: commentProof } : {}),
         version: VERSION,
         attempt_count: (previous?.attempt_count ?? (previous ? 1 : 0)) + 1,
@@ -613,6 +695,11 @@ export class Engine {
         if ((await d.account()) !== expected)
           throw new Fault("account_changed");
         await d.checkpoint?.();
+        if (preparedComposer) {
+          row.message_proof.after = d.now();
+          await d.store.set("journal", journal);
+          check();
+        }
         const request = mutation(op, a, origin);
         dispatched = true;
         const result = request
@@ -621,6 +708,7 @@ export class Engine {
               op,
               {
                 ...a,
+                prepared_composer: preparedComposer,
                 verified_target: target,
                 verified_actor: actor,
                 ...(commentProof ? { comment_proof: commentProof } : {}),
@@ -630,6 +718,19 @@ export class Engine {
               {},
             );
         mutationReturned = true;
+        if (
+          preparedComposer &&
+          typeof result.thread_path === "string" &&
+          /^\/messaging\/thread\/[\w%+=-]+\/?$/.test(result.thread_path)
+        )
+          row.message_proof.thread_path = result.thread_path;
+        if (
+          preparedComposer &&
+          typeof result.clicked_at === "number" &&
+          result.clicked_at >= row.message_proof.after &&
+          result.clicked_at <= deadline
+        )
+          row.message_proof.after = result.clicked_at;
         row.dispatch_state = "dispatched";
         await d.store.set("journal", journal);
         if (op === "post_schedule" || op === "scheduled_post_cancel") {
@@ -749,6 +850,15 @@ export class Engine {
             entity?.conversation?.entityUrn ??
             null;
         }
+        if (preparedComposer) {
+          await reconcileDM(row);
+          if (
+            row.status !== "confirmed" &&
+            row.reconciliation === "scan_in_progress" &&
+            d.now() + 18000 < deadline
+          )
+            await reconcileDM(row);
+        }
       } catch (e) {
         if (
           !mutationReturned &&
@@ -760,6 +870,7 @@ export class Engine {
               "invitation_withdraw",
               "conversation_delete",
               "post_comment",
+              "message_send",
             ].includes(op))
         )
           dispatched = false;
@@ -770,6 +881,21 @@ export class Engine {
             : "unknown"
           : "not_dispatched";
         row.error = e instanceof Fault ? e.code : "transport_error";
+        if (
+          op === "message_send" &&
+          !preparedComposer &&
+          e instanceof Fault &&
+          e.code === "linkedin_http_422" &&
+          [
+            "INVALID_RECIPIENT",
+            "INVALID_ARGUMENT",
+            "INSUFFICIENT_CREDITS",
+          ].includes(e.details.validation_reason as string)
+        ) {
+          row.status = "rejected";
+          row.dispatch_state = "dispatched";
+          row.validation_reason = e.details.validation_reason;
+        }
       }
       try {
         await d.checkpoint?.();
@@ -778,7 +904,12 @@ export class Engine {
         if (dispatched) throw new Fault("interrupted_unknown_outcome");
         throw e;
       }
-      return { ...row, comment_proof: undefined };
+      return {
+        ...row,
+        comment_proof: undefined,
+        message_proof: undefined,
+        message_scan: undefined,
+      };
     }
     let state: Args = {};
     let cursorRecord: Args | undefined;

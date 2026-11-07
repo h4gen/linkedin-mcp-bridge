@@ -102,7 +102,16 @@ export const schemas = {
     })
     .strict(),
   profile_posts_list: z.object({ ...page, profile_urn: profileUrn }).strict(),
-  relationship_get: z.object({ ...account, profile_urn: profileUrn }).strict(),
+  relationship_get: z
+    .object({
+      ...account,
+      profile_urn: profileUrn,
+      inspect_composer: z
+        .boolean()
+        .optional()
+        .describe("Read the recipient-bound composer cost without writing."),
+    })
+    .strict(),
   message_send: z
     .object({
       ...write,
@@ -277,7 +286,7 @@ export const descriptions: Record<Operation, string> = {
   profile_posts_list:
     "Read observed profile activity; distinguish original posts from reposts only where the source proves it.",
   relationship_get:
-    "Observe relationship and messaging capability for an exact profile. Missing invitations never prove acceptance.",
+    "Observe relationship and messaging capability for an exact profile. Set inspect_composer to read the actual first-message cost without drafting or sending. Missing invitations never prove acceptance.",
   conversations_list:
     "List bounded inbox, archived or spam conversations, optionally unread only. Returns conversation URNs and pagination. Follow next_cursor with unchanged filters; inspect page_info for actual coverage. Does not open threads or mark them read.",
   conversations_get:
@@ -324,7 +333,7 @@ export const descriptions: Record<Operation, string> = {
   messages_list:
     "Read compact message history newest-first without marking it read. Text is capped at 1000 Unicode codepoints; use message_get for full text. Continue unchanged cursor arguments; inspect partial/page_info for unresolved timestamp boundaries.",
   message_send:
-    "Send plain text to an existing conversation or one recipient. Must be explicitly requested by the user. Supply exact expected participant URNs, excluding yourself. Never retry an unknown outcome with a new key.",
+    "Send plain text to an existing conversation or one recipient. Must be explicitly requested by the user. First contact only sends from a verified free composer; for an existing chat prefer conversation_urn. Supply exact expected participant URNs, excluding yourself. Never retry an unknown outcome with a new key.",
   conversation_delete:
     "Delete this conversation from your own inbox; not a recall for recipients. Requires explicit user intent.",
   operation_get:

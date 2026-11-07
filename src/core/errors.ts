@@ -29,6 +29,16 @@ export function errorDetails(code: string) {
 // source payloads, URLs or session tokens.
 export function adapterDiagnostics(details: Record<string, unknown> = {}) {
   const allowed = new Set([
+    "composer_route_mismatch",
+    "composer_dialog_blocked",
+    "composer_unavailable",
+    "composer_body_not_unique",
+    "composer_recipient_unverified",
+    "recipient_mismatch",
+    "composer_send_control_not_unique",
+    "profile_compose_link_unavailable",
+    "verified_recipient_composer",
+    "premium_subscription_required",
     "reaction_list_empty_while_hidden",
     "reaction_list_empty",
     "reaction_rows_unrecognized",

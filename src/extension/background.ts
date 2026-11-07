@@ -151,11 +151,14 @@ async function fetchRequest(r: Request, check = () => {}) {
     if (result.error === "rate_limited" || result.error === "session_blocked")
       await store.set("blockedUntil", retryAt(result.retry_after, Date.now()));
     const retry = await store.get("blockedUntil");
-    throw new Fault(
-      result.error,
-      result.error,
-      retry > Date.now() ? { retry_at: new Date(retry).toISOString() } : {},
-    );
+    throw new Fault(result.error, result.error, {
+      ...(retry > Date.now()
+        ? { retry_at: new Date(retry).toISOString() }
+        : {}),
+      ...(result.validation_reason
+        ? { validation_reason: result.validation_reason }
+        : {}),
+    });
   }
   if (!result || !Object.hasOwn(result, "data"))
     throw new Fault("empty_browser_response");
@@ -315,8 +318,61 @@ const engine = new Engine({
         },
       );
     }
+    if (op === "message_send" && a.prepared_composer) {
+      // Use the precise preflight document and its interaction guard. Never navigate
+      // or rebind a lost session as part of a write.
+      const proof = a.prepared_composer;
+      if (proof.tab !== id || proof.peer !== a.recipient_urn)
+        throw new Fault(
+          "composer_session_changed",
+          "composer_session_changed",
+          { dispatch_state: "not_dispatched" },
+        );
+      const session = proof.session;
+      inFlightDom = { id, session, check };
+      try {
+        check();
+        const r = (
+          await pageOperation("message_composer", {
+            dispatch: true,
+            profile_url: proof.profile_url,
+            profile_urn: proof.peer,
+            text: a.text,
+            execution_deadline: a.execution_deadline,
+            execution_session: session,
+          })
+        )[0]?.result;
+        if (!r || r.bridge_error)
+          throw new Fault(
+            r?.bridge_error ?? "composer_result_lost",
+            r?.bridge_error,
+            { dispatch_state: r?.dispatch_state ?? "unknown" },
+          );
+        for (let n = 0; n < 5; n++) {
+          check();
+          const url = (await chrome.tabs.get(id)).url;
+          if (
+            url &&
+            /^https:\/\/www\.linkedin\.com\/messaging\/thread\/[\w%+=-]+\/?(?:[?#].*)?$/.test(
+              url,
+            )
+          )
+            return { ...r, thread_path: new URL(url).pathname };
+          await new Promise((wait) => setTimeout(wait, 250));
+        }
+        return r;
+      } finally {
+        inFlightDom = undefined;
+      }
+    }
+    const firstMessage =
+      op === "message_send" && a.recipient_urn && a.preflight;
+    if (firstMessage) a = { ...a, profile_urn: a.recipient_urn };
     if (
-      ["profile_get", "profile_posts_list", "relationship_get"].includes(op) &&
+      (firstMessage ||
+        ["profile_get", "profile_posts_list", "relationship_get"].includes(
+          op,
+        )) &&
       !state.dom_session
     ) {
       const cached = a.profile_urn
@@ -400,6 +456,44 @@ const engine = new Engine({
         { ...basic, posts_url: extra.posts_url },
         "profile_verified",
       );
+      const inspectComposer = async () => {
+        const peer = basic.entityUrn;
+        let reason = "profile_compose_link_unavailable";
+        if (extra?.compose_url) {
+          await navigate(extra.compose_url);
+          const session = crypto.randomUUID();
+          await pageOperation("session_begin", { token: session });
+          for (let n = 0; n < 10; n++) {
+            check();
+            const result = (
+              await pageOperation("message_composer", {
+                profile_url: basic.profile_url,
+                profile_urn: peer,
+              })
+            )[0]?.result;
+            reason = result?.reason ?? "composer_unavailable";
+            if (result?.profile_urn === peer)
+              return {
+                cost: result.cost,
+                reason,
+                prepared_composer: {
+                  session,
+                  tab: id,
+                  peer,
+                  profile_url: basic.profile_url,
+                },
+              };
+            if (
+              reason === "recipient_mismatch" ||
+              reason === "composer_route_mismatch"
+            )
+              break;
+            await new Promise((r) => setTimeout(r, 200));
+          }
+        }
+        return { cost: "unknown", reason };
+      };
+      if (firstMessage) return inspectComposer();
       if (op === "profile_get") {
         const all: Record<string, any> = {
           basic: { status: "available" },
@@ -438,7 +532,18 @@ const engine = new Engine({
               (r) => fetchRequest(r, check),
             ),
         );
-        return resolveRelationship(observed, scans);
+        const relationship = resolveRelationship(observed, scans);
+        if (!a.inspect_composer) return relationship;
+        const { cost, reason } = await inspectComposer();
+        return {
+          ...relationship,
+          messaging_cost: cost,
+          cost_evidence: {
+            reason,
+            observed_at: new Date().toISOString(),
+            profile_urn: basic.entityUrn,
+          },
+        };
       }
       if (!extra.posts_url && extra.activity_url) {
         await navigate(extra.activity_url);

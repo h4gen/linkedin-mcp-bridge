@@ -1,3 +1,4 @@
+import { messageComposer } from "./message-composer.js";
 import { profileReader, readProfileRelationship } from "./profile-reader.js";
 import { beginDomSession, bindDomSession } from "./dom-session.js";
 import { domOperation } from "./dom.js";
@@ -23,6 +24,7 @@ const operations = new Set([
   a: Record<string, any>,
   state: Record<string, any>,
 ) => {
+  if (op === "message_composer") return messageComposer(a);
   if (op === "profile_read") return profileReader(a.profile_url, a.profile_urn);
   if (op === "profile_relationship")
     return readProfileRelationship(a.profile_url, a.profile_urn);

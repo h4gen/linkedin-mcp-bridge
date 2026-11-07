@@ -91,7 +91,7 @@ async function harness(
   };
   w.HTMLElement.prototype.scrollIntoView = () => {};
   const fastTimeout = (fn: any, ms: number, ...args: any[]) =>
-    setTimeout(fn, Math.min(ms ?? 0, 2), ...args);
+    setTimeout(fn, ms > 25000 ? ms : Math.min(ms ?? 0, 2), ...args);
   w.setTimeout = fastTimeout;
   w.clearTimeout = clearTimeout;
   let interactDuringFilter = false;
@@ -797,5 +797,130 @@ it.each([true, false])(
       });
       expect(h.tab.url).toBe("https://www.linkedin.com/feed/");
     }
+  },
+);
+
+it.each(["free", "paid", "unknown", "wrong", "mixed", "delayed"])(
+  "routes a %s first message through the built, recipient-bound composer",
+  async (mode) => {
+    const src = identitySource(),
+      url = "https://www.linkedin.com/in/alex-example/";
+    const body = "A relevant note\n\nhttps://example.org/information";
+    const key = "free-private-fixture-" + mode,
+      msg = "urn:li:msg_message:private";
+    let clicks = 0,
+      delivered = 0,
+      show = mode !== "delayed",
+      apiWrites = 0;
+    const options = {
+      navigationDelay: 1,
+      page: (href: string) =>
+        href.includes("/messaging/compose/")
+          ? `<main><form class="msg-compose"><span class="msg-compose__inmail-compose-entity-lockup"><a href="${mode === "wrong" ? "/in/other/" : url}">Recipient</a></span><p>${mode === "paid" ? "Use 1 InMail credit" : mode === "unknown" ? "Send a message" : 'Free message | <strong><a href="/help/linkedin">Why?</a></strong>'}</p>${mode === "mixed" ? "<p>Use 1 credit</p>" : ""}<textarea></textarea><button type="button">Send</button></form><aside>Free message</aside></main>`
+          : src
+              .page(href)
+              .replace(
+                "Contact info</a>",
+                "Contact info</a>" +
+                  `<a href="/messaging/compose/?profileUrn=${encodeURIComponent(identityUrn)}&recipient=${identityMember}&screenContext=NON_SELF_PROFILE_VIEW&interop=msgOverlay">Message</a>`,
+              ),
+      onMount: (w: any) =>
+        w.document
+          .querySelector("form button")
+          ?.addEventListener("click", () => {
+            expect(w.document.querySelector("textarea").value).toBe(body);
+            clicks++;
+            delivered = Date.now() + 1;
+          }),
+      fetch: (r: any) => {
+        if (r.method) {
+          apiWrites++;
+          throw Error("unexpected generic send");
+        }
+        if (r.path.includes("messengerMessages."))
+          return {
+            data: {
+              elements: [
+                {
+                  entityUrn: "urn:li:msg_message:older",
+                  body: { text: body },
+                  sender: { hostIdentityUrn: account },
+                  deliveredAt: 1,
+                },
+                ...(show && clicks
+                  ? [
+                      {
+                        entityUrn: msg,
+                        body: { text: body },
+                        sender: { hostIdentityUrn: account },
+                        deliveredAt: delivered,
+                      },
+                    ]
+                  : []),
+              ],
+            },
+          };
+        return src.fetch(r);
+      },
+    };
+    let h = await harness(options);
+    const relationship = await h.request("relationship_get", {
+      profile_urn: identityUrn,
+      inspect_composer: true,
+    });
+    expect(relationship.error).toBeUndefined();
+    expect(relationship.result.messaging_cost).toBe(
+      mode === "paid"
+        ? "credits_required"
+        : ["wrong", "unknown", "mixed"].includes(mode)
+          ? "unknown"
+          : "free",
+    );
+    expect(clicks).toBe(0);
+    const args = {
+      recipient_urn: identityUrn,
+      expected_participant_urns: [identityUrn],
+      text: body,
+      idempotency_key: key,
+    };
+    const sent = await h.request("message_send", args);
+    if (!["free", "delayed"].includes(mode)) {
+      expect(sent.error?.code).toBe(
+        mode === "wrong"
+          ? "recipient_mismatch"
+          : mode === "paid"
+            ? "message_credits_required"
+            : "message_cost_unknown",
+      );
+      expect(clicks).toBe(0);
+    } else {
+      expect(sent.error).toBeUndefined();
+      expect(sent.result.status).toBe(
+        mode === "free" ? "confirmed" : "unknown_outcome",
+      );
+      expect(JSON.stringify(h.local.journal)).not.toContain(body);
+      // Browser/worker restart: durable receipt survives, including any partial scan.
+      h = await harness({ ...options, local: h.local });
+      show = true;
+      let receipt;
+      for (let n = 0; n < 5; n++) {
+        receipt = (await h.request("operation_get", { idempotency_key: key }))
+          .result;
+        if (receipt.status === "confirmed") break;
+      }
+      expect(receipt).toMatchObject({
+        status: "confirmed",
+        receipt_id: msg,
+        conversation_urn: identityConversation,
+        attempt_count: 1,
+      });
+      expect(receipt.message_proof).toBeUndefined();
+      expect((await h.request("message_send", args)).result).toMatchObject({
+        replayed: true,
+        receipt_id: msg,
+      });
+      expect(clicks).toBe(1);
+    }
+    expect(apiWrites).toBe(0);
   },
 );
