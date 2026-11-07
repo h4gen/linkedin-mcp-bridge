@@ -233,6 +233,16 @@ async function validateDomCursor(_op: string, state: Record<string, any>) {
 const engine = new Engine({
   generation: () => generation,
   identity: (urn) => store.get("identity:" + urn),
+  activeMessageThread: async () => {
+    const tab = await tabId.placement.existing(await tabId.placement.mode());
+    if (
+      tab?.url &&
+      !tab.pendingUrl &&
+      /^https:\/\/www\.linkedin\.com\/messaging\/thread\//.test(tab.url)
+    )
+      return new URL(tab.url).pathname;
+    return undefined;
+  },
   cursorContext: validateDomCursor,
   store,
   fetch: fetchRequest,
@@ -348,7 +358,11 @@ const engine = new Engine({
             r?.bridge_error,
             { dispatch_state: r?.dispatch_state ?? "unknown" },
           );
-        for (let n = 0; n < 5; n++) {
+        for (
+          let n = 0;
+          n < 24 && Date.now() + 1500 < a.execution_deadline;
+          n++
+        ) {
           check();
           const url = (await chrome.tabs.get(id)).url;
           if (

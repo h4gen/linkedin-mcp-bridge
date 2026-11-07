@@ -310,17 +310,13 @@ it("a native thread hint only confirms after an exact peer, sender, body and new
     const fetch = vi.fn(async (r: any) => {
       if (r.path.includes("messengerConversations"))
         return { data: { elements: [] } };
-      if (r.path.includes("countBefore:1,"))
-        return {
-          data: { elements: [] },
-          included: [
-            {
-              entityUrn: thread,
-              participants: [{ hostIdentityUrn: wrong ? own : peer }],
-            },
-          ],
-        };
       return {
+        included: [
+          {
+            entityUrn: thread,
+            participants: [{ hostIdentityUrn: wrong ? own : peer }],
+          },
+        ],
         data: {
           elements: [
             {
@@ -342,4 +338,55 @@ it("a native thread hint only confirms after an exact peer, sender, body and new
     if (wrong) expect(proof).toBeUndefined();
     else expect(proof).toEqual({ receipt_id: msg, conversation_urn: thread });
   }
+});
+
+it("confirms an observed first message on the first mailbox page even with years of unrelated continuations", async () => {
+  const { reconcileMessage } = await import("../src/core/api.js");
+  const own = "urn:li:fsd_profile:self",
+    peer = "urn:li:fsd_profile:peer",
+    thread = "urn:li:msg_conversation:exact",
+    id = "urn:li:msg_message:one";
+  const row: any = {
+    account_urn: own,
+    target: peer,
+    message_proof: { after: 100, until: 160, digest: "full" },
+  };
+  const fetch = vi.fn(async (r: any) => {
+    if (r.path.includes("messengerConversations"))
+      return {
+        data: {
+          elements: [
+            {
+              entityUrn: thread,
+              participants: [
+                { hostIdentityUrn: own },
+                { hostIdentityUrn: peer },
+              ],
+            },
+          ],
+          metadata: { nextCursor: "more" },
+        },
+      };
+    return {
+      data: {
+        elements: [
+          {
+            entityUrn: id,
+            deliveredAt: 130,
+            sender: { hostIdentityUrn: own },
+            body: { text: "full" },
+          },
+        ],
+      },
+    };
+  });
+  expect(
+    await reconcileMessage(
+      row,
+      fetch,
+      () => {},
+      async (x) => x,
+    ),
+  ).toEqual({ receipt_id: id, conversation_urn: thread });
+  expect(fetch).toHaveBeenCalledTimes(2);
 });

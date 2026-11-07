@@ -669,23 +669,70 @@ export async function reconcileMessage(
     threads: known ? [known] : [],
     before: null,
   });
+  const inspectPage = async (raw: any, conversation: string) => {
+    const hits: Args[] = [];
+    const linkedThread = (m: Args) =>
+      m.conversationUrn ?? m.conversation?.entityUrn ?? m["*conversation"];
+    // Existing API writes have a unique client token. Never match by text for legacy rows.
+    const tokenHits = (raw.included ?? []).filter(
+      (m: Args) =>
+        row.origin_token &&
+        m.originToken === row.origin_token &&
+        /^urn:li:msg_message:/.test(m.entityUrn ?? "") &&
+        (!linkedThread(m) || linkedThread(m) === conversation),
+    );
+    if (!row.message_proof && tokenHits.length === 1)
+      return {
+        token: {
+          receipt_id: tokenHits[0].entityUrn,
+          conversation_urn: conversation,
+        },
+        items: [],
+        hits,
+      };
+    const items = collection(raw, "messages_list").items;
+    for (const m of items) {
+      const proof = row.message_proof;
+      if (
+        !proof ||
+        !hash ||
+        !/^urn:li:msg_message:/.test(m.entityUrn ?? "") ||
+        (linkedThread(m) && linkedThread(m) !== conversation) ||
+        !(m.deliveredAt > proof.after && m.deliveredAt <= proof.until) ||
+        personRef(m.sender ?? m.from ?? {}).entityUrn !== row.account_urn ||
+        (await hash(messageText(m).replace(/\r\n/g, "\n"))) !== proof.digest
+      )
+        continue;
+      const candidate = {
+        receipt_id: m.entityUrn,
+        conversation_urn: conversation,
+      };
+      hits.push(candidate);
+    }
+    return { hits, items };
+  };
   for (let reads = 0; reads < 3; reads++) {
     check();
-    if (!known && !scan.tried_direct && row.message_proof?.thread_path) {
+    if (
+      !known &&
+      !scan.tried_direct &&
+      (row.thread_hint || row.message_proof?.thread_path)
+    ) {
       // Native routes and conversation URNs share a thread suffix. This only
       // suggests a lookup: the source must return the exact entity and peer.
-      const id = decodeURIComponent(row.message_proof.thread_path).match(
+      const id = decodeURIComponent(row.message_proof?.thread_path ?? "").match(
         /^\/messaging\/thread\/([\w+=-]+)\/?$/,
       )?.[1];
       scan.tried_direct = true; // Unavailable or stale direct hints fall back to the bounded mailbox scan.
-      if (id) {
+      if (id || row.thread_hint) {
         const candidate =
+          row.thread_hint ??
           "urn:li:msg_conversation:(" + row.account_urn + "," + id + ")";
         const raw = await fetch(
           graph("messages", {
             deliveredAt: Date.now(),
             conversationUrn: candidate,
-            countBefore: 1,
+            countBefore: 50,
             countAfter: 0,
           }),
         );
@@ -695,9 +742,20 @@ export async function reconcileMessage(
             exactPeer(t, row.account_urn, row.target),
         );
         if (thread) {
-          row.conversation_urn = candidate;
-          scan.threads = [candidate];
-          scan.category = categories.length;
+          const { hits, items, token } = await inspectPage(raw, candidate);
+          if (token) return token;
+          const ids = new Set(hits.map((h) => h.receipt_id));
+          if (ids.size > 1) scan.ambiguous = true;
+          if (
+            !scan.ambiguous &&
+            ids.size === 1 &&
+            (items.length < 50 ||
+              (items.every((m) => typeof m.deliveredAt === "number") &&
+                Math.min(...items.map((m) => m.deliveredAt)) <=
+                  row.message_proof.after))
+          )
+            return hits[0];
+          // A stale or unrelated hint must not restrict future mailbox scans.
         }
       }
       continue;
@@ -717,7 +775,7 @@ export async function reconcileMessage(
       const threads = page.items.filter((t: Args) =>
         exactPeer(t, row.account_urn, row.target),
       );
-      if (row.message_proof?.thread_path) {
+      if (row.message_proof?.thread_path && !row.thread_hint) {
         const matches = threads.filter((t: Args) => {
           const path = row.message_proof.thread_path.replace(/\/$/, "");
           try {
@@ -742,6 +800,8 @@ export async function reconcileMessage(
           /^urn:li:msg_conversation:/.test(matches[0].entityUrn)
         ) {
           row.conversation_urn = matches[0].entityUrn;
+          delete scan.match;
+          scan.before = null;
           scan.threads = [row.conversation_urn];
           scan.cursor = {};
           scan.category = categories.length;
@@ -751,7 +811,6 @@ export async function reconcileMessage(
       scan.threads = [
         ...new Set(
           threads
-            .filter((t: Args) => !row.message_proof?.thread_path)
             .map((t: Args) => t.entityUrn)
             .filter(
               (id: unknown) =>
@@ -779,39 +838,10 @@ export async function reconcileMessage(
         countAfter: 0,
       }),
     );
-    const linkedThread = (m: Args) =>
-      m.conversationUrn ?? m.conversation?.entityUrn ?? m["*conversation"];
-    // Existing API writes have a unique client token. Never match by text for legacy rows.
-    const tokenHits = (raw.included ?? []).filter(
-      (m: Args) =>
-        row.origin_token &&
-        m.originToken === row.origin_token &&
-        /^urn:li:msg_message:/.test(m.entityUrn ?? "") &&
-        (!linkedThread(m) || linkedThread(m) === conversation),
-    );
-    if (!row.message_proof && tokenHits.length === 1)
-      return {
-        receipt_id: tokenHits[0].entityUrn,
-        conversation_urn: conversation,
-      };
-    const items = collection(raw, "messages_list").items;
-    for (const m of items) {
-      const proof = row.message_proof;
-      if (
-        !proof ||
-        !hash ||
-        !/^urn:li:msg_message:/.test(m.entityUrn ?? "") ||
-        (linkedThread(m) && linkedThread(m) !== conversation) ||
-        !(m.deliveredAt > proof.after && m.deliveredAt <= proof.until) ||
-        personRef(m.sender ?? m.from ?? {}).entityUrn !== row.account_urn ||
-        (await hash(messageText(m).replace(/\r\n/g, "\n"))) !== proof.digest
-      )
-        continue;
-      const candidate = {
-        receipt_id: m.entityUrn,
-        conversation_urn: conversation,
-      };
-      if (scan.match && scan.match.receipt_id !== m.entityUrn)
+    const { hits, items, token } = await inspectPage(raw, conversation);
+    if (token) return token;
+    for (const candidate of hits) {
+      if (scan.match && scan.match.receipt_id !== candidate.receipt_id)
         scan.ambiguous = true;
       else scan.match = candidate;
     }
@@ -835,7 +865,11 @@ export async function reconcileMessage(
         scan.match &&
         !scan.ambiguous &&
         !scan.threads.length &&
-        (known || row.conversation_urn)
+        (known ||
+          row.conversation_urn ||
+          (!scan.incomplete &&
+            row.message_proof &&
+            scan.match.conversation_urn === conversation))
       )
         return scan.match;
     }

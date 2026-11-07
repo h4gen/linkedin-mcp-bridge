@@ -46,6 +46,7 @@ export interface Deps {
   now: () => number;
   uuid: () => string;
   hash: (text: string) => Promise<string>;
+  activeMessageThread?: () => Promise<string | undefined>;
   cursorContext?: (op: Operation, state: Args) => Promise<void>;
   checkpoint?: () => Promise<void>;
   generation?: () => number;
@@ -303,6 +304,38 @@ export class Engine {
         };
         if (self(await fetch({ path: "/me" })) !== expected)
           throw new Fault("account_changed");
+        const provided =
+          op === "operation_get" &&
+          a.conversation_urn &&
+          row.target.startsWith("urn:li:fsd_profile:")
+            ? a.conversation_urn
+            : undefined;
+        if (!row.conversation_urn && provided && row.thread_hint !== provided) {
+          row.thread_hint = provided;
+          if (row.message_scan) row.message_scan.tried_direct = false;
+        } else if (
+          !provided &&
+          !row.conversation_urn &&
+          row.message_proof &&
+          !row.message_proof.thread_path
+        ) {
+          const path = await d.activeMessageThread?.();
+          if (path && /^\/messaging\/thread\/[\w%+=-]+\/?$/.test(path)) {
+            row.message_proof.thread_path = path;
+            if (row.message_scan) row.message_scan.tried_direct = false;
+          }
+        }
+        // Upgrade a persisted positive sighting from an older mailbox scan:
+        // first establish the exact conversation; verify the message again.
+        if (
+          !row.thread_hint &&
+          !row.conversation_urn &&
+          row.message_scan?.match &&
+          !row.message_scan.ambiguous
+        ) {
+          row.thread_hint = row.message_scan.match.conversation_urn;
+          row.message_scan.tried_direct = false;
+        }
         const match = await reconcileMessage(row, fetch, room, d.hash);
         if (match) {
           Object.assign(row, match, {

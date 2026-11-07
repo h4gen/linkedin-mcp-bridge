@@ -217,6 +217,14 @@ export const schemas = {
   operation_get: z
     .object({
       ...account,
+      conversation_urn: z
+        .string()
+        .regex(/^urn:li:msg_conversation:[^\s]+$/)
+        .max(1024)
+        .optional()
+        .describe(
+          "Optional exact conversation returned by LinkedIn to prioritize a message receipt read. Verified against the original recipient; never sends.",
+        ),
       idempotency_key: z
         .string()
         .min(8)
