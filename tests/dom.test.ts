@@ -477,3 +477,43 @@ it.each(["", "shareId=123", "ugcPostId=123"])(
     });
   },
 );
+
+it("reads late rows from the replacement reaction dialog on the exact same permalink", async () => {
+  const { extractionOperation } = await import(
+    "../src/extension/extraction.js"
+  );
+  const urn = "urn:li:share:71";
+  const dom = page(
+    '<main><article data-mcp-post-urn="urn:li:share:71"></article></main><div role="dialog"><h2>Reactions</h2></div>',
+  );
+  dom.reconfigure({ url: "https://www.linkedin.com/feed/update/" + urn + "/" });
+  dom.window.Element.prototype.getClientRects = () => [{}] as any;
+  vi.stubGlobal(
+    "getComputedStyle",
+    dom.window.getComputedStyle.bind(dom.window),
+  );
+  vi.useFakeTimers();
+  try {
+    const run = extractionOperation(
+      "reactions_list",
+      { post_urn: urn, limit: 1 },
+      {},
+    );
+    await vi.advanceTimersByTimeAsync(4200);
+    const shell = document.querySelector('[role="dialog"]')!;
+    expect(shell.getAttribute("data-bridge-post")).toBe(urn);
+    const replacement = shell.cloneNode(true) as Element;
+    replacement.removeAttribute("data-bridge-post");
+    replacement.innerHTML +=
+      '<div data-testid="lazy-column"><a href="/in/example/"><div aria-label="Example Member reacted with Like, 2nd degree connection"><p>Example Member</p></div></a></div>';
+    shell.replaceWith(replacement);
+    const r = await run;
+    expect(r.items?.[0]).toMatchObject({
+      name: "Example Member",
+      reaction_type: "Like",
+    });
+    expect(replacement.getAttribute("data-bridge-post")).toBe(urn);
+  } finally {
+    vi.useRealTimers();
+  }
+});

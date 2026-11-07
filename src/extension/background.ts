@@ -298,6 +298,8 @@ const engine = new Engine({
         await new Promise((r) => setTimeout(r, 250));
       }
       const last = await chrome.tabs.get(id);
+      if (last.pendingUrl || last.status === "loading")
+        await tabId.placement.markStalled(id);
       throw new Fault(
         "work_tab_navigation_timeout",
         "work_tab_navigation_timeout",
@@ -706,11 +708,15 @@ const engine = new Engine({
         injectImmediately: true,
         target: { tabId: id },
         world: "ISOLATED",
-        func: (session: string) => {
-          const w = window as any;
+        func: (retainPost: string | null) => {
           for (const dialog of document.querySelectorAll<HTMLElement>(
             "[data-bridge-post]",
           )) {
+            if (
+              retainPost &&
+              dialog.getAttribute("data-bridge-post") === retainPost
+            )
+              continue;
             const dismiss = dialog.querySelector<HTMLElement>(
               'button[aria-label="Dismiss"],button[aria-label="Close"],button[aria-label="Schließen"],.artdeco-modal__dismiss',
             );
@@ -718,7 +724,7 @@ const engine = new Engine({
             else if (dialog.getClientRects().length) throw Error("ui_conflict");
           }
         },
-        args: [session],
+        args: [op === "reactions_list" ? a.post_urn : null],
       });
       await pageOperation("session_begin", {
         token: session,

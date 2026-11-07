@@ -158,3 +158,28 @@ it("keeps the agent window unfocused, shares it across requests, and only reveal
   expect(tabs.update).toHaveBeenCalledExactlyOnceWith(2, { active: true });
   expect(windows.update).toHaveBeenCalledExactlyOnceWith(42, { focused: true });
 });
+
+it("replaces a previously timed-out navigation on the next request and bounds repeat replacements", async () => {
+  vi.useFakeTimers();
+  const f = fixture();
+  const stuck = {
+    ...f.tab,
+    id: 1,
+    status: "complete",
+    pendingUrl: "https://www.linkedin.com/posts/next/",
+  };
+  f.tabs.get.mockImplementation(async (id) => (id === 1 ? stuck : f.tab));
+  const first = f.ensure().catch((e) => e);
+  await vi.advanceTimersByTimeAsync(20100);
+  expect((await first).code).toBe("work_tab_loading_timeout");
+  expect(f.tabs.create).not.toHaveBeenCalled();
+  expect(await f.ensure()).toBe(2);
+  expect(f.verify).toHaveBeenCalledExactlyOnceWith(2, "me");
+  f.tab.status = "loading";
+  for (let i = 0; i < 2; i++) {
+    const pending = f.ensure().catch((e) => e);
+    await vi.advanceTimersByTimeAsync(20100);
+    expect((await pending).code).toBe("work_tab_loading_timeout");
+  }
+  expect(f.tabs.create).toHaveBeenCalledTimes(1);
+});

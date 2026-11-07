@@ -464,16 +464,18 @@ export async function extractionOperation(
       !!e.offsetParent &&
       !e.matches(':disabled,[aria-disabled="true"],[aria-busy="true"]');
     if (op === "reactions_list") {
+      const routeAtOpen = postUrlIdentity(location.href);
       const prior = findReactionDialog();
       const trigger = findReactionTrigger(root);
       let dialog = prior;
       if (
         prior &&
         !(
-          (state.dom_session &&
-            prior.getAttribute("data-bridge-post") === a.post_urn) ||
-          onPermalink ||
-          (prior.id && trigger?.getAttribute("aria-controls") === prior.id)
+          prior.getAttribute("data-bridge-post") === a.post_urn ||
+          (!prior.hasAttribute("data-bridge-post") &&
+            (onPermalink ||
+              (prior.id &&
+                trigger?.getAttribute("aria-controls") === prior.id)))
         )
       )
         throw Error("unrelated_dialog_open");
@@ -493,9 +495,47 @@ export async function extractionOperation(
       }
       if (!dialog) throw Error("reaction_dialog_missing");
       dialog.setAttribute("data-bridge-post", a.post_urn);
-      await waitFor(() => !!extractReactors(dialog!).length, dialog, 3000);
-      if (!extractReactors(dialog).length)
-        throw Error("reaction_content_not_loaded");
+      // LinkedIn can hydrate the list after the shell is displayed. Keep the
+      // owned shell for the next read if this bounded wait expires.
+      const hasRows = await waitFor(
+        () => {
+          if (!dialog!.isConnected) {
+            const replacement = findReactionDialog();
+            if (
+              !replacement ||
+              !onPermalink ||
+              postUrlIdentity(location.href) !== routeAtOpen ||
+              (replacement.hasAttribute("data-bridge-post") &&
+                replacement.getAttribute("data-bridge-post") !== a.post_urn)
+            )
+              return false;
+            dialog = replacement;
+            dialog.setAttribute("data-bridge-post", a.post_urn);
+          }
+          return !!extractReactors(dialog!).length;
+        },
+        document,
+        12000,
+      );
+      if (!hasRows) {
+        const candidates = dialog.isConnected
+          ? dialog.querySelectorAll('a[href*="/in/"],a[href*="/company/"]')
+              .length
+          : 0;
+        return {
+          bridge_error: "reaction_content_not_loaded",
+          details: {
+            reason: !dialog.isConnected
+              ? "reaction_dialog_replaced"
+              : candidates
+                ? "reaction_rows_unrecognized"
+                : document.hidden
+                  ? "reaction_list_empty_while_hidden"
+                  : "reaction_list_empty",
+            candidate_count: candidates,
+          },
+        };
+      }
       {
         let progressed = false;
         for (let step = 0; step < 5 && items.length < a.limit; step++) {

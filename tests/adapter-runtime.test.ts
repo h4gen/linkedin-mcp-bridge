@@ -340,7 +340,9 @@ it.each(["share", "ugcPost"])(
       url,
       `<main><div componentkey="pagedCommentsContainer"><div role="listitem"><button aria-label="Open control menu for post by Author"></button><p data-testid="expandable-text-box">Relevant text</p><a href="${url}">Send</a><a id="reactions" href="${url}">3 reactions</a></div>${comment(1)}${comment(2)}</div></main>`,
     );
+    let openings = 0;
     h.w.document.getElementById("reactions").onclick = (event: any) => {
+      openings++;
       event.preventDefault();
       const dialog = h.w.document.createElement("div");
       dialog.setAttribute("role", "dialog");
@@ -383,6 +385,13 @@ it.each(["share", "ugcPost"])(
         ).result,
       ).toEqual(second.result);
     }
+    // A fresh read must keep the very dialog whose rows already loaded.
+    const fresh = await h.request("reactions_list", { post_urn, limit: 1 });
+    expect(fresh.result.items).toHaveLength(1);
+    expect(openings).toBe(1);
+    const other = await h.request("post_get", { post_urn });
+    expect(other.error).toBeUndefined();
+    expect(h.w.document.querySelector("[data-bridge-post]")).toBeNull();
   },
 );
 it.each(

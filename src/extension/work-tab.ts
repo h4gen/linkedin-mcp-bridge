@@ -38,11 +38,14 @@ export function workTab(deps: {
       });
     }
     const deadline = Date.now() + 20000;
-    while (tab.status !== "complete") {
+    while (tab.pendingUrl || tab.status !== "complete") {
       check();
       if (!tab.pendingUrl && tab.url && (await deps.ready?.(id, tab.url)))
         break;
-      if (Date.now() >= deadline) throw new Fault("work_tab_loading_timeout");
+      if (Date.now() >= deadline) {
+        await placement.markStalled(id);
+        throw new Fault("work_tab_loading_timeout");
+      }
       await new Promise((resolve) => setTimeout(resolve, 100));
       tab = await chrome.tabs.get(id).catch(() => {
         throw new Fault("work_tab_unavailable");

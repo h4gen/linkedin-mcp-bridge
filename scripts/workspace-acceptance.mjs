@@ -51,10 +51,34 @@ async function call(op, args = {}) {
     undefined,
     { timeout: 75000 },
   );
-  assert(
-    !result.isError,
-    op + ": " + (result.structuredContent?.error?.code ?? "tool_error"),
-  );
+  if (result.isError) {
+    const payload = result.content?.find((block) => block.type === "text");
+    let code = "tool_error",
+      reason;
+    try {
+      const error = JSON.parse(payload?.text ?? "{}").error;
+      if (typeof error?.code === "string" && /^[a-z_]{1,120}$/.test(error.code))
+        code = error.code;
+      if (
+        typeof error?.reason === "string" &&
+        /^[a-z_]{1,120}$/.test(error.reason)
+      )
+        reason = error.reason;
+    } catch {
+      /* Error payloads need not be JSON. */
+    }
+    const failure = { op, code, reason };
+    if (op !== "health") {
+      const h = await health().catch(() => null);
+      if (
+        h?.workspace?.last?.op === op &&
+        h.workspace.last.sequence > lastSequence
+      )
+        failure.measurement = h.workspace.last;
+    }
+    report.failure = failure;
+    throw Error(op + ": " + code + (reason ? " (" + reason + ")" : ""));
+  }
   return result.structuredContent;
 }
 async function health() {

@@ -29,6 +29,10 @@ export function errorDetails(code: string) {
 // source payloads, URLs or session tokens.
 export function adapterDiagnostics(details: Record<string, unknown> = {}) {
   const allowed = new Set([
+    "reaction_list_empty_while_hidden",
+    "reaction_list_empty",
+    "reaction_rows_unrecognized",
+    "reaction_dialog_replaced",
     "tab_changed",
     "document_changed",
     "path_changed",
