@@ -9,6 +9,12 @@ The 0.8.4 development build removes the tab activation that used to precede ever
 
 The lease belongs to a browser session. A worker restart reuses the owned tab; a browser restart creates a new one and checks the account. An ID recovered from durable storage is not enough to take over someone's personal tab. Changing workspace invalidates document-bound cursors, but keeps account binding, API pagination, and send receipts. Dispatched writes are never replayed to recover from a slow, discarded or closed tab.
 
+## Current macOS results
+
+On build `80716c16`, the separate window preserved the selected tab and window during inbox, message, search, post and comment reads. After six minutes without MCP polling, inbox and post reads also completed with zero tab activations or window focus changes.
+
+Build `aab7d075` was retested on two posts with known reactions. Each initial read and each follow-up read through the retained dialog reported `reaction_content_not_loaded` with reason `reaction_list_empty_while_hidden`. An earlier inspection of one visible dialog had shown ten profile links. The hidden-page result therefore cannot establish how many people reacted. This retest did not collect a new focus measurement. Reading reaction identities in a hidden workspace remains a release blocker.
+
 ## Release acceptance
 
 The mode selector and measurement controls are initially available in the development build. Neither placement is advertised as verified on a platform until checked there in a normal, signed-in Chrome without a debugger. Store publishing remains gated separately. The previous Store version is unaffected.
