@@ -693,16 +693,37 @@ export async function reconcileMessage(
     const items = collection(raw, "messages_list").items;
     for (const m of items) {
       const proof = row.message_proof;
-      if (
-        !proof ||
-        !hash ||
-        !/^urn:li:msg_message:/.test(m.entityUrn ?? "") ||
-        (linkedThread(m) && linkedThread(m) !== conversation) ||
-        !(m.deliveredAt > proof.after && m.deliveredAt <= proof.until) ||
-        personRef(m.sender ?? m.from ?? {}).entityUrn !== row.account_urn ||
-        (await hash(messageText(m).replace(/\r\n/g, "\n"))) !== proof.digest
-      )
-        continue;
+      if (!proof || !hash) continue;
+      // Native Chromium click handlers and the first outgoing event can share
+      // a millisecond. Accept that precision boundary only for a recorded
+      // dispatch and a sole first event newer than the durable attempt itself.
+      const sameClickTick =
+        m.deliveredAt === proof.after &&
+        m.deliveredAt > row.last_attempt_at &&
+        row.dispatch_state === "dispatched" &&
+        items.length === 1 &&
+        !scan.before;
+      const checks = {
+        stable_message_id: /^urn:li:msg_message:/.test(m.entityUrn ?? ""),
+        thread_matches: !linkedThread(m) || linkedThread(m) === conversation,
+        own_sender:
+          personRef(m.sender ?? m.from ?? {}).entityUrn === row.account_urn,
+        full_body_matches:
+          (await hash(messageText(m).replace(/\r\n/g, "\n"))) === proof.digest,
+        after_dispatch: m.deliveredAt > proof.after || sameClickTick,
+        before_cutoff: m.deliveredAt <= proof.until,
+      };
+      // Content-free diagnostics, restricted to messages matching this private
+      // receipt's digest. No unrelated message content or timestamps leave the browser.
+      if (checks.full_body_matches)
+        row.message_observation = {
+          ...checks,
+          delivery_minus_dispatch_ms:
+            typeof m.deliveredAt === "number"
+              ? m.deliveredAt - proof.after
+              : null,
+        };
+      if (!Object.values(checks).every(Boolean)) continue;
       const candidate = {
         receipt_id: m.entityUrn,
         conversation_urn: conversation,
@@ -711,7 +732,33 @@ export async function reconcileMessage(
     }
     return { hits, items };
   };
-  for (let reads = 0; reads < 3; reads++) {
+  // Existing checkpoints can be far beyond a newly visible conversation. A
+  // specific thread deserves a bounded lookup in the current mailbox head
+  // even if history itself omits the redundant conversation/participant entity.
+  let readsUsed = 0;
+  const hint = row.thread_hint;
+  if (!known && hint && scan.head_checked_for !== hint) {
+    readsUsed++;
+    const head = await readApi(
+      "conversations_list",
+      { account_urn: row.account_urn, category: "INBOX", limit: 20 },
+      {},
+      fetch,
+    );
+    check();
+    scan.head_checked_for = hint;
+    const exact = head.items.filter(
+      (t: Args) =>
+        t.entityUrn === hint && exactPeer(t, row.account_urn, row.target),
+    );
+    if (exact.length === 1) {
+      scan.tried_direct = true;
+      scan.threads = [hint, ...scan.threads.filter((t: string) => t !== hint)];
+      scan.before = null;
+      row.verified_thread_source = "exact_inbox_participants";
+    }
+  }
+  for (let reads = readsUsed; reads < 3; reads++) {
     check();
     if (
       !known &&

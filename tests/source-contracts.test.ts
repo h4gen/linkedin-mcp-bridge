@@ -390,3 +390,111 @@ it("confirms an observed first message on the first mailbox page even with years
   ).toEqual({ receipt_id: id, conversation_urn: thread });
   expect(fetch).toHaveBeenCalledTimes(2);
 });
+
+it("can recheck the exact inbox head after an older saved scan passed it, even when history omits participant entities", async () => {
+  const { reconcileMessage } = await import("../src/core/api.js");
+  const thread = "urn:li:msg_conversation:recent",
+    peer = "urn:li:fsd_profile:peer",
+    own = "urn:li:fsd_profile:self";
+  const row: any = {
+    account_urn: own,
+    target: peer,
+    thread_hint: thread,
+    message_proof: { after: 100, until: 200, digest: "full" },
+    message_scan: {
+      tried_direct: true,
+      threads: [],
+      category: 0,
+      before: null,
+      cursor: { nextCursor: "page-100" },
+    },
+  };
+  const r = await reconcileMessage(
+    row,
+    async (q) =>
+      q.path.includes("messengerConversations")
+        ? {
+            data: {
+              elements: [
+                {
+                  entityUrn: thread,
+                  participants: [{ hostIdentityUrn: peer }],
+                },
+              ],
+              metadata: { nextCursor: "more" },
+            },
+          }
+        : {
+            data: {
+              elements: [
+                {
+                  entityUrn: "urn:li:msg_message:one",
+                  sender: { hostIdentityUrn: own },
+                  deliveredAt: 111,
+                  body: { text: "full" },
+                },
+              ],
+            },
+          },
+    () => {},
+    async (x) => x,
+  );
+  expect(r?.conversation_urn).toBe(thread);
+  expect(row.message_observation).toMatchObject({
+    full_body_matches: true,
+    own_sender: true,
+    after_dispatch: true,
+  });
+});
+
+it.each([
+  [101, "dispatched", true],
+  [100, "dispatched", false],
+  [101, "unknown", false],
+])(
+  "checks millisecond boundary %s and dispatch proof %s for the sole outgoing event",
+  async (at, dispatch, confirm) => {
+    const { reconcileMessage } = await import("../src/core/api.js");
+    const peer = "urn:li:fsd_profile:peer",
+      own = "urn:li:fsd_profile:me",
+      thread = "urn:li:msg_conversation:exact";
+    const row = {
+      account_urn: own,
+      last_attempt_at: 100,
+      target: peer,
+      dispatch_state: dispatch,
+      message_proof: { digest: "exact", after: 101, until: 150 },
+      thread_hint: thread,
+    };
+    const proof = await reconcileMessage(
+      row,
+      async (r) =>
+        r.path.includes("messengerConversations")
+          ? {
+              data: {
+                elements: [
+                  {
+                    entityUrn: thread,
+                    participants: [{ hostIdentityUrn: peer }],
+                  },
+                ],
+              },
+            }
+          : {
+              data: {
+                elements: [
+                  {
+                    entityUrn: "urn:li:msg_message:one",
+                    deliveredAt: at,
+                    body: { text: "exact" },
+                    sender: { hostIdentityUrn: own },
+                  },
+                ],
+              },
+            },
+      () => {},
+      async (x) => x,
+    );
+    expect(!!proof).toBe(confirm);
+  },
+);
