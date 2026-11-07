@@ -17,6 +17,10 @@ Build `aab7d075` was retested on two posts with known reactions. Each initial re
 
 The new page adapter from `7f8571e` read two pages each in a Dotun → Todd → Dotun sequence on macOS. All three traversals returned four distinct reactors, each repeated cursor returned identical items, and the second Dotun traversal matched the first. The two posts returned different people. A passive macOS observer recorded 393 samples over 85 seconds, with the work tab never selected in the front window and no observed tab, window or application switch. This observation was sampled. Chrome still reported background build `aab7d075` while injecting the new adapter, so the run is functional evidence and is not credited to whole-build Store acceptance.
 
+On the fully reloaded build `c4c954fb`, the internal macOS measurement verified all twelve calls in a two-post reaction test. Each post change returned two distinct pages and an identical cursor replay. Chrome reported hidden documents, stable selection, zero tab activations and zero window focus events on every call.
+
+The broader separate-window test failed focus acceptance. All 54 reads returned the expected data across three passes, including the pass after the test client paused for six minutes. Chrome measured foreground workspace or document focus during 25 calls. Across the 18 reaction reads, ten stayed hidden throughout. The comparison search could load page two while hidden and also observed a focus transition on page one. The reported events do not identify who initiated a switch. A separate diagnostic encountered a concurrent MCP client, so a shared last-operation measurement must match the requested operation before it can be used as evidence. The passing reaction test does not qualify the full workspace for release.
+
 ## Release acceptance
 
 The workspace selector is available in both builds. The measurement controls are available in the development build. Neither placement is advertised as verified on a platform until checked there in a normal, signed-in Chrome without a debugger. Store publishing remains gated separately. The previous Store version is unaffected.
