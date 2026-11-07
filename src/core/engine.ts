@@ -112,7 +112,12 @@ export class Engine {
       },
       fetch: async (request) => {
         check();
-        return this.d.fetch(request, check);
+        return this.d.fetch(
+          request.method
+            ? { ...request, execution_deadline: deadline }
+            : request,
+          check,
+        );
       },
       dom: async (op, args, state) => {
         check();

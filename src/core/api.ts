@@ -9,6 +9,7 @@ import { collection, normalize, restli } from "./normalize.js";
 export type Request = {
   surface?: "guest_typeahead";
   path: string;
+  execution_deadline?: number; // Internal; never serialized into the LinkedIn request.
   method?: "POST" | "DELETE";
   body?: unknown;
   headers?: Record<string, string>;

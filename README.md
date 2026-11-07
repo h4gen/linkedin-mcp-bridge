@@ -56,3 +56,5 @@ Your agent receives the LinkedIn content you request and can perform requested a
 For development only, local testers build the selected candidate with `npm ci` and `npm run build`, load `dist/extension` through Chrome's **Load unpacked**, then use that extension's copied instructions. Register its actual ID with `node dist/cli.js install EXTENSION_ID`. Do not use the assigned Store ID for an unpacked build. A development build and a Store/pilot build use separate native registrations.
 
 The repository's instructions are sufficient for a local agent to handle shell work. The human still completes account sign-in and any client/OS permission prompt that requires personal interaction. Store submission and real platform acceptance are tracked separately from automated tests.
+
+For the 0.8.4 development build, see [background workspace settings and acceptance](docs/quiet-workspace.md).

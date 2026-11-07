@@ -1,5 +1,9 @@
 # Chrome Web Store publication — 0.8.2
 
+## 0.8.4 development candidate — not submitted
+
+Removes automatic foreground activation from LinkedIn operations. The development settings offer a background tab or an unfocused separate window. Desktop focus and background execution require [live acceptance](../docs/quiet-workspace.md) before making a Store claim or selecting supported modes. Do not reuse a previous build's evidence.
+
 ## Local 0.8.3 candidate — not submitted
 
 0.8.3 repairs comment confirmation and adds read-only reconciliation of durable receipts. The public Store version remains **0.8.2**. Local ZIP: `artifacts/store-0.8.3/linkedin-extension.zip`; SHA-256 `a056d1ed5d974924746ed7ad7f85148162df07eac85ae3b2db7fe556a23f1e96`. No upload, submission or new publication occurred. 278 automated tests pass. On live build `cf4b6fce`, one earlier comment was reconciled read-only and one new authorized comment immediately confirmed; both receipts survived fresh MCP processes. A third target disallowed comments and received none. The final extra recovery correction handles an already-open sort menu and is prepared as **`0.8.3 · build 14bbd765`**; activation and current-candidate capability acceptance remain outstanding. Evidence from earlier fingerprints is not relabelled. See `docs/comment-receipts.md`. Existing listing copy and all five explainer graphics are unchanged.

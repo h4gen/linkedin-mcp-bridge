@@ -27,6 +27,12 @@ export async function pageFetch(request: Request): Promise<any> {
   const csrf = cookie?.slice("JSESSIONID=".length).replace(/^"|"$/g, "");
   if (!guest && !csrf) return { error: "not_logged_in" };
   try {
+    if (
+      request.method &&
+      request.execution_deadline !== undefined &&
+      Date.now() >= request.execution_deadline
+    )
+      return { error: "deadline_exceeded" };
     const r = await fetch((guest ? "" : "/voyager/api") + request.path, {
       method: request.method ?? "GET",
       credentials: guest ? "omit" : "include",

@@ -15,6 +15,14 @@ function render(s: any) {
   const previousView = next;
   state = s;
   const c = s.connection;
+  el("workspace-choice").hidden = s.channel !== "development";
+  const select = el<HTMLSelectElement>("workspace-mode");
+  if (!select.disabled) select.value = s.workspaceMode ?? "background_tab";
+  el("workspace-reveal").hidden = !c || c.paused;
+  el("workspace-measure").hidden = s.channel !== "development";
+  el("workspace-measure").textContent = s.measuring
+    ? "Stop focus measurement"
+    : "Start 30-minute focus measurement";
   el("build-version").textContent = `Version ${s.versionName ?? s.version}`;
   let title = "LinkedIn, connected to your AI.",
     description =
@@ -101,6 +109,7 @@ function render(s: any) {
       hostVersion: s.hostVersion,
       nativeReady: s.nativeReady,
       connection: c ? (c.paused ? "paused" : "bound") : "disconnected",
+      workspaceMode: s.workspaceMode,
       error: s.setupError ?? s.nativeError,
     },
     null,
@@ -174,10 +183,40 @@ el("copy-remove").addEventListener(
   "click",
   () => void copy(instructions("uninstall")),
 );
-el("copy-diagnostics").addEventListener(
-  "click",
-  () => void copy(el("diagnostics").textContent ?? ""),
-);
+el("workspace-mode").addEventListener("change", async () => {
+  const input = el<HTMLSelectElement>("workspace-mode");
+  input.disabled = true;
+  el("workspace-feedback").textContent = "Applying after queued work finishes…";
+  try {
+    const r = await chrome.runtime.sendMessage({
+      action: "workspace-mode",
+      mode: input.value,
+    });
+    el("workspace-feedback").textContent = r?.changed
+      ? "Workspace updated."
+      : "Workspace could not be changed.";
+  } catch {
+    el("workspace-feedback").textContent = "Reload settings and try again.";
+  } finally {
+    input.disabled = false;
+    await refresh();
+  }
+});
+el("workspace-measure").addEventListener("click", async () => {
+  await chrome.runtime.sendMessage({
+    action: "workspace-measure",
+    enable: !state.measuring,
+  });
+  await refresh();
+});
+el("copy-diagnostics").addEventListener("click", async () => {
+  const base = JSON.parse(el("diagnostics").textContent ?? "{}");
+  if (state.channel === "development")
+    base.measurement = await chrome.runtime.sendMessage({
+      action: "workspace-report",
+    });
+  await copy(JSON.stringify(base, null, 2));
+});
 const repair = document.createElement("button");
 repair.textContent = "Copy repair instructions";
 repair.addEventListener("click", () => void copy(instructions("repair")));

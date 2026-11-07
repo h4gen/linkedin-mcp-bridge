@@ -28,6 +28,11 @@ it("opens the feed for a fresh feed reader after another primitive changed the w
   });
   expect(result.error).toBeUndefined();
   expect(result.result.items).toEqual([]);
+  expect(
+    h.chrome.tabs.update.mock.calls.some(
+      ([, options]: any[]) => options.active,
+    ),
+  ).toBe(false);
   expect(h.chrome.tabs.update).toHaveBeenCalledWith(10, {
     url: "https://www.linkedin.com/feed/",
   });
@@ -41,11 +46,11 @@ async function harness(
   } = {},
 ) {
   const local: any = options.local ?? {
-    schemaVersion: options.schema ?? VERSION,
+    schemaVersion: options.schema ?? 2,
     connection: { tabId: 10, account, paused: options.paused ?? false },
     workTabId: 10,
   };
-  const session: any = {};
+  const session: any = { "workspace:background_tab": { id: 10 } };
   const area = (data: any) => ({
     get: async (k: string | null) =>
       k === null ? { ...data } : { [k!]: data[k!] },
@@ -155,10 +160,10 @@ async function harness(
       URL,
     },
   );
-  const action = (action: string) =>
+  const action = (action: string, extra = {}) =>
     new Promise<any>((resolve) =>
       popup(
-        { action },
+        { ...extra, action },
         { id: "extension", url: chrome.runtime.getURL("setup.html") },
         resolve,
       ),
@@ -351,4 +356,21 @@ it("survives twenty successive host and tab losses without accumulating tabs", a
   }
   expect(h.ports).toHaveLength(21);
   expect(h.chrome.tabs.create).toHaveBeenCalledTimes(20);
+});
+
+it("moves the next operation to the chosen workspace without discarding API cursors or write receipts", async () => {
+  const h = await harness();
+  h.local["op:example"] = { status: "unknown_outcome" };
+  h.session["cursor:api"] = { state: { offset: 20 } };
+  h.session["cursor:dom"] = { state: { dom_session: "old" } };
+  expect(
+    (await h.action("workspace-mode", { mode: "separate_window" })).changed,
+  ).toBe(true);
+  expect(h.local.workspaceMode).toBe("separate_window");
+  expect(h.session["cursor:dom"]).toBeUndefined();
+  expect(h.session["cursor:api"].state.offset).toBe(20);
+  expect(h.local["op:example"].status).toBe("unknown_outcome");
+  expect(h.local.connection.account).toBe(account);
+  expect(h.chrome.tabs.create).not.toHaveBeenCalled();
+  expect(h.chrome.tabs.update).not.toHaveBeenCalled();
 });

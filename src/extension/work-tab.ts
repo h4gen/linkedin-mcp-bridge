@@ -1,3 +1,4 @@
+import { workspace } from "./workspace.js";
 import { Fault } from "../core/contracts.js";
 import type { Store } from "../core/engine.js";
 
@@ -9,29 +10,21 @@ export function workTab(deps: {
   invalidate: () => Promise<void>;
   ready?: (id: number, url: string) => Promise<boolean>;
 }) {
+  const placement = workspace(deps.store);
   let pending: Promise<number> | undefined;
-  async function resolve() {
+  async function resolve(setup: boolean) {
     const generation = deps.generation();
     const connection = await deps.store.get("connection");
-    if (!connection) throw new Fault("disconnected");
-    if (connection.paused) throw new Fault("connection_paused");
+    if (!setup && !connection) throw new Fault("disconnected");
+    if (connection?.paused) throw new Fault("connection_paused");
     const check = () => {
       if (generation !== deps.generation()) throw new Fault("cancelled");
     };
-    let tab = await chrome.tabs.get(connection.tabId).catch(() => undefined);
-    check();
-    let replaced = false;
-    if (!tab?.url?.startsWith("https://www.linkedin.com/")) {
-      tab = await chrome.tabs
-        .create({ url: "https://www.linkedin.com/feed/", active: false })
-        .catch(() => {
-          throw new Fault("work_tab_create_failed");
-        });
-      replaced = true;
+    const acquired = await placement.acquire(check);
+    let tab = acquired.tab;
+    const replaced = acquired.created || tab.id !== connection?.tabId;
+    if (replaced || (await deps.store.get("workTabId")) !== tab.id) {
       check();
-      if (!tab.id) throw new Fault("work_tab_unavailable");
-      // Persist immediately so a failed login or a suspended worker doesn't spawn more tabs.
-      await deps.store.set("connection", { ...connection, tabId: tab.id });
       await deps.store.set("workTabId", tab.id);
       await deps.invalidate();
     }
@@ -60,16 +53,21 @@ export function workTab(deps: {
       throw new Fault("work_tab_navigation_changed");
     if (/\/(login|checkpoint|challenge)(\/|\?|$)/.test(tab.url))
       throw new Fault("not_logged_in");
-    if (replaced && connection.account)
+    if (replaced && connection?.account && !setup)
       await deps.verify(id, connection.account);
     check();
+    if (!setup && connection && connection.tabId !== id) {
+      check();
+      await deps.store.set("connection", { ...connection, tabId: id });
+    }
     return id;
   }
-  return () => {
+  const ensure = (setup = false) => {
     if (!pending)
-      pending = resolve().finally(() => {
+      pending = resolve(setup).finally(() => {
         pending = undefined;
       });
     return pending;
   };
+  return Object.assign(ensure, { placement });
 }

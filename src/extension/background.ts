@@ -1,3 +1,4 @@
+import { workspaceProbe } from "./workspace-probe.js";
 import { postUrlIdentity } from "./post-context.js";
 import { setupController } from "./setup-controller.js";
 import { CHANNEL } from "../version.js";
@@ -27,6 +28,8 @@ import { navigationTargetReached } from "./navigation.js";
 import type { Request } from "../core/api.js";
 import { VERSION, PROTOCOL, NATIVE_HOST as HOST } from "../version.js";
 const area = (k: string) =>
+  k.startsWith("workspace:") ||
+  k === "workTabId" ||
   k.startsWith("identity:") ||
   k.startsWith("post-url:") ||
   k.startsWith("cursor:") ||
@@ -48,6 +51,7 @@ const store: Store = {
   },
   remove: async (k) => area(k).remove(k),
 };
+const probe = CHANNEL === "development" ? workspaceProbe() : undefined;
 let generation = 0;
 let lastRequest = 0;
 async function browserFetch(id: number, request: Request) {
@@ -123,6 +127,8 @@ async function fetchRequest(r: Request, check = () => {}) {
     const id = await tabId();
     if (generation !== requestGeneration) throw new Fault("cancelled");
     check();
+    await probe?.sample("api_entry", r.method ? "mutation" : "read", id);
+    check();
     return browserFetch(id, r);
   }
   let out;
@@ -160,13 +166,37 @@ async function fetchRequest(r: Request, check = () => {}) {
   }
   return result.data;
 }
+// Requests share one execution queue. A cancellation for a queued client must
+// never clear the document marker of the request in front of it.
+let inFlightDom: { id: number; session: string; check: () => void } | undefined;
+function revokeCancelledDom() {
+  const current = inFlightDom;
+  if (!current) return;
+  try {
+    current.check();
+    return;
+  } catch {}
+  void chrome.scripting
+    .executeScript({
+      target: { tabId: current.id },
+      world: "ISOLATED",
+      injectImmediately: true,
+      func: (session: string) => {
+        if ((window as any).__liBridgeSession === session)
+          (window as any).__liBridgeSession = undefined;
+      },
+      args: [current.session],
+    })
+    .catch(() => {});
+}
 async function invalidateDocument() {
   const c = await store.get("connection");
-  if (c?.tabId)
+  const owned = await tabId.placement.existing(await tabId.placement.mode());
+  if (owned?.id && c?.tabId === owned.id)
     await chrome.scripting
       .executeScript({
         injectImmediately: true,
-        target: { tabId: c.tabId },
+        target: { tabId: owned.id },
         world: "ISOLATED",
         func: () => {
           (window as any).__liBridgeSession = undefined;
@@ -206,8 +236,8 @@ const engine = new Engine({
   dom: async (op, a, state, check = () => {}) => {
     const id = await tabId();
     check();
+    await probe?.sample("dom_entry", op, id);
     if (state.dom_session) await validateDomCursor(op, state);
-    await chrome.tabs.update(id, { active: true });
     async function pageOperation(
       operation: string,
       args: Record<string, any>,
@@ -220,6 +250,12 @@ const engine = new Engine({
         files: ["page-adapters.js"],
         injectImmediately: true,
       });
+      probe?.record({
+        phase: "adapter",
+        op: operation,
+        documentId: loaded[0]?.documentId,
+      });
+      check();
       const documentId = loaded[0]?.documentId;
       return chrome.scripting.executeScript({
         target: documentId
@@ -696,15 +732,23 @@ const engine = new Engine({
       "scheduled_posts_list",
       "scheduled_post_cancel",
     ].includes(op);
-    const result = planning
-      ? await chrome.scripting.executeScript({
-          injectImmediately: true,
-          target: { tabId: id },
-          world: "ISOLATED",
-          func: composerOperation,
-          args: [op, { ...a, execution_session: session }, state],
-        })
-      : await pageOperation(op, { ...a, execution_session: session }, state);
+    inFlightDom = { id, session, check };
+    const result = await (async () =>
+      planning
+        ? await chrome.scripting.executeScript({
+            injectImmediately: true,
+            target: { tabId: id },
+            world: "ISOLATED",
+            func: composerOperation,
+            args: [op, { ...a, execution_session: session }, state],
+          })
+        : await pageOperation(
+            op,
+            { ...a, execution_session: session },
+            state,
+          ))().finally(() => {
+      inFlightDom = undefined;
+    });
     if (!result[0]?.result) throw new Fault("ui_operation_failed");
     if (result[0].result.bridge_error)
       throw new Fault(
@@ -876,7 +920,7 @@ const setup = setupController({
   store,
   generation: () => generation,
   ready: () => nativeReady,
-  invalidate: invalidateWorkDocument,
+  setupTab: () => tabId(true),
   readSelf: async (id) => {
     if ((await store.get("blockedUntil")) > Date.now())
       throw new Fault("rate_limited");
@@ -948,7 +992,10 @@ function connectHost() {
       reconnectDelay = 1000;
       nativeError = undefined;
       if (msg?.cancel) {
-        if (active.has(msg.cancel)) cancelled.add(msg.cancel);
+        if (active.has(msg.cancel)) {
+          cancelled.add(msg.cancel);
+          revokeCancelledDom();
+        }
         return;
       }
       if (!msg || typeof msg.id !== "string" || typeof msg.op !== "string")
@@ -956,6 +1003,7 @@ function connectHost() {
       if (active.has(msg.id)) return;
       active.add(msg.id);
       const current = connectedPort;
+      const measurement = probe?.begin(msg.op);
       try {
         if (msg.protocol !== PROTOCOL || msg.hostVersion !== VERSION)
           throw new Fault(
@@ -968,6 +1016,20 @@ function connectHost() {
           Math.min(Number(msg.deadline) || 0, Date.now() + 60000),
           () => port !== connectedPort || cancelled.has(msg.id),
         );
+        if (measurement)
+          await store
+            .get("workTabId")
+            .then((id) => probe!.finish(msg.op, measurement, id, true))
+            .catch(() => {});
+        if (msg.op === "health")
+          result.workspace = {
+            mode: await tabId.placement.mode(),
+            ready: result.connected,
+            ...(probe?.enabled()
+              ? { measurement_active: true, last: probe.last() }
+              : {}),
+          };
+        probe?.record({ phase: "result", op: msg.op, ok: true });
         if (
           new TextEncoder().encode(JSON.stringify(result)).byteLength >
           6 * 1024 * 1024
@@ -975,6 +1037,17 @@ function connectHost() {
           throw new Fault("response_too_large");
         if (port === current) current.postMessage({ id: msg.id, result });
       } catch (e) {
+        if (measurement)
+          await store
+            .get("workTabId")
+            .then((id) => probe!.finish(msg.op, measurement, id, false))
+            .catch(() => {});
+        probe?.record({
+          phase: "result",
+          op: msg.op,
+          ok: false,
+          code: e instanceof Fault ? e.code : "operation_failed",
+        });
         if (port === current)
           current.postMessage({
             id: msg.id,
@@ -999,6 +1072,7 @@ function connectHost() {
       nativeError =
         chrome.runtime.lastError?.message ?? "native_host_disconnected";
       if (port === connectedPort) port = undefined;
+      revokeCancelledDom();
       scheduleReconnect();
     });
     port.postMessage?.({ type: "hello" });
@@ -1050,22 +1124,40 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       return { enabled: true };
     }
     if (msg.action === "open-linkedin") {
-      let id = await store.get("workTabId");
-      let tab = id
-        ? await chrome.tabs.get(id).catch(() => undefined)
-        : undefined;
-      if (!tab?.url?.startsWith("https://www.linkedin.com/")) {
-        tab = await chrome.tabs.create({
-          url: "https://www.linkedin.com/feed/",
-          active: true,
+      await engine.maintain(async () => {
+        const g = generation;
+        await tabId.placement.show(() => {
+          if (g !== generation) throw new Fault("cancelled");
         });
-        await store.set("workTabId", tab.id);
-      } else await chrome.tabs.update(tab.id!, { active: true });
+      });
       return { opened: true };
+    }
+    if (msg.action === "workspace-measure" && probe) {
+      if (msg.enable === true) probe.start();
+      else probe.stop();
+      return { active: probe.enabled() };
+    }
+    if (msg.action === "workspace-report" && probe) return probe.report();
+    if (msg.action === "workspace-mode") {
+      if (
+        CHANNEL !== "development" ||
+        !["background_tab", "separate_window"].includes(msg.mode)
+      )
+        throw new Fault("workspace_mode_unavailable");
+      await engine.maintain(async () => {
+        if ((await tabId.placement.mode()) === msg.mode) return;
+        await invalidateDocument();
+        await invalidateWorkDocument();
+        await store.remove("workTabId");
+        await store.set("workspaceMode", msg.mode);
+      });
+      return { changed: true };
     }
     if (msg.action === "status")
       return {
         connection: await store.get("connection"),
+        workspaceMode: await tabId.placement.mode(),
+        measuring: probe?.enabled() ?? false,
         native: !!port,
         nativeReady,
         hostVersion,

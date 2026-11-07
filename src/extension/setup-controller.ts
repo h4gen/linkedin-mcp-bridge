@@ -8,7 +8,7 @@ export function setupController(deps: {
   store: Store;
   generation: () => number;
   ready: () => boolean;
-  invalidate: () => Promise<void>;
+  setupTab: () => Promise<number>;
   readSelf: (id: number) => Promise<any>;
 }) {
   let pending: Promise<void> | undefined;
@@ -31,38 +31,7 @@ export function setupController(deps: {
           throw new Fault("cancelled");
       };
       try {
-        const oldId = connection?.tabId ?? (await store.get("workTabId"));
-        let tab = oldId
-          ? await chrome.tabs.get(oldId).catch(() => undefined)
-          : undefined;
-        check();
-        if (!tab?.url?.startsWith("https://www.linkedin.com/")) {
-          tab = await chrome.tabs.create({
-            url: "https://www.linkedin.com/feed/",
-            active: false,
-          });
-          if (!tab.id) throw new Fault("work_tab_unavailable");
-          await store.set("workTabId", tab.id);
-          await deps.invalidate();
-        }
-        check();
-        const id = tab.id!;
-        if (tab.discarded) {
-          await chrome.tabs.reload(id);
-          tab = await chrome.tabs.get(id);
-        }
-        const deadline = Date.now() + 20000;
-        while (tab.status !== "complete") {
-          check();
-          if (Date.now() >= deadline)
-            throw new Fault("work_tab_loading_timeout");
-          await new Promise((resolve) => setTimeout(resolve, 100));
-          tab = await chrome.tabs.get(id);
-        }
-        if (!tab.url?.startsWith("https://www.linkedin.com/"))
-          throw new Fault("work_tab_navigation_changed");
-        if (/\/(login|checkpoint|challenge)(\/|\?|$)/.test(tab.url))
-          throw new Fault("not_logged_in");
+        const id = await deps.setupTab();
         check();
         const raw = await deps.readSelf(id);
         check();

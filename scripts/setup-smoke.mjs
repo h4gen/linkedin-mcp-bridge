@@ -66,6 +66,10 @@ try {
           sendMessage: async (msg) => {
             window.calls.push(msg.action);
             if (msg.action === "status") return window.fixture;
+            if (msg.action === "workspace-mode") {
+              window.fixture.workspaceMode = msg.mode;
+              return { changed: true };
+            }
             if (msg.action === "pause") window.fixture.connection.paused = true;
             if (msg.action === "resume")
               window.fixture.connection.paused = false;
@@ -106,6 +110,16 @@ try {
   assert.equal(await page.locator("#client-choice").isVisible(), false);
   await page.screenshot({ path: out + "/ready.png", fullPage: true });
   await page.getByText("Settings & help", { exact: true }).click();
+  await page.getByLabel("Agent workspace").selectOption("separate_window");
+  await page.getByText("Workspace updated.").waitFor();
+  assert.equal(
+    await page.getByLabel("Agent workspace").inputValue(),
+    "separate_window",
+  );
+  assert.equal(
+    await page.evaluate(() => window.calls.includes("open-linkedin")),
+    false,
+  );
   await page.getByRole("button", { name: "Pause", exact: true }).click();
   await page.getByRole("heading", { name: "LinkedIn is paused." }).waitFor();
   await page.locator("#primary").click();

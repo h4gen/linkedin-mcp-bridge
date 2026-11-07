@@ -83,6 +83,53 @@ if (store) {
       failures.push("Missing runtime-bound capability acceptance: " + name);
   }
   for (const platform of ["darwin", "win32"]) {
+    for (const mode of ["background_tab", "separate_window"]) {
+      const path = proof?.workspace?.[platform]?.[mode]?.evidence_path;
+      const data =
+        path &&
+        (await readFile(path, "utf8")
+          .then(JSON.parse)
+          .catch(() => null));
+      if (
+        !data ||
+        data.fingerprint !== fingerprint ||
+        data.version !== version ||
+        data.platform !== platform ||
+        data.mode !== mode ||
+        data.status !== "passed" ||
+        !(data.idle_ms >= 360000) ||
+        data.runs?.length !== 3 ||
+        !data.runs.every(
+          (run) =>
+            Array.isArray(run) &&
+            [
+              "conversations_list",
+              "messages_list",
+              "posts_search",
+              "post_resolve",
+              "post_get",
+              "comments_list",
+              "reactions_list",
+              "profile_get",
+              "profile_posts_list",
+            ].every((op) => run.some((row) => row.op === op)) &&
+            run.filter((row) => row.op === "posts_search").length >= 2 &&
+            run.every(
+              (row) =>
+                row.ok &&
+                row.complete &&
+                row.selection_stable &&
+                !row.work_foreground &&
+                !row.document_focused &&
+                row.activations === 0 &&
+                row.window_focus_events === 0,
+            ),
+        )
+      )
+        failures.push(
+          "Missing background-workspace acceptance: " + platform + " " + mode,
+        );
+    }
     const row = proof?.installation?.[platform];
     if (
       proof?.fingerprint !== fingerprint ||

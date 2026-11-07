@@ -14,12 +14,16 @@
 </section>
 <details id="settings"><summary>Settings &amp; help</summary><div class="settings-body">
 <div class="setting"><span>LinkedIn connection</span><button id="toggle" data-action="pause">Pause</button></div>
+<div class="setting" id="workspace-choice" hidden><label for="workspace-mode">Agent workspace</label><select id="workspace-mode"><option value="background_tab">Background tab</option><option value="separate_window">Separate window</option></select></div>
+<div class="setting" id="workspace-reveal" hidden><span>LinkedIn workspace</span><button id="show-workspace" data-action="open-linkedin">Show workspace</button></div>
+<p id="workspace-feedback" class="small" role="status"></p>
 <div class="setting"><span>Set up another agent</span><button id="copy-setup">Copy instructions</button></div>
 <p class="small">Choose the client above before copying. A new chat or client restart may be needed after your agent finishes installation.</p>
 <p><a href="https://github.com/h4gen/linkedin-mcp-bridge" target="_blank" rel="noreferrer">Installation guide</a> <span aria-hidden="true">·</span> <a href="https://github.com/h4gen/linkedin-mcp-bridge/issues" target="_blank" rel="noreferrer">Get help</a></p>
 <details id="advanced"><summary>Advanced</summary><div class="advanced-body">
 <p class="small">Disconnect stops access until you enable it again. Clearing local data also removes saved duplicate-send protection.</p>
 <div class="buttons"><button data-action="disconnect">Disconnect</button><button data-action="clear">Clear local data</button><button id="copy-remove">Copy uninstall instructions</button></div>
+<button id="workspace-measure" hidden>Start 30-minute focus measurement</button>
 <button id="copy-diagnostics">Copy diagnostics</button><pre id="diagnostics"></pre>
 </div></details>
 </div></details>

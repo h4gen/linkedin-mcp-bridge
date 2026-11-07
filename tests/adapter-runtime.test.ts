@@ -104,7 +104,9 @@ async function harness(
     workTabId: 10,
     ...options.local,
   };
-  const session: any = options.session ?? {};
+  const session: any = options.session ?? {
+    "workspace:background_tab": { id: 10 },
+  };
   const area = (data: any) => ({
     // Chrome storage does not preserve object property insertion order.
     get: async (k: string | null) =>
@@ -178,6 +180,7 @@ async function harness(
   const chrome: any = {
     storage: { local: area(local), session: area(session) },
     tabs: {
+      create: async (opts: any) => Object.assign(tab, opts),
       get: async () => ({ ...tab }),
       update: async (_id: number, opts: any) => {
         if (opts.url && options.navigationDelay) {

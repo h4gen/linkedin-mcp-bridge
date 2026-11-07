@@ -37,6 +37,15 @@ export async function domOperation(
       /checkpoint|challenge|login/.test(location.pathname)
     )
       fail("session_unavailable");
+    const beforeMutation = () => {
+      if (Date.now() >= (a.execution_deadline ?? Infinity))
+        fail("deadline_exceeded");
+      if (
+        a.execution_session &&
+        (window as any).__liBridgeSession !== a.execution_session
+      )
+        fail("cancelled");
+    };
     const visible = (e: Element) =>
       !!(e as HTMLElement).offsetParent || e.getClientRects().length > 0;
     const wait = () => new Promise((r) => setTimeout(r, 800));
@@ -521,6 +530,7 @@ export async function domOperation(
       const active = reactionState(b);
       if (active === null) fail("reaction_state_unknown");
       if (active === a.liked) return { verified: true };
+      beforeMutation();
       b.click();
       await wait();
       const current = button(
@@ -849,8 +859,7 @@ export async function domOperation(
       // Revalidate target and cancellation immediately before the irreversible click.
       if (card() !== post || (parent && !parent.isConnected))
         fail("parent_comment_changed");
-      if (a.execution_deadline && Date.now() >= a.execution_deadline)
-        fail("cancelled");
+      beforeMutation();
       mutationStarted = true;
       submits[0].click();
       let candidates: Element[] = [];

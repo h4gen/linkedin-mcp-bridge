@@ -6,7 +6,10 @@ afterEach(() => {
 });
 function fixture(ready?: (id: number, url: string) => Promise<boolean>) {
   let generation = 0;
-  const data: any = { connection: { tabId: 1, account: "me", paused: false } };
+  const data: any = {
+    "workspace:background_tab": { id: 1 },
+    connection: { tabId: 1, account: "me", paused: false },
+  };
   const tab: any = {
     id: 2,
     status: "complete",
@@ -91,6 +94,7 @@ it("pause/disconnect during creation cancels without restoring connection", asyn
 it("revives a discarded work tab without replacing it", async () => {
   const f = fixture();
   f.data.connection.tabId = 2;
+  f.data["workspace:background_tab"] = { id: 2 };
   f.tab.discarded = true;
   expect(await f.ensure()).toBe(2);
   expect(f.tabs.reload).toHaveBeenCalledExactlyOnceWith(2);
@@ -115,4 +119,42 @@ it("never mistakes the old interactive document for a pending navigation", async
   await vi.advanceTimersByTimeAsync(20100);
   expect((await result).code).toBe("work_tab_loading_timeout");
   expect(ready).not.toHaveBeenCalled();
+});
+
+it("never adopts a personal LinkedIn tab when Chrome reuses yesterday's tab ID", async () => {
+  const f = fixture();
+  delete f.data["workspace:background_tab"];
+  f.tabs.get.mockImplementation(async (id) =>
+    id === 1 ? { ...f.tab, id: 1 } : f.tab,
+  );
+  expect(await f.ensure()).toBe(2);
+  expect(f.tabs.create).toHaveBeenCalledExactlyOnceWith({
+    url: "https://www.linkedin.com/feed/",
+    active: false,
+  });
+  expect(f.tabs.get).not.toHaveBeenCalledWith(1);
+});
+it("keeps the agent window unfocused, shares it across requests, and only reveals it on explicit request", async () => {
+  const f = fixture();
+  f.data.workspaceMode = "separate_window";
+  f.tab.windowId = 42;
+  const windows = {
+    create: vi.fn(async () => ({ id: 42, tabs: [f.tab] })),
+    update: vi.fn(),
+  };
+  const tabs = { ...f.tabs, update: vi.fn() };
+  vi.stubGlobal("chrome", { tabs, windows });
+  expect(await Promise.all([f.ensure(), f.ensure()])).toEqual([2, 2]);
+  expect(await f.ensure()).toBe(2);
+  expect(windows.create).toHaveBeenCalledExactlyOnceWith({
+    url: "https://www.linkedin.com/feed/",
+    focused: false,
+    type: "normal",
+  });
+  expect(tabs.create).not.toHaveBeenCalled();
+  expect(tabs.update).not.toHaveBeenCalled();
+  expect(windows.update).not.toHaveBeenCalled();
+  await f.ensure.placement.show(() => {});
+  expect(tabs.update).toHaveBeenCalledExactlyOnceWith(2, { active: true });
+  expect(windows.update).toHaveBeenCalledExactlyOnceWith(42, { focused: true });
 });
