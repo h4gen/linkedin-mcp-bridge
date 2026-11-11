@@ -188,8 +188,11 @@ export async function commentActors(
       check();
       if (!target.input.checked) fail("comment_actor_selection_failed");
       control(d, "Save").click();
-      await wait();
-      check();
+      for (let n = 0; n < 8; n++) {
+        await wait();
+        check();
+        if (!d.isConnected || !visible(d) || !d.hasAttribute("open")) break;
+      }
       if (d.isConnected && visible(d) && d.hasAttribute("open"))
         fail("comment_actor_save_unconfirmed");
     }

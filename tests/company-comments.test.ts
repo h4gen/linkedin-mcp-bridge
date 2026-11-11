@@ -168,6 +168,26 @@ it("still cancels on native input after the synchronous actor selection", async 
   expect(h.w.__liBridgeOwnedInput).toBeUndefined();
   expect(h.sends()).toBe(0);
 });
+it("waits for a delayed actor save without clicking Save again", async () => {
+  const h = await setup();
+  const ref = await company(h);
+  const open = h.picker.trigger.onclick!;
+  let saves = 0;
+  h.picker.trigger.onclick = (event: PointerEvent) => {
+    open.call(h.picker.trigger, event);
+    const save = h.w.document.querySelector("dialog button:last-child");
+    const close = save.onclick;
+    save.onclick = () => {
+      saves++;
+      setTimeout(close, 4);
+    };
+  };
+  expect(
+    await h.engine.run("post_comment", { ...args, actor_ref: ref }),
+  ).toMatchObject({ status: "confirmed" });
+  expect(saves).toBe(1);
+  expect(h.sends()).toBe(1);
+});
 it.each(["/feed/?other=1", "/in/other"])(
   "still cancels on an actual comment route change to %s",
   async (url) => {
