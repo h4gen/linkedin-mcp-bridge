@@ -50,6 +50,7 @@ export function installActorPicker(
       row.innerHTML = `<figure><svg id="${actor.type === "person" ? "person" : "company"}-accent-4"></svg><img src="${actor.avatar}"></figure><p>${actor.name}</p><div><input type="radio" aria-label="Select ${actor.name}"></div>`;
       row.querySelector("input")!.checked = actor === active;
       row.querySelector("p")!.onclick = () => {
+        row.querySelector("input")!.click();
         selection = actor;
         dialog
           .querySelectorAll("input")

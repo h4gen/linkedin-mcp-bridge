@@ -171,7 +171,19 @@ export async function commentActors(
     if (!target.input.checked) {
       if (mode === "assert") fail("comment_actor_changed");
       check();
-      target.row!.querySelector<HTMLElement>("p")!.click();
+      // Native radio activation emits a trusted input event synchronously,
+      // even when triggered by our click. Own only that exact input and stack;
+      // subsequent user input must still cancel the operation.
+      const w = window as any;
+      w.__liBridgeOwnedInput = {
+        target: target.input,
+        token: w.__liBridgeSession,
+      };
+      try {
+        target.row!.querySelector<HTMLElement>("p")!.click();
+      } finally {
+        delete w.__liBridgeOwnedInput;
+      }
       await wait();
       check();
       if (!target.input.checked) fail("comment_actor_selection_failed");

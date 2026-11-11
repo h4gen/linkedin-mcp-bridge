@@ -43,9 +43,15 @@ async function setup(reply = false, actors = fixtureActors) {
       w.document.querySelector(reply ? "article" : "[data-urn]").append(e);
   };
   const run = async (op: any, args: any) => {
+    const token = crypto.randomUUID();
+    await w.__liBridgeAdapters("session_begin", { token }, {});
     const result = await w.__liBridgeAdapters(
       op,
-      { ...args, execution_deadline: Date.now() + 30000 },
+      {
+        ...args,
+        execution_session: token,
+        execution_deadline: Date.now() + 30000,
+      },
       {},
     );
     if (result.bridge_error)
@@ -118,6 +124,7 @@ it.each([false, true])(
       ...(reply ? { parent_comment_id: parent } : {}),
     };
     const receipt = await h.engine.run("post_comment", input);
+    expect(h.w.__liBridgeOwnedInput).toBeUndefined();
     expect(receipt).toMatchObject({
       status: "confirmed",
       actor: { type: "company", profile_url: fixtureActors[1].profile_url },
@@ -142,6 +149,22 @@ it.each([false, true])(
     expect(h.sends()).toBe(2);
   },
 );
+it("still cancels on native input after the synchronous actor selection", async () => {
+  const h = await setup();
+  const ref = await company(h);
+  const other = h.w.document.createElement("input");
+  other.type = "checkbox";
+  h.w.document.body.append(other);
+  h.w.document.addEventListener("input", (event: Event) => {
+    if ((event.target as HTMLInputElement).type === "radio")
+      setTimeout(() => other.click(), 0);
+  });
+  await expect(
+    h.engine.run("post_comment", { ...args, actor_ref: ref }),
+  ).rejects.toMatchObject({ code: "cancelled" });
+  expect(h.w.__liBridgeOwnedInput).toBeUndefined();
+  expect(h.sends()).toBe(0);
+});
 it("recovers a company receipt after restart without opening the picker or submitting again", async () => {
   const h = await setup();
   const ref = await company(h);
