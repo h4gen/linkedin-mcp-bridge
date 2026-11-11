@@ -24,8 +24,18 @@ export function actorImage(value: string): string | undefined {
     if (
       u.hostname === "media.licdn.com" &&
       u.pathname.startsWith("/dms/image/")
-    )
-      return u.origin + u.pathname;
+    ) {
+      // Observed SDUI sidebar/picker variants: same media ID and upload time,
+      // but 200px/100px sizes and different rendition tokens. Do not collapse
+      // other media types, different uploads or unrelated asset IDs.
+      const photo =
+        /^\/dms\/image\/v2\/([^/]+)\/profile-displayphoto-scale_\d+_\d+\/[^/]+\/0\/(\d+)$/.exec(
+          u.pathname,
+        );
+      return photo
+        ? `${u.origin}/dms/image/v2/${photo[1]}/profile-displayphoto/${photo[2]}`
+        : u.origin + u.pathname;
+    }
   } catch {
     /* Not an observed avatar. */
   }

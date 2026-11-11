@@ -83,3 +83,12 @@ pair and a post-level avatar switch. Avatar paths corroborate observed identity
 links; names alone never authorize selection. Unknown picker layouts fail before
 publication. A client may keep a preferred actor per chat, but must include its
 reference in every write; the bridge has no shared `switch_context` operation.
+
+Live inspection on 2026-11-11 found that the picker can initially contain only a
+progress indicator. Discovery opens it once and waits up to eight checked polls
+for the radio rows, respecting cancellation/deadline checks. The same inspection
+found 100px picker and 200px sidebar `profile-displayphoto-scale` renditions with
+the same media ID and upload timestamp but different rendition tokens. Only that
+observed photo shape is normalized by asset ID and upload timestamp; different
+uploads, media IDs and background images remain distinct. The native dialog is
+closed with Cancel after listing, leaving its selected author unchanged.

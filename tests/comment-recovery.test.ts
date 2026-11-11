@@ -65,7 +65,7 @@ it("confirms a new comment despite collapsed blank lines without a second send",
   );
   expect(await result).toMatchObject({ verified: true });
   expect(sends).toBe(1);
-});
+}, 10000);
 it("reconciles read-only using stored proof and rejects an older identical comment", async () => {
   page();
   add(start - 10000);

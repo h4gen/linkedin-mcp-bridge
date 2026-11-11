@@ -346,3 +346,50 @@ it("waits for delayed native picker contents without clicking the switch twice",
   expect(h.sends()).toBe(0);
   expect(h.w.document.querySelector("dialog")).toBeNull();
 });
+
+it("resolves the personal author across observed 100px and 200px avatar renditions", async () => {
+  const avatar =
+    "https://media.licdn.com/dms/image/v2/memberPhoto/profile-displayphoto-scale_100_100/rendition100/0/1758571373941";
+  const h = await setup(false, [
+    { ...fixtureActors[0], avatar },
+    fixtureActors[1],
+  ]);
+  h.picker.links.querySelector("img")!.src = avatar.replace(
+    "100_100/rendition100",
+    "200_200/rendition200",
+  );
+  const listing = await h.engine.run("comment_actors_list", {
+    account_urn: account,
+    post_urn: post,
+  });
+  expect(listing.complete).toBe(true);
+  expect(listing.items).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        type: "person",
+        profile_url: fixtureActors[0].profile_url,
+      }),
+    ]),
+  );
+  expect(h.sends()).toBe(0);
+});
+
+it("keeps distinct avatar assets and uploads separate when normalizing renditions", async () => {
+  const { actorImage } = await import("../src/extension/comment-actors.js");
+  const source =
+    "https://media.licdn.com/dms/image/v2/memberPhoto/profile-displayphoto-scale_100_100/rendition100/0/1758571373941";
+  expect(actorImage(source)).toBe(
+    actorImage(source.replace("100_100/rendition100", "200_200/rendition200")),
+  );
+  expect(actorImage(source)).not.toBe(
+    actorImage(source.replace("memberPhoto", "otherPhoto")),
+  );
+  expect(actorImage(source)).not.toBe(
+    actorImage(source.replace("1758571373941", "1758571373942")),
+  );
+  expect(actorImage(source)).not.toBe(
+    actorImage(
+      source.replace("profile-displayphoto", "profile-displaybackgroundimage"),
+    ),
+  );
+});
