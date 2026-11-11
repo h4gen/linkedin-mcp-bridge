@@ -47,7 +47,13 @@ export function beginDomSession(token: string) {
           !!w.__liBridgeSession &&
           location.hostname === "www.linkedin.com" &&
           /^\/(feed\/?|sharing\/compose\/?)$/.test(location.pathname);
-        if (w.__liBridgeTraversal?.path && !ownedComposerTransition)
+        // SDUI can emit popstate when opening a comment editor without changing
+        // its URL. Keep that session, while actual route/query or hash changes
+        // and trusted user input still invalidate it.
+        const changed =
+          type === "hashchange" ||
+          w.__liBridgeTraversal?.path !== location.pathname + location.search;
+        if (w.__liBridgeTraversal?.path && changed && !ownedComposerTransition)
           invalidate("path_changed");
       });
   }

@@ -22,6 +22,9 @@ async function setup(reply = false, actors = fixtureActors) {
   Object.defineProperty(w.crypto, "subtle", { value: crypto.subtle });
   w.setTimeout = (fn: any) => setTimeout(fn, 1);
   const picker = installActorPicker(w, undefined, actors)!;
+  // LinkedIn emits popstate while opening the comment editor on the same post.
+  w.document.querySelector("[data-urn] > button").onclick = () =>
+    w.dispatchEvent(new w.PopStateEvent("popstate"));
   await w.eval(await readFile("dist/extension/page-adapters.js", "utf8"));
   let sends = 0;
   let hide = false;
@@ -165,6 +168,21 @@ it("still cancels on native input after the synchronous actor selection", async 
   expect(h.w.__liBridgeOwnedInput).toBeUndefined();
   expect(h.sends()).toBe(0);
 });
+it.each(["/feed/?other=1", "/in/other"])(
+  "still cancels on an actual comment route change to %s",
+  async (url) => {
+    const h = await setup();
+    const ref = await company(h);
+    h.w.document.querySelector("[data-urn] > button").onclick = () => {
+      h.w.history.replaceState({}, "", url);
+      h.w.dispatchEvent(new h.w.PopStateEvent("popstate"));
+    };
+    expect(
+      await h.engine.run("post_comment", { ...args, actor_ref: ref }),
+    ).toMatchObject({ status: "failed_before_dispatch", error: "cancelled" });
+    expect(h.sends()).toBe(0);
+  },
+);
 it("recovers a company receipt after restart without opening the picker or submitting again", async () => {
   const h = await setup();
   const ref = await company(h);
