@@ -1,3 +1,4 @@
+import { installActorPicker } from "./comment-actors-fixture.js";
 import { afterEach, expect, it, vi } from "vitest";
 import { JSDOM } from "jsdom";
 import { domOperation } from "../src/extension/dom.js";
@@ -7,6 +8,7 @@ function page(html: string) {
   vi.stubGlobal("document", dom.window.document);
   vi.stubGlobal("location", dom.window.location);
   vi.stubGlobal("innerHeight", 800);
+  installActorPicker(dom.window);
   return dom;
 }
 afterEach(() => vi.unstubAllGlobals());

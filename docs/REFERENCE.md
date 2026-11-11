@@ -14,7 +14,7 @@ All names have a `linkedin_` prefix. First call `health`, then supply its `accou
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Inbox       | `conversations_list`, `conversations_search`, `conversations_get`, `conversations_find`, `messages_list`, `message_get`, `message_send`, `conversation_update`, `conversation_delete` |
 | People      | `profile_get`, `profile_posts_list`, `relationship_get`, `people_search`, `invitations_list`, `invitation_send`, `invitation_respond`, `invitation_withdraw`                          |
-| Feed        | `feed_list`, `posts_search`, `post_get`, `post_like`, `post_comment`, `comments_list`                                                                                                 |
+| Feed        | `feed_list`, `posts_search`, `post_get`, `post_like`, `post_comment`, `comment_actors_list`, `comments_list`                                                                          |
 | Planning    | `post_draft_create`, `post_schedule`, `scheduled_posts_list`, `scheduled_post_cancel`                                                                                                 |
 | GTM         | `people_search_filters`, `reactions_list`, `post_resolve`                                                                                                                             |
 | Diagnostics | `health`, `operation_get`                                                                                                                                                             |
@@ -95,3 +95,29 @@ Connection recovery is automatic after work-tab loss, worker restarts and brief 
 Read-primitive repair contracts and compatibility notes: [0.7.1 repairs](repairs-0.7.1.md).
 
 Inbox-to-profile identity repair: [0.7.2 contracts and migration](repairs-0.7.2.md).
+
+### Comments as a company page
+
+1. Call `health` and use the connected member's `account_urn`.
+2. Resolve the exact post. To reply, obtain a stable `parent_comment_id` from
+   `comments_list`.
+3. Call `comment_actors_list` with that account, `post_urn`, and optional parent.
+   Choose a returned `actor_ref` by its name and observed `profile_url`.
+4. Pass that reference to `post_comment` with the same target, meaningful text and
+   one idempotency key. Omit `actor_ref` to explicitly comment as the personal
+   profile, even if LinkedIn currently has a company selected.
+
+The discovery result contains `items` (`actor_ref`, `type: person|company`, `name`,
+`profile_url`) and `complete`. Discovery visits the feed sidebar and target post
+but does not select an actor or publish. `complete: false` means some picker
+entries lacked unambiguous identity evidence, not that no other pages exist.
+References last seven days and are bound to the connected account; availability
+is checked again when writing. A missing parent fails without a root-comment
+fallback. Use `comments_list` to load/resolve the target again when necessary.
+
+Receipts expose `actor` and the supplied `actor_ref`. Unknown outcomes must be
+checked through `operation_get`; never send again under a different key. A key
+cannot be reused with another actor. Older personal receipts remain readable.
+`comments_list` also exposes company authors via `author.type` and their observed
+`author.profile_url`. Company posting, scheduling, reactions and multiple browser
+accounts are not added by this feature.

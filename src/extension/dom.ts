@@ -1,3 +1,4 @@
+import { commentActors, assertActorAvatar } from "./comment-actors.js";
 import { commentHash, freshComment } from "../core/comment-proof.js";
 import {
   COMMENT_SELECTOR,
@@ -204,7 +205,11 @@ export async function domOperation(
           null,
       };
     };
-    if (["post_get", "post_like", "post_comment"].includes(op)) {
+    if (
+      ["post_get", "post_like", "post_comment", "comment_actors_list"].includes(
+        op,
+      )
+    ) {
       await waitForPost(a.post_urn);
     }
     if (["feed_list", "posts_search", "profile_posts_list"].includes(op)) {
@@ -515,6 +520,16 @@ export async function domOperation(
       return postData(root);
     }
     if (op === "post_like") {
+      if (card().querySelector('[aria-label="Switch to different account"]')) {
+        const selected = await commentActors(
+          () => card(),
+          "select",
+          a.verified_actor,
+          beforeMutation,
+          wait,
+        );
+        assertActorAvatar(card(), selected.items[0]);
+      }
       const root = card();
       const b = button(
         root,
@@ -538,6 +553,23 @@ export async function domOperation(
         /^(Like|Unlike|Gefällt mir|Gefällt mir nicht mehr)(\s|$)|^Reaction button state:/i,
       );
       return { verified: reactionState(current) === a.liked };
+    }
+    if (op === "comment_actors_list") {
+      const context = postContext(a.post_urn);
+      if (a.parent_comment_id) {
+        const matches = [
+          ...context.commentsRoot.querySelectorAll(COMMENT_SELECTOR),
+        ].filter((e) => commentId(e) === a.parent_comment_id);
+        if (matches.length !== 1) fail("parent_comment_not_unique");
+      }
+      return await commentActors(
+        () => card(),
+        "list",
+        undefined,
+        beforeMutation,
+        wait,
+        a.actor_directory,
+      );
     }
     if (op === "post_comment") {
       const post = card();
@@ -563,7 +595,18 @@ export async function domOperation(
           fail("post_comments_disabled");
       }
       if (a.preflight) {
-        const before_ids = [...root.querySelectorAll(selector)]
+        const selected = await commentActors(
+          () => card(),
+          "select",
+          a.verified_actor,
+          beforeMutation,
+          wait,
+        );
+        const actor = selected.items[0];
+        assertActorAvatar(card(), actor);
+        const before_ids = [
+          ...postContext(a.post_urn).commentsRoot.querySelectorAll(selector),
+        ]
           .map(sourceId)
           .filter(Boolean);
         if (before_ids.length > 500) fail("comment_baseline_too_large");
@@ -573,7 +616,8 @@ export async function domOperation(
             ...(postUrlIdentity(location.href) === a.post_urn
               ? { post_url: location.href }
               : {}),
-            actor_url: a.verified_actor?.profile_url,
+            actor_url: actor.profile_url,
+            actor,
             text_hash: await commentHash(a.text),
             before_ids,
             observed_at: Date.now(),
@@ -736,7 +780,17 @@ export async function domOperation(
       }
       const ownControls = (scope: Element, pattern: RegExp) =>
         matchingControls(scope, pattern).filter(
-          (e) => e.closest(selector) === scope,
+          (e) =>
+            e.closest(selector) === scope &&
+            ![...e.querySelectorAll('button,[role="button"]')].some((child) =>
+              pattern.test(
+                (
+                  child.getAttribute("aria-label") ??
+                  child.textContent ??
+                  ""
+                ).trim(),
+              ),
+            ),
         );
       let parent: Element | undefined;
       let scope: Element = post;
@@ -843,6 +897,15 @@ export async function domOperation(
         fields[0].textContent?.trim() !== a.text.trim()
       )
         fail("comment_editor_not_empty");
+      const selected = await commentActors(
+        () => card(),
+        "assert",
+        a.verified_actor,
+        beforeMutation,
+        wait,
+      );
+      const selectedActor = selected.items[0];
+      if (!fields[0].isConnected) fail("comment_editor_changed");
       fill(fields[0], a.text);
       await wait();
       let submitScope: Element | null = fields[0].parentElement;
@@ -851,7 +914,10 @@ export async function domOperation(
         submits = matchingControls(
           submitScope,
           /^(Post|Comment|Reply|Antworten|Kommentieren|Posten)$/i,
-        ).filter((e) => !triggers.includes(e));
+        ).filter(
+          (e) =>
+            !triggers.some((trigger) => e === trigger || e.contains(trigger)),
+        );
         if (submits.length || submitScope === scope) break;
         submitScope = submitScope.parentElement;
       }
@@ -859,6 +925,7 @@ export async function domOperation(
       // Revalidate target and cancellation immediately before the irreversible click.
       if (card() !== post || (parent && !parent.isConnected))
         fail("parent_comment_changed");
+      assertActorAvatar(card(), selectedActor);
       beforeMutation();
       mutationStarted = true;
       submits[0].click();

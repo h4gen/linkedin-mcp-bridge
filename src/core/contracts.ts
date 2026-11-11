@@ -205,11 +205,25 @@ export const schemas = {
   post_like: z
     .object({ ...write, ...post, liked: z.boolean().default(true) })
     .strict(),
+  comment_actors_list: z
+    .object({
+      ...account,
+      ...post,
+      parent_comment_id: z.string().min(1).max(500).optional(),
+    })
+    .strict(),
   post_comment: z
     .object({
       ...write,
       ...post,
       text,
+      actor_ref: z
+        .string()
+        .regex(/^[a-f0-9]{64}$/)
+        .optional()
+        .describe(
+          "Publishing actor reference returned by comment_actors_list. Omit to explicitly use the connected personal profile.",
+        ),
       parent_comment_id: z.string().min(1).max(500).optional(),
     })
     .strict(),
@@ -321,8 +335,10 @@ export const descriptions: Record<Operation, string> = {
     "Read one post using a canonical activity/ugcPost/share URN returned by feed_list or post_resolve. Use reactions_list/comments_list for paginated engagement in the agent workspace.",
   post_like:
     "Like or unlike one exact post according to the liked boolean. Uses a canonical post_urn and idempotency_key, acts directly, and returns a receipt. Inspect unknown outcomes before retrying.",
+  comment_actors_list:
+    "List verified personal and company publishing actors available at this exact post or parent comment. Does not select an actor or publish. Pass a returned actor_ref to post_comment; incomplete identity evidence is omitted and complete is false.",
   post_comment:
-    "Publish a text comment on one exact post, or reply to one stable parent_comment_id returned by comments_list. The parent is part of the idempotency target; there is no fallback to a root comment. Use the canonical post_urn and an idempotency_key. This is an immediate public action. Use only for a requested comment; inspect unknown outcomes instead of retrying with a new key.",
+    "Publish as actor_ref from comment_actors_list, or explicitly as the connected personal profile when omitted. Publish a text comment on one exact post, or reply to one stable parent_comment_id returned by comments_list. The parent is part of the idempotency target; there is no fallback to a root comment. Use the canonical post_urn and an idempotency_key. This is an immediate public action. Use only for a requested comment; inspect unknown outcomes instead of retrying with a new key.",
   post_draft_create:
     "Save a native LinkedIn text draft without publishing. Refuses an existing unrelated draft. Same key replays the receipt.",
   post_schedule:

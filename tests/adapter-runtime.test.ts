@@ -1,3 +1,4 @@
+import { installActorPicker } from "./comment-actors-fixture.js";
 import { createHash } from "node:crypto";
 import { afterEach, expect, it } from "vitest";
 import { JSDOM } from "jsdom";
@@ -924,3 +925,34 @@ it.each(["free", "paid", "unknown", "wrong", "mixed", "delayed"])(
     expect(apiWrites).toBe(0);
   },
 );
+
+it("resolves company identities in the feed then checks the exact post picker in the built background", async () => {
+  const post = "urn:li:activity:123";
+  const h = await harness({
+    navigationDelay: 1,
+    page: (url) =>
+      `<main><div data-urn="${url.includes("/update/") ? post : "urn:li:activity:456"}"><button>Comment</button></div></main>`,
+    onMount: (w) => {
+      const picker = installActorPicker(w)!;
+      if (w.location.pathname.includes("/update/"))
+        picker.links.querySelector('a[href*="/company/"]')!.remove();
+    },
+  });
+  // Start at a detail page that has no managed-page sidebar.
+  h.mount(
+    "https://www.linkedin.com/feed/update/" + post + "/",
+    `<main><div data-urn="${post}"><button>Comment</button></div></main>`,
+  );
+  const result = await h.request("comment_actors_list", { post_urn: post });
+  expect(result.result?.items).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        type: "company",
+        profile_url: "https://www.linkedin.com/company/example",
+        actor_ref: expect.stringMatching(/^[a-f0-9]{64}$/),
+      }),
+    ]),
+  );
+  expect(h.tab.url).toBe("https://www.linkedin.com/feed/update/" + post + "/");
+  expect(Object.keys(h.local["publishing-actors"])).toHaveLength(2);
+});

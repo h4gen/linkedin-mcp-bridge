@@ -180,6 +180,12 @@ export async function extractionOperation(
           item.querySelectorAll<HTMLAnchorElement>(
             'a[href*="/in/"], a[href*="/company/"]',
           ),
+        ).filter(
+          (link) =>
+            link.closest(COMMENT_SELECTOR) === item &&
+            !link.closest(
+              '.comments-comment-item__main-content,.comments-comment-entity__content,[data-testid="expandable-text-box"],.comments-comment-item-content-body',
+            ),
         );
         const link = legacy
           ? item.querySelector<HTMLAnchorElement>(
@@ -612,6 +618,7 @@ export async function extractionOperation(
           id: key,
           author: {
             name: p.name,
+            type: p.profile_url.includes("/company/") ? "company" : "person",
             profile_url: p.profile_url,
             headline: p.description,
             connection_degree: p.connection_degree,

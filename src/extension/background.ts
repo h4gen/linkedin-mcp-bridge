@@ -791,6 +791,27 @@ const engine = new Engine({
         );
       await new Promise((r) => setTimeout(r, 250));
     }
+    if (op === "comment_actors_list") {
+      // The post detail omits managed-page links. Resolve identities from the
+      // feed sidebar, then independently check availability at the exact target.
+      const current = await chrome.tabs.get(id);
+      if (current.url && postUrlIdentity(current.url) === a.post_urn)
+        await store.set("post-url:" + a.post_urn, current.url);
+      if (
+        !current.url ||
+        !/^https:\/\/www\.linkedin\.com\/feed\/?(?:[?#]|$)/.test(current.url)
+      )
+        await navigate("https://www.linkedin.com/feed/");
+      let directory: any[] = [];
+      for (let n = 0; n < 8; n++) {
+        check();
+        directory =
+          (await pageOperation("actor_directory", {}))[0]?.result?.items ?? [];
+        if (directory.length) break;
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      a = { ...a, actor_directory: directory };
+    }
     if (
       [
         "comments_list",
@@ -798,6 +819,7 @@ const engine = new Engine({
         "post_get",
         "post_like",
         "post_comment",
+        "comment_actors_list",
       ].includes(op)
     ) {
       const url =

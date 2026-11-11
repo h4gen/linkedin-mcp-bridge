@@ -32,7 +32,7 @@ Your agent installs the server release matching the extension and directs you to
 - Check profiles, author posts and connection or pending-invitation status.
 - Save a native text draft, schedule a post or cancel a scheduled post.
 
-The agent combines 32 individual tools. There are no built-in campaigns, lead scores, CRM records or always-on reply monitoring. Results can be partial; your agent can request further available pages. No direct ChatGPT website connection is included.
+The development build combines 33 individual tools, including company-page comments and replies with an explicit per-call author. Store installations use the capabilities of their published version. There are no built-in campaigns, lead scores, CRM records or always-on reply monitoring. Results can be partial; your agent can request further available pages. No direct ChatGPT website connection is included.
 
 ## Settings and troubleshooting
 

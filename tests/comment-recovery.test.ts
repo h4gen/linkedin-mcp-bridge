@@ -1,3 +1,4 @@
+import { installActorPicker } from "./comment-actors-fixture.js";
 import { it, expect, vi, afterEach } from "vitest";
 import { JSDOM } from "jsdom";
 import { domOperation } from "../src/extension/dom.js";
@@ -26,6 +27,7 @@ function page() {
   dom.window.Element.prototype.getClientRects = () => [{}] as any;
   vi.useFakeTimers();
   vi.setSystemTime(start);
+  installActorPicker(dom.window);
   return dom;
 }
 function add(

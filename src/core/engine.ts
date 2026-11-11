@@ -578,16 +578,32 @@ export class Engine {
         if (!target || target.account_urn !== expected)
           throw new Fault("scheduled_reference_unknown");
       }
-      const actor =
-        (planningWrites.has(op) || op === "post_comment") && d.identity
+      let actor =
+        (planningWrites.has(op) ||
+          op === "post_comment" ||
+          op === "post_like") &&
+        d.identity
           ? await d.identity(expected)
           : undefined;
       if (
-        (planningWrites.has(op) || op === "post_comment") &&
+        (planningWrites.has(op) ||
+          op === "post_comment" ||
+          op === "post_like") &&
         d.identity &&
         (!actor?.name || (op === "post_comment" && !actor?.profile_url))
       )
         throw new Fault("actor_identity_unavailable");
+      if (op === "post_comment" && a.actor_ref) {
+        const actors = (await d.store.get("publishing-actors")) ?? {};
+        const saved = actors[a.actor_ref];
+        if (
+          !saved ||
+          saved.account_urn !== expected ||
+          saved.expires <= d.now()
+        )
+          throw new Fault("actor_reference_unknown");
+        actor = saved.actor;
+      }
       if (d.identity && op === "invitation_send") {
         const identity = await d.identity(a.profile_urn);
         if (!identity?.name) throw new Fault("recipient_identity_unavailable");
@@ -658,7 +674,13 @@ export class Engine {
               },
             }
           : {}),
-        ...(commentProof ? { comment_proof: commentProof } : {}),
+        ...(commentProof
+          ? {
+              comment_proof: commentProof,
+              actor: commentProof.actor ?? actor,
+              actor_ref: a.actor_ref,
+            }
+          : {}),
         version: VERSION,
         attempt_count: (previous?.attempt_count ?? (previous ? 1 : 0)) + 1,
         dispatch_state: "unknown",
@@ -743,7 +765,7 @@ export class Engine {
                 ...a,
                 prepared_composer: preparedComposer,
                 verified_target: target,
-                verified_actor: actor,
+                verified_actor: commentProof?.actor ?? actor,
                 ...(commentProof ? { comment_proof: commentProof } : {}),
                 execution_deadline: deadline,
                 resume_confirmation: resumeConfirmation,
@@ -995,6 +1017,28 @@ export class Engine {
         person.profile_url
       )
         await rememberIdentity(d.store, person);
+    }
+    if (op === "comment_actors_list") {
+      const actors = (await d.store.get("publishing-actors")) ?? {};
+      for (const [ref, saved] of Object.entries(actors) as [string, Args][])
+        if (saved.expires <= d.now()) delete actors[ref];
+      result.items = await Promise.all(
+        result.items.map(async (actor: Args) => {
+          const ref = await d.hash(`${expected}:${actor.profile_url}`);
+          actors[ref] = {
+            account_urn: expected,
+            actor,
+            expires: d.now() + 7 * 86400000,
+          };
+          return {
+            actor_ref: ref,
+            type: actor.type,
+            name: actor.name,
+            profile_url: actor.profile_url,
+          };
+        }),
+      );
+      await d.store.set("publishing-actors", actors);
     }
     if (op === "scheduled_posts_list") {
       result.items = await Promise.all(

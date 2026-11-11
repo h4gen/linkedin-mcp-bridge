@@ -29,6 +29,7 @@ export const expectedTools = [
   "scheduled_post_cancel",
   "post_like",
   "post_comment",
+  "comment_actors_list",
   "comments_list",
   "reactions_list",
   "operation_get",

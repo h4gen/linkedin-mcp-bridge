@@ -69,7 +69,7 @@ export function commentActor(e: Element, profileUrl: string): boolean {
     try {
       const u = new URL(value, location.href);
       return u.origin === "https://www.linkedin.com" &&
-        /^\/in\/[^/]+\/?$/.test(u.pathname)
+        /^\/(?:in|company)\/[^/]+\/?$/.test(u.pathname)
         ? u.origin + u.pathname.replace(/\/$/, "")
         : null;
     } catch {
@@ -79,7 +79,11 @@ export function commentActor(e: Element, profileUrl: string): boolean {
   const expected = clean(profileUrl);
   return (
     !!expected &&
-    [...e.querySelectorAll<HTMLAnchorElement>('a[href*="/in/"]')]
+    [
+      ...e.querySelectorAll<HTMLAnchorElement>(
+        'a[href*="/in/"],a[href*="/company/"]',
+      ),
+    ]
       .filter(
         (link) =>
           link.closest(COMMENT_SELECTOR) === e &&
@@ -149,10 +153,20 @@ export function visibleCommentProof(
   return (
     body?.textContent?.replace(/\s+/gu, " ").trim() ===
       text.replace(/\s+/gu, " ").trim() &&
-    [...row.querySelectorAll<HTMLAnchorElement>('a[href*="/in/"]')].some(
+    [
+      ...row.querySelectorAll<HTMLAnchorElement>(
+        'a[href*="/in/"],a[href*="/company/"]',
+      ),
+    ].some(
       (link) =>
+        link.closest(
+          '[componentkey^="replaceableComment_"],[data-comment-urn],.comments-comment-entity,.comments-comment-item',
+        ) === row &&
+        !link.closest(
+          '.comments-comment-item__main-content,.comments-comment-entity__content,[data-testid="expandable-text-box"]',
+        ) &&
         link.href.split(/[?#]/)[0].replace(/\/$/, "") ===
-        profileUrl.replace(/\/$/, ""),
+          profileUrl.replace(/\/$/, ""),
     )
   );
 }

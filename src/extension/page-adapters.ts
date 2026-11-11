@@ -1,3 +1,4 @@
+import { actorDirectory } from "./comment-actors.js";
 import { messageComposer } from "./message-composer.js";
 import { profileReader, readProfileRelationship } from "./profile-reader.js";
 import { beginDomSession, bindDomSession } from "./dom-session.js";
@@ -13,6 +14,7 @@ const operations = new Set([
   "post_get",
   "post_like",
   "post_comment",
+  "comment_actors_list",
   "comments_list",
   "reactions_list",
   "invitation_respond",
@@ -24,6 +26,7 @@ const operations = new Set([
   a: Record<string, any>,
   state: Record<string, any>,
 ) => {
+  if (op === "actor_directory") return { items: actorDirectory() };
   if (op === "message_composer") return messageComposer(a);
   if (op === "profile_read") return profileReader(a.profile_url, a.profile_urn);
   if (op === "profile_relationship")

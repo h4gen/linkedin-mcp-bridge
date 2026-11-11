@@ -356,6 +356,22 @@ const definitions = {
     }),
   },
   post_like: { adapter: "dom", output: mutation },
+  comment_actors_list: {
+    adapter: "dom",
+    output: row({
+      items: z.array(
+        z
+          .object({
+            actor_ref: z.string(),
+            type: z.enum(["person", "company"]),
+            name: z.string(),
+            profile_url: z.string(),
+          })
+          .strict(),
+      ),
+      complete: z.boolean(),
+    }),
+  },
   post_comment: { adapter: "dom", output: mutation },
 } satisfies Record<
   Operation,
