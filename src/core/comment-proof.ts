@@ -16,7 +16,7 @@ export async function commentHash(text: string): Promise<string> {
 // bits (source contract in docs/comment-receipts.md). Unsupported IDs fail closed.
 export function commentCreatedAt(id: string): number | undefined {
   const match =
-    /^(?:replaceableComment_)?urn:li:comment:\(activity:\d+,(\d{18,20})\)$/.exec(
+    /^(?:replaceableComment_)?urn:li:comment:\((?:activity|ugcPost):\d+,(\d{18,20})\)$/.exec(
       id,
     );
   if (!match) return;

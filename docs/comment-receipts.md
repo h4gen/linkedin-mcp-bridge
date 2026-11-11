@@ -14,6 +14,8 @@ Native compound IDs of the observed form `replaceableComment_urn:li:comment:(act
 
 This time signal is an additional requirement, never sufficient proof alone. The ID must not be in the persisted baseline, its encoded time must be at or after the pre-dispatch observation and no more than two minutes after it, and must not be in the future. Older identical comments, unsupported ID formats and inconsistent clocks fail closed. This also excludes an older comment that was not loaded in the preflight viewport. Account, exact post, normalized content and unique candidate checks remain necessary. Unknown formats require a new source contract rather than treating any text match as a send receipt.
 
+The same compound format with `ugcPost:<post>` was observed on 2026-11-11 in the authorized Dossaro comment. Comment ID `7526362091499274240` decodes to 19:15:55.659 UTC, matching the live publication interval. Both `activity` and `ugcPost` are supported with identical freshness and author/content requirements; other formats remain unsupported. The observation exposed a confirmation bug, not a reason to send again: the existing comment must be reconciled read-only.
+
 Legacy 0.8.2 receipts lack the pre-dispatch proof. They report `legacy_comment_proof_missing` and retain their unknown status; existing evidence is not invented after the fact. In particular, the reported Todd publication must not be repeated to repair its receipt.
 
 ## Live acceptance discipline

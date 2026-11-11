@@ -2,11 +2,40 @@ import { installActorPicker } from "./comment-actors-fixture.js";
 import { it, expect, vi, afterEach } from "vitest";
 import { JSDOM } from "jsdom";
 import { domOperation } from "../src/extension/dom.js";
-import { commentHash } from "../src/core/comment-proof.js";
+import {
+  commentHash,
+  commentCreatedAt,
+  freshComment,
+} from "../src/core/comment-proof.js";
 const start = Date.parse("2026-11-03T11:04:10Z");
 const id = (t: number) =>
   `replaceableComment_urn:li:comment:(activity:123,${BigInt(t) << 22n})`;
 const text = "Hello\n\nhttps://example.com/long-link";
+it("recognizes the observed ugcPost comment timestamp and keeps freshness bounds", () => {
+  const observed =
+    "replaceableComment_urn:li:comment:(ugcPost:7524062994184560641,7526362091499274240)";
+  const created = Date.parse("2026-11-11T19:15:55.659Z");
+  expect(commentCreatedAt(observed)).toBe(created);
+  const proof = { before_ids: [], observed_at: created - 1000 };
+  expect(freshComment(observed, proof, created + 1000)).toBe(true);
+  expect(
+    freshComment(
+      observed,
+      { ...proof, before_ids: [observed] },
+      created + 1000,
+    ),
+  ).toBe(false);
+  expect(
+    freshComment(
+      observed,
+      { ...proof, observed_at: created + 1 },
+      created + 1000,
+    ),
+  ).toBe(false);
+  expect(
+    commentCreatedAt(observed.replace("ugcPost:", "unsupported:")),
+  ).toBeUndefined();
+});
 function page() {
   const dom = new JSDOM(
     '<div data-urn="urn:li:activity:123"><button>Comment</button><div contenteditable="true" role="textbox"></div><button>Post</button></div>',

@@ -10,9 +10,9 @@ afterEach(() => windows.splice(0).forEach((w) => w.window.close()));
 const post = "urn:li:activity:123";
 const parent = "urn:li:comment:(activity:123,1234567890123456789)";
 const account = "urn:li:fsd_profile:me";
-async function setup(reply = false, actors = fixtureActors) {
+async function setup(reply = false, actors = fixtureActors, targetPost = post) {
   const page = new JSDOM(
-    `<div data-urn="${post}"><button>Comment</button>${reply ? `<article class="comments-comment-entity" data-id="${parent}"><a href="/in/other">Other</a><div role="button"><button>Reply</button></div>` : ""}<div contenteditable="true" role="textbox"></div><button id="submit">Post</button>${reply ? "</article>" : ""}</div>`,
+    `<div data-urn="${targetPost}"><button>Comment</button>${reply ? `<article class="comments-comment-entity" data-id="${parent}"><a href="/in/other">Other</a><div role="button"><button>Reply</button></div>` : ""}<div contenteditable="true" role="textbox"></div><button id="submit">Post</button>${reply ? "</article>" : ""}</div>`,
     { url: "https://www.linkedin.com/feed/", runScripts: "outside-only" },
   );
   windows.push(page);
@@ -21,7 +21,11 @@ async function setup(reply = false, actors = fixtureActors) {
   w.TextEncoder = TextEncoder;
   Object.defineProperty(w.crypto, "subtle", { value: crypto.subtle });
   w.setTimeout = (fn: any) => setTimeout(fn, 1);
-  const picker = installActorPicker(w, undefined, actors)!;
+  const picker = installActorPicker(
+    w,
+    w.document.querySelector("[data-urn]"),
+    actors,
+  )!;
   // LinkedIn emits popstate while opening the comment editor on the same post.
   w.document.querySelector("[data-urn] > button").onclick = () =>
     w.dispatchEvent(new w.PopStateEvent("popstate"));
@@ -35,7 +39,7 @@ async function setup(reply = false, actors = fixtureActors) {
     e.className = "comments-comment-entity";
     e.setAttribute(
       "data-id",
-      `urn:li:comment:(activity:123,${BigInt(Date.now()) << 22n})`,
+      `urn:li:comment:(${targetPost.replace("urn:li:", "")},${BigInt(Date.now()) << 22n})`,
     );
     const author = actors.find(
       (a) => a.avatar === picker.trigger.querySelector("img")!.src,
@@ -83,6 +87,7 @@ async function setup(reply = false, actors = fixtureActors) {
     hash: commentHash,
   };
   return {
+    targetPost,
     w,
     picker,
     run,
@@ -100,7 +105,7 @@ async function setup(reply = false, actors = fixtureActors) {
 async function company(h: Awaited<ReturnType<typeof setup>>, reply = false) {
   const listing = await h.engine.run("comment_actors_list", {
     account_urn: account,
-    post_urn: post,
+    post_urn: h.targetPost,
     ...(reply ? { parent_comment_id: parent } : {}),
   });
   expect(listing.complete).toBe(true);
@@ -203,28 +208,35 @@ it.each(["/feed/?other=1", "/in/other"])(
     expect(h.sends()).toBe(0);
   },
 );
-it("recovers a company receipt after restart without opening the picker or submitting again", async () => {
-  const h = await setup();
-  const ref = await company(h);
-  h.hide();
-  expect(
-    await h.engine.run("post_comment", { ...args, actor_ref: ref }),
-  ).toMatchObject({ status: "unknown_outcome" });
-  h.reveal();
-  h.picker.trigger.remove();
-  delete h.data["publishing-actors"]; // Receipts must not depend on a discovery cache.
-  expect(
-    await h.restart().run("operation_get", {
-      account_urn: account,
-      idempotency_key: args.idempotency_key,
-    }),
-  ).toMatchObject({
-    status: "confirmed",
-    attempt_count: 1,
-    actor: { type: "company" },
-  });
-  expect(h.sends()).toBe(1);
-});
+it.each(["activity", "ugcPost"])(
+  "recovers a %s company receipt after restart without submitting again",
+  async (kind) => {
+    const h = await setup(false, fixtureActors, `urn:li:${kind}:123`);
+    const ref = await company(h);
+    h.hide();
+    expect(
+      await h.engine.run("post_comment", {
+        ...args,
+        post_urn: h.targetPost,
+        actor_ref: ref,
+      }),
+    ).toMatchObject({ status: "unknown_outcome" });
+    h.reveal();
+    h.picker.trigger.remove();
+    delete h.data["publishing-actors"]; // Receipts must not depend on a discovery cache.
+    expect(
+      await h.restart().run("operation_get", {
+        account_urn: account,
+        idempotency_key: args.idempotency_key,
+      }),
+    ).toMatchObject({
+      status: "confirmed",
+      attempt_count: 1,
+      actor: { type: "company" },
+    });
+    expect(h.sends()).toBe(1);
+  },
+);
 it("distinguishes identically named companies by observed URLs and avatars", async () => {
   const actors = [
     ...fixtureActors,
