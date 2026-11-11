@@ -318,3 +318,31 @@ it("rejects a company no longer offered by the native picker", async () => {
   ).rejects.toMatchObject({ code: "comment_actor_unavailable" });
   expect(h.sends()).toBe(0);
 });
+
+it("waits for delayed native picker contents without clicking the switch twice", async () => {
+  const h = await setup();
+  let opens = 0;
+  let ticks = 0;
+  let restore: (() => void) | undefined;
+  h.w.setTimeout = (fn: () => void) =>
+    setTimeout(() => {
+      if (++ticks === 3) restore?.();
+      fn();
+    }, 1);
+  h.picker.trigger.addEventListener("click", () => {
+    opens++;
+    const group = h.w.document.querySelector('[role="radiogroup"]');
+    const rows = [...group.children];
+    group.replaceChildren();
+    restore = () => group.append(...rows);
+  });
+  const listing = await h.engine.run("comment_actors_list", {
+    account_urn: account,
+    post_urn: post,
+  });
+  expect(listing.items).toHaveLength(2);
+  expect(listing.complete).toBe(true);
+  expect(opens).toBe(1);
+  expect(h.sends()).toBe(0);
+  expect(h.w.document.querySelector("dialog")).toBeNull();
+});

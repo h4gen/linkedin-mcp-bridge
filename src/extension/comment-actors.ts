@@ -47,7 +47,7 @@ export function actorSwitch(scope: Element): HTMLElement {
   if (unique.length !== 1) fail("comment_actor_switch_unavailable");
   return unique[0];
 }
-function dialog(): HTMLElement {
+function dialog(): HTMLElement | undefined {
   const matches = [
     ...document.querySelectorAll<HTMLElement>('dialog[open], [role="dialog"]'),
   ].filter(
@@ -57,7 +57,7 @@ function dialog(): HTMLElement {
       e.querySelector("h2")?.textContent?.trim() ===
         "Comment, react, and repost as",
   );
-  if (matches.length !== 1) fail("comment_actor_dialog_unavailable");
+  if (matches.length > 1) fail("comment_actor_dialog_unavailable");
   return matches[0];
 }
 function control(d: Element, label: string) {
@@ -128,9 +128,16 @@ export async function commentActors(
   check();
   const trigger = actorSwitch(scope());
   trigger.click();
-  await wait();
-  check();
-  const d = dialog();
+  // LinkedIn can mount the dialog shell before its radio rows arrive. Open
+  // once and wait for the observed contents; never toggle/reclick on a delay.
+  let observed: HTMLElement | undefined;
+  for (let n = 0; n < 8; n++) {
+    await wait();
+    check();
+    observed = dialog();
+    if (observed) break;
+  }
+  const d = observed ?? fail("comment_actor_dialog_unavailable");
   try {
     const entries = pickerEntries(
       d,
