@@ -4,9 +4,9 @@ This is the canonical installation contract for a local **Codex or Claude Code**
 
 ## Published installation
 
-The [Chrome extension is available now](https://chromewebstore.google.com/detail/linkedin-mcp-%E2%80%93-ai-connect/pibhcinkiadfplcaefllaeappkpnpfjm) at version **0.8.2** (verified 2026-11-03). Use server tag `v0.8.2`, build with `npm run build:store`, and register Store extension ID `pibhcinkiadfplcaefllaeappkpnpfjm`. The internal build-channel name is `pilot`; it is also the channel used by the public Store extension.
+The [Chrome extension is available now](https://chromewebstore.google.com/detail/linkedin-mcp-%E2%80%93-ai-connect/pibhcinkiadfplcaefllaeappkpnpfjm) at version **0.8.3**, build `14bbd765` (verified 2026-11-12; Store update date 2026-11-04). Use server tag `v0.8.3`, build with `npm run build:store`, and register Store extension ID `pibhcinkiadfplcaefllaeappkpnpfjm`. The internal build-channel name is `pilot`; it is also the channel used by the public Store extension.
 
-The immutable `v0.8.2` source was tagged before Store approval. Its installer may print `published_version: null` and a pre-publication `store_note`. These are a cached release-time snapshot, not a failed registration. The current canonical `store/release.json` and public Store listing establish availability. Keep the exact tag and Store channel; do not switch to an unpacked development build or modify the tag to remove that notice.
+The immutable `v0.8.3` source retains its release-time publication metadata (`published_version: 0.8.2`). This is a historical snapshot, not a failed registration. The current canonical `store/release.json` and public Store listing establish availability. Keep the exact tag and Store channel; do not switch to an unpacked development build or modify the tag to change that notice. The recovered tag points to `97d77eeb520b086e65bfcbf2c45cf19a2688e636`, whose executable fingerprint matches the published build exactly.
 
 ## Inputs and prerequisites
 

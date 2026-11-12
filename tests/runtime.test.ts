@@ -103,7 +103,7 @@ it("installs isolated native manifest and round-trips a real native/socket frame
     installer.stdout!.on("data", (b) => (installOutput += b));
     expect((await once(installer, "exit"))[0]).toBe(0);
     const installed = JSON.parse(installOutput);
-    expect(installed.published_version).toBe("0.8.2");
+    expect(installed.published_version).toBe("0.8.3");
     expect(installed.extension_url).toBe(
       "https://chromewebstore.google.com/detail/linkedin-mcp-%E2%80%93-ai-connect/pibhcinkiadfplcaefllaeappkpnpfjm",
     );

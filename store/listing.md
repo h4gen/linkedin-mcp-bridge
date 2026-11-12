@@ -8,7 +8,7 @@ Connect LinkedIn to Claude & Codex: manage your inbox, research posts and people
 
 Bring LinkedIn conversations, people and posts into Claude Code, Codex and other local MCP-compatible AI clients. Give your agent the context to research a person, pick up an earlier conversation or prepare your next post, with less copying between tabs.
 
-This Chrome extension connects your signed-in LinkedIn account to a separately installed LinkedIn MCP server. Its 32 tools work together; you choose the task and your agent combines the steps.
+This Chrome extension connects your signed-in LinkedIn account to a separately installed LinkedIn MCP server. Its 33 tools work together; you choose the task and your agent combines the steps.
 
 MANAGE YOUR INBOX WITH CONTEXT
 Find conversations by participant, title or preview, or find the exact personal chats for a profile, including archived conversations. Read recent messages and older history, retrieve long message text, send replies, and manage read or archive status. History reads leave the read status unchanged. Conversation search is not a full-text search of all message bodies.
@@ -22,11 +22,15 @@ Search people and read their background, current positions, location and recent 
 PREPARE AND SCHEDULE TEXT POSTS
 Create native LinkedIn text drafts, schedule posts for later, inspect scheduled posts and cancel a scheduled post. Your agent can turn research or your own notes into a draft. There is no immediate-publish tool.
 
+JOIN DISCUSSIONS AS YOURSELF OR YOUR COMPANY
+Write a requested comment on a selected post or reply to a specific comment. Ask your agent which company Pages are available, then choose the author for that comment. The available choices come from LinkedIn's native account selector. Each comment has its own author choice; omitting a company selection uses your personal profile. Comments and replies publish immediately when requested.
+
 For example, ask your agent to:
 
 - Find recent posts about a topic, read the comments and research a relevant participant.
 - Check how you are connected to a person and read your earlier conversation before preparing a reply.
 - Turn your notes into a LinkedIn text draft and schedule it for your chosen time.
+- Find a relevant discussion and prepare a comment for one of your company Pages before publishing it on request.
 
 These are tasks your agent can compose, not built-in campaigns or a CRM. Reads are bounded and paginated. Unavailable profile sections, uncertain relationship states and incomplete results are identified; missing results are not proof that nothing exists. There is no always-on reply monitoring or automatic outreach sequence.
 

@@ -2,9 +2,9 @@
 
 Bring your LinkedIn inbox, people research and posts into your AI agent. Find earlier conversations, understand a person before replying, and prepare or schedule text posts.
 
-**[Install from the Chrome Web Store](https://chromewebstore.google.com/detail/linkedin-mcp-%E2%80%93-ai-connect/pibhcinkiadfplcaefllaeappkpnpfjm)** · [Agent setup instructions](docs/INSTALL_AGENT.md) · [Release v0.8.2](https://github.com/h4gen/linkedin-mcp-bridge/releases/tag/v0.8.2)
+**[Install from the Chrome Web Store](https://chromewebstore.google.com/detail/linkedin-mcp-%E2%80%93-ai-connect/pibhcinkiadfplcaefllaeappkpnpfjm)** · [Agent setup instructions](docs/INSTALL_AGENT.md) · [Published source v0.8.3](https://github.com/h4gen/linkedin-mcp-bridge/tree/v0.8.3)
 
-Available now: **0.8.2**. Works on macOS and native Windows with Chrome and a local MCP client such as Codex or Claude Code. The extension and local server are both required.
+Available now: **0.8.3** (Store listing verified 2026-11-12). Works on macOS and native Windows with Chrome and a local MCP client such as Codex or Claude Code. The extension and local server are both required.
 
 [![Find people. Reply faster. Plan posts.](store/graphics-v2/upload/promo-small-440x280.png)](https://chromewebstore.google.com/detail/linkedin-mcp-%E2%80%93-ai-connect/pibhcinkiadfplcaefllaeappkpnpfjm)
 

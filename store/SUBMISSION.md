@@ -1,6 +1,18 @@
-# Chrome Web Store publication — 0.8.2
+# Chrome Web Store release status
 
-## 0.8.4 development candidate — not submitted
+## 0.8.4 package preparation — 2026-11-12
+
+The public listing now shows **0.8.3 · build 14bbd765**, updated 4 November 2026. Its immutable source is recovered as `v0.8.3` at `97d77eeb520b086e65bfcbf2c45cf19a2688e636`; the computed fingerprint exactly matches the published package. Canonical `published_version` and installation instructions now reflect 0.8.3. Older publication and acceptance records below remain historical.
+
+The cumulative 0.8.4 candidate includes all intervening inbox, reaction, workspace and comment repairs, plus company-page comments and replies. The listing now describes 33 tools and per-comment author selection. No permissions, data categories, privacy policy, icon or gallery replacements are needed. See [0.8.4 release notes](release-notes-0.8.4.md). The existing five gallery images and both promotional tiles are retained.
+
+Candidate fingerprint after correcting publication metadata: `0a0680122978fd7817f7b3cf99236dc3117d4a886e57908f8bb331b4689d8e43`. The package and upload materials are prepared under `artifacts/store-0.8.4/2026-11-12-0a068012/`. Build in an isolated canonical checkout so the installed development extension remains unchanged. The matching immutable source tag `v0.8.4` is for the candidate; its presence does not mean Store publication or acceptance.
+
+The company-comment publication was independently observed on LinkedIn and reconciled read-only to `confirmed` on fully loaded build `742babee`. This is historical functional evidence. The publication-metadata correction changes the fingerprint, so this evidence is not relabeled as a new dispatch on `0a068012`. No additional public or private writes are authorized by package preparation.
+
+**Submission remains blocked by current-runtime acceptance.** `store:check` requires per-capability proofs, macOS/Windows installation evidence, and four platform/workspace reports. The workspace work was explicitly deferred by the user. A prepared ZIP, passing automated tests or matching historical receipts do not waive these checks. The generated `store-check.json` in the package directory records the exact outstanding evidence. No upload, review submission, or publication is performed during this preparation.
+
+## Earlier 0.8.4 development candidates — not submitted
 
 Removes automatic foreground activation from LinkedIn operations. The candidate offers a background tab or an unfocused separate window in Settings & help. Reaction reads can use a post-bound activity query without opening a reaction dialog. Desktop focus and background execution require [live acceptance](../docs/quiet-workspace.md) before making a Store claim or selecting supported modes. Do not reuse a previous build's evidence.
 
