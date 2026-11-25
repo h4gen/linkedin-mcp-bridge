@@ -14,6 +14,7 @@ All names have a `linkedin_` prefix. First call `health`, then supply its `accou
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Inbox       | `conversations_list`, `conversations_search`, `conversations_get`, `conversations_find`, `messages_list`, `message_get`, `message_send`, `conversation_update`, `conversation_delete` |
 | People      | `profile_get`, `profile_posts_list`, `relationship_get`, `people_search`, `invitations_list`, `invitation_send`, `invitation_respond`, `invitation_withdraw`                          |
+| Companies   | `company_search`, `company_get`, `company_people_list`                                                                                                                                |
 | Feed        | `feed_list`, `posts_search`, `post_get`, `post_like`, `post_comment`, `comment_actors_list`, `comments_list`                                                                          |
 | Planning    | `post_draft_create`, `post_schedule`, `scheduled_posts_list`, `scheduled_post_cancel`                                                                                                 |
 | GTM         | `people_search_filters`, `reactions_list`, `post_resolve`                                                                                                                             |
@@ -22,6 +23,12 @@ All names have a `linkedin_` prefix. First call `health`, then supply its `accou
 Lists default to 20, max 50. LinkedIn Inbox requests are capped at 20 per backend page because live requests for 50 return an unusable response; use the cursor to continue. Pass the returned opaque `next_cursor` as `cursor` with the **same arguments**. Cursors expire after 30 minutes, are bound to account, filters and operation, and reset with the browser session. Lists are live, not immutable snapshots. Deduplicate by entity URN when traversing a changing inbox. `conversations_search` searches participant/title/preview content in each fetched page; follow its cursor to search older pages. It is not full historical message search.
 
 Inbox/history reads use HTTP only and never intentionally open a conversation or mark it read. Attachment metadata can appear in normalized read results; uploading or downloading attachment content is not implemented.
+
+### Company research
+
+Use `company_search(query)` for the company name. If several results could match, confirm the page with the user. Pass the chosen result's `company_id` and `company_url` to `company_get`. The overview includes the description, industry, headquarters, website and company size band when available.
+
+Pass the confirmed `company_id` to `company_people_list`. It uses LinkedIn's current-employer filter without a keyword. Follow `next_cursor` with the same company and limit when more results are needed. Coverage applies to the results LinkedIn makes available to the connected account, and the size band is a separate field from search coverage.
 
 ### Native drafts and scheduling
 
@@ -62,7 +69,7 @@ Feed pagination is a bounded live scroll. `post_resolve` resolves a rendered car
 
 Collection jobs were removed in 0.3. Use direct cursor pages. DOM reads use a dedicated LinkedIn work tab and bring it forward to avoid background timer throttling. Navigating or clicking controls in that tab invalidates its traversal cursor; API reads do not. A consumed cursor replays its cached page. Session cursors expire after 30 minutes and share a 5 MiB storage budget. See [interface contract](interface-patterns.md).
 
-The registry exposes all 32 operations in development and pilot builds. `health` reports current-build acceptance separately from availability. `store:check` requires current-runtime evidence for every capability and the publishing prerequisites; acceptance does not gate individual calls.
+The registry exposes all 36 operations in development and pilot builds. `health` reports current-build acceptance separately from availability. `store:check` requires current-runtime evidence for every capability and the publishing prerequisites; acceptance does not gate individual calls.
 
 ## Development and packaging
 

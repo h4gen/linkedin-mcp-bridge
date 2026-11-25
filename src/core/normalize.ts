@@ -49,6 +49,7 @@ export function collection(
     ],
     messages_list: ["messengerMessagesBySyncToken", "messengerMessages"],
     people_search: ["searchDashClustersByAll", "searchDashClusters"],
+    company_search: ["searchDashClustersByAll", "searchDashClusters"],
     invitations_list: [],
   };
   const candidates: any[] = [];

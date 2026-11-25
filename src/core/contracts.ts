@@ -36,6 +36,7 @@ const conversation = { conversation_urn: urn };
 const post = {
   post_urn: z.string().regex(/^urn:li:(activity|ugcPost|share):\d+$/),
 };
+const companyId = z.string().regex(/^\d{1,20}$/);
 const filters = z
   .object({
     connection_degrees: z
@@ -161,6 +162,26 @@ export const schemas = {
       ...account,
       query: z.string().trim().min(1).max(200),
       kind: z.enum(["location", "company"]).default("location"),
+    })
+    .strict(),
+  company_search: z
+    .object({ ...page, query: z.string().trim().min(1).max(200) })
+    .strict(),
+  company_get: z
+    .object({
+      ...account,
+      company_id: companyId.describe("Company ID returned by company_search."),
+      company_url: z
+        .string()
+        .max(500)
+        .regex(/^https:\/\/www\.linkedin\.com\/company\/[\w-]+\/?$/)
+        .describe("LinkedIn URL from the same company_search result."),
+    })
+    .strict(),
+  company_people_list: z
+    .object({
+      ...page,
+      company_id: companyId.describe("Confirmed company ID from company_get."),
     })
     .strict(),
   reactions_list: z.object({ ...page, ...post }).strict(),
@@ -319,6 +340,12 @@ export const descriptions: Record<Operation, string> = {
     "Search people by keywords and optional connection degrees, company IDs and location IDs. Resolve supported filter IDs with people_search_filters. Returns bounded profiles and pagination, not Sales Navigator results or a complete people database.",
   people_search_filters:
     "Resolve a company or location name into supported numeric people_search filter IDs. Choose the returned matching option; do not invent IDs. Options may be partial.",
+  company_search:
+    "Find LinkedIn company pages by name. Use the chosen result's company_id and company_url with company_get. Ask which company the user means when several results are plausible.",
+  company_get:
+    "Read the selected company's LinkedIn overview, including description, industry, headquarters, website and size band where available. Pass the confirmed company_id to company_people_list.",
+  company_people_list:
+    "List visible LinkedIn profiles associated with this exact current employer, without a keyword. Follow next_cursor with the same arguments when more results are needed. Coverage applies to LinkedIn search results visible to the connected account.",
   invitations_list:
     "List received or sent connection invitations with bounded pagination. Returned invitation URNs identify respond/withdraw targets; shared secrets never leave the browser. Inspect page_info for coverage.",
   invitation_send:

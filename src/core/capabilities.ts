@@ -27,6 +27,15 @@ const person = row({
   name: z.string().optional(),
   headline: z.string().nullable().optional(),
 });
+const company = z
+  .object({
+    company_id: z.string().regex(/^\d{1,20}$/),
+    company_url: z.string(),
+    name: z.string(),
+    industry: z.string().nullable(),
+    location: z.string().nullable(),
+  })
+  .strict();
 const reference = z
   .object({
     entityUrn: z.string().nullable(),
@@ -276,6 +285,33 @@ const definitions = {
     output: list(message),
   },
   people_search: {
+    adapter: "api",
+    source: "offset",
+    order: "linkedin_ranked",
+    output: list(person),
+  },
+  company_search: {
+    adapter: "api",
+    source: "offset",
+    order: "linkedin_ranked",
+    output: list(company),
+  },
+  company_get: {
+    adapter: "api",
+    output: z
+      .object({
+        company: company.extend({
+          description: z.string().nullable(),
+          website: z.string().nullable(),
+          size_band: z
+            .object({ min: z.number().int(), max: z.number().int().nullable() })
+            .strict()
+            .nullable(),
+        }),
+      })
+      .strict(),
+  },
+  company_people_list: {
     adapter: "api",
     source: "offset",
     order: "linkedin_ranked",

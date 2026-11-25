@@ -77,7 +77,7 @@ describe("contracts", () => {
     ).toThrow();
   });
   it("caps pages and validates all tool schemas", () => {
-    expect(Object.keys(schemas)).toHaveLength(33);
+    expect(Object.keys(schemas)).toHaveLength(36);
     expect(() =>
       parse("messages_list", {
         account_urn: account,
@@ -90,6 +90,164 @@ describe("contracts", () => {
     expect(restli({ x: "a),evil:(1", list: ["urn:li:x:a"] })).toBe(
       "(x:a%29%2Cevil%3A%281,list:List(urn%3Ali%3Ax%3Aa))",
     );
+  });
+});
+
+describe("LinkedIn company research", () => {
+  const companyUrl = "https://www.linkedin.com/company/acme/";
+  const company = { account_urn: account, company_id: "123" };
+  const searchPage = (elements: unknown[], start: number, total: number) => ({
+    data: {
+      searchDashClustersByAll: { elements, paging: { start, count: 2, total } },
+    },
+  });
+  const employee = (slug: string) => ({
+    navigationUrl: `https://www.linkedin.com/in/${slug}/?tracking=fixture`,
+    entityUrn: `urn:li:fsd_entityResultViewModel:(urn:li:fsd_profile:opaque-${slug},SEARCH_SRP,DEFAULT)`,
+    title: { text: slug },
+  });
+
+  it("finds homonyms separately and confirms the selected LinkedIn company profile", async () => {
+    const f = fixture();
+    const profileUrn = "urn:li:fs_normalized_company:123";
+    f.fetch.mockImplementation(async ({ path }) => {
+      if (path === "/me") return me;
+      if (path.startsWith("/graphql")) {
+        expect(path).toContain("key:resultType,value:List(COMPANIES)");
+        return searchPage(
+          [
+            {
+              items: ["123", "456"].map((id) => ({
+                entityResult: {
+                  navigationUrl:
+                    id === "123"
+                      ? companyUrl
+                      : "https://www.linkedin.com/company/other-acme/",
+                  entityUrn: `urn:li:fsd_entityResultViewModel:(urn:li:fsd_company:${id},SEARCH_SRP,DEFAULT)`,
+                  title: { text: "Acme" },
+                },
+              })),
+            },
+          ],
+          0,
+          2,
+        );
+      }
+      expect(path).toContain("universalName=acme");
+      return {
+        data: { "*elements": [profileUrn] },
+        included: [
+          { entityUrn: "urn:li:fs_normalized_company:456", name: "Acme" },
+          {
+            entityUrn: profileUrn,
+            name: "Acme",
+            description: "Acme makes widgets",
+            staffCountRange: { start: 11, end: 50 },
+          },
+        ],
+      };
+    });
+    const found = await f.engine.run("company_search", {
+      account_urn: account,
+      query: "Acme",
+      limit: 2,
+    });
+    expect(found.items.map((row: any) => row.company_id)).toEqual([
+      "123",
+      "456",
+    ]);
+    const profile = await f.engine.run("company_get", {
+      ...company,
+      company_url: found.items[0].company_url,
+    });
+    expect(profile.company).toEqual({
+      company_id: "123",
+      company_url: companyUrl,
+      name: "Acme",
+      description: "Acme makes widgets",
+      website: null,
+      industry: null,
+      location: null,
+      size_band: { min: 11, max: 50 },
+    });
+    await expect(
+      f.engine.run("company_get", {
+        ...company,
+        company_id: "456",
+        company_url: companyUrl,
+      }),
+    ).rejects.toThrow("company_identity_mismatch");
+    expect(() =>
+      parse("company_get", {
+        ...company,
+        company_url: "https://other.example/company/acme/",
+      }),
+    ).toThrow();
+  });
+
+  it("continues short and overlapping employer pages using a company-bound cursor", async () => {
+    const f = fixture();
+    const args = { ...company, limit: 2 };
+    f.fetch.mockImplementation(async ({ path }) => {
+      if (path === "/me") return me;
+      expect(path).toContain("origin:COMPANY_PAGE_CANNED_SEARCH");
+      expect(path).toContain("key:currentCompany,value:List(123)");
+      expect(path).not.toContain("keywords:");
+      if (path.includes("start:0")) return searchPage([employee("one")], 0, 4);
+      expect(path).toContain("start:2");
+      return searchPage([employee("one"), employee("two")], 2, 4);
+    });
+    const first = await f.engine.run("company_people_list", args);
+    expect(first.items.map((row: any) => row.public_identifier)).toEqual([
+      "one",
+    ]);
+    expect(first.page_info.continuation).toBe("available");
+    const next = { ...args, cursor: first.next_cursor };
+    await expect(
+      f.engine.run("company_people_list", { ...next, company_id: "456" }),
+    ).rejects.toThrow("invalid_cursor");
+    const second = await f.engine.run("company_people_list", next);
+    expect(second.items.map((row: any) => row.public_identifier)).toEqual([
+      "two",
+    ]);
+    expect(second.page_info).toMatchObject({
+      continuation: "exhausted",
+      coverage: "complete_for_scope",
+    });
+    expect(await f.engine.run("company_people_list", next)).toEqual(second);
+  });
+
+  it("distinguishes confirmed empty results, a source cap and a malformed response", async () => {
+    const args = { ...company, limit: 2 };
+    const call = (raw: object) =>
+      readApi("company_people_list", args, {}, async () => raw);
+    expect(await call(searchPage([], 0, 0))).toMatchObject({
+      items: [],
+      partial: false,
+      completeness: "source_exhausted",
+    });
+    expect(await call(searchPage([], 0, 1))).toMatchObject({
+      items: [],
+      partial: true,
+      completeness: "source_incomplete",
+      next: undefined,
+    });
+    expect(await call({ data: { elements: [] } })).toMatchObject({
+      partial: true,
+      completeness: "source_incomplete",
+    });
+    expect(
+      await call({
+        data: {
+          elements: [employee("one")],
+          paging: { start: 0, count: 2, total: 0 },
+          metadata: { totalResultCount: 8 },
+        },
+      }),
+    ).toMatchObject({ partial: true, next: { start: 2 } });
+    await expect(
+      call({ data: { unrelated: { elements: [] } } }),
+    ).rejects.toThrow("no recognized collection");
   });
 });
 describe("normalization", () => {

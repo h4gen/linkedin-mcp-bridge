@@ -11,6 +11,7 @@ import {
 } from "./read-models.js";
 import { Args, Fault, Operation } from "./contracts.js";
 import { collection, normalize, restli } from "./normalize.js";
+import { companyProfile, companySearchHit } from "./company.js";
 export type Request = {
   surface?: "guest_typeahead";
   path: string;
@@ -217,6 +218,8 @@ export async function readApi(
       source: "linkedin_public_typeahead",
     };
   }
+  if (op === "company_get")
+    return companyProfile(a.company_id, a.company_url, fetch);
   if (op === "conversations_get")
     return { conversation: await getConversation(a, fetch) };
   if (op === "profile_get") {
@@ -307,17 +310,28 @@ export async function readApi(
         countAfter: 0,
       }),
     );
-  else if (op === "people_search")
+  else if (
+    ["people_search", "company_search", "company_people_list"].includes(op)
+  )
     raw = await fetch(
       graph("people", {
         start: state.start ?? 0,
         count: a.limit,
-        origin: "GLOBAL_SEARCH_HEADER",
+        origin:
+          op === "company_people_list"
+            ? "COMPANY_PAGE_CANNED_SEARCH"
+            : "GLOBAL_SEARCH_HEADER",
         query: {
-          keywords: a.query,
+          keywords: op === "company_people_list" ? undefined : a.query,
           flagshipSearchIntent: "SEARCH_SRP",
           queryParameters: [
-            { key: "resultType", value: ["PEOPLE"] },
+            {
+              key: "resultType",
+              value: [op === "company_search" ? "COMPANIES" : "PEOPLE"],
+            },
+            ...(op === "company_people_list"
+              ? [{ key: "currentCompany", value: [a.company_id] }]
+              : []),
             ...(a.filters?.connection_degrees?.length
               ? [
                   {
@@ -353,15 +367,26 @@ export async function readApi(
         }),
     });
   else throw new Fault("not_api_operation");
-  const c = collection(raw, op);
+  const c = collection(
+    raw,
+    op === "company_people_list" ? "people_search" : op,
+  );
   let items = c.items;
-  if (op === "people_search") {
+  if (
+    op === "people_search" ||
+    op === "company_search" ||
+    op === "company_people_list"
+  ) {
+    const companySearch = op === "company_search";
+    const companyScoped = op !== "people_search";
     const rows: Args[] = [];
     const walk = (x: any, depth = 0) => {
       if (!x || typeof x !== "object" || depth > 12) return;
       if (
         typeof x.navigationUrl === "string" &&
-        /linkedin\.com\/in\//.test(x.navigationUrl) &&
+        (companySearch
+          ? /^https:\/\/www\.linkedin\.com\/company\//.test(x.navigationUrl)
+          : /linkedin\.com\/in\//.test(x.navigationUrl)) &&
         x.title?.text
       ) {
         rows.push(x);
@@ -371,34 +396,65 @@ export async function readApi(
     };
     walk(c.items);
     const seen = new Set<string>(state.seen ?? []);
-    const extracted = rows.map((x) => ({
-      entityUrn: x.entityUrn?.match(/urn:li:fsd_profile:[\w-]+/)?.[0] ?? null,
-      profile_url: x.navigationUrl.split("?")[0],
-      name: x.title.text,
-      headline: x.primarySubtitle?.text ?? null,
-      location: x.secondarySubtitle?.text ?? null,
-      connection_degree: x.badgeText?.text ?? null,
-    }));
+    const extracted = companySearch
+      ? rows.map(companySearchHit).filter((hit) => hit !== null)
+      : rows.map((x) => ({
+          entityUrn:
+            x.entityUrn?.match(/urn:li:fsd_profile:[\w-]+/)?.[0] ?? null,
+          profile_url: x.navigationUrl.split("?")[0],
+          name: x.title.text,
+          headline: x.primarySubtitle?.text ?? null,
+          location: x.secondarySubtitle?.text ?? null,
+          connection_degree: x.badgeText?.text ?? null,
+        }));
     const unique = extracted.filter((x) => {
-      const key = x.entityUrn ?? x.profile_url;
+      const key =
+        "company_id" in x ? x.company_id : (x.entityUrn ?? x.profile_url);
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
-    if (c.items.length && !rows.length) throw new Fault("people_shape_changed");
+    if (c.items.length && !extracted.length)
+      throw new Fault(
+        companySearch ? "company_search_shape_changed" : "people_shape_changed",
+      );
     const sourceStart = c.paging.start ?? state.start ?? 0;
     const sourceCount = c.paging.count ?? a.limit;
-    const total = c.paging.total;
     const nextStart = sourceStart + sourceCount;
-    const more =
-      typeof total === "number" ? nextStart < total : c.items.length > 0;
-    if (more && (sourceCount <= 0 || nextStart <= (state.start ?? -1)))
+    const total = companyScoped
+      ? (c.metadata.totalResultCount ?? c.paging.total)
+      : c.paging.total;
+    const reportedTotal = companyScoped
+      ? Number.isSafeInteger(total) && total >= 0 && (total > 0 || !rows.length)
+      : typeof total === "number";
+    if (
+      companyScoped &&
+      (!Number.isSafeInteger(sourceStart) ||
+        sourceStart !== (state.start ?? 0) ||
+        !Number.isSafeInteger(sourceCount) ||
+        sourceCount < 0)
+    )
+      throw new Fault("pagination_stalled");
+    const more = reportedTotal ? nextStart < total : c.items.length > 0;
+    const unverifiedEnd = companyScoped && !more && !reportedTotal;
+    const capped =
+      companyScoped && reportedTotal && sourceStart < total && !c.items.length;
+    if (
+      more &&
+      !capped &&
+      (sourceCount <= 0 || nextStart <= (state.start ?? -1))
+    )
       throw new Fault("pagination_stalled");
     return {
       items: unique,
-      partial: more,
-      completeness: more ? "more_available" : "source_exhausted",
-      next: more ? { start: nextStart, seen: [...seen] } : undefined,
+      partial: more || capped || unverifiedEnd,
+      completeness:
+        capped || unverifiedEnd
+          ? "source_incomplete"
+          : more
+            ? "more_available"
+            : "source_exhausted",
+      next: more && !capped ? { start: nextStart, seen: [...seen] } : undefined,
       scanned: rows.length,
     };
   }

@@ -1090,7 +1090,7 @@ export class Engine {
           : null,
       };
     }
-    if (["people_search", "reactions_list"].includes(op))
+    if (["people_search", "company_people_list", "reactions_list"].includes(op))
       result.items = result.items.map((r: Args) => ({
         ...r,
         public_identifier: personRef(r).public_identifier,

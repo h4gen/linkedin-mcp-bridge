@@ -16,6 +16,11 @@ export async function pageFetch(request: Request): Promise<any> {
   // Only packaged code builds request paths. Defense in depth at browser boundary.
   if (
     !guest &&
+    !(
+      !request.method &&
+      !request.body &&
+      /^\/organization\/companies(?:\/\d{1,20})?\?/.test(request.path)
+    ) &&
     !/^\/(me|identity\/dash\/profiles|graphql|relationships\/(invitationViews|sentInvitationViewsV2)|voyagerMessagingGraphQL\/graphql|voyagerMessagingDashMessengerMessages|voyagerMessagingDashMessengerConversations|voyagerRelationshipsDashMemberRelationships)(\?|$)/.test(
       request.path,
     )

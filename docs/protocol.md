@@ -62,3 +62,9 @@ An already-connected profile inspected on 2026-10-29 exposed its exact profile U
 ## 0.4 execution policy
 
 The earlier enabled-write restrictions above are historical. All implemented operations now execute directly without extension approval. Endpoint acceptance remains evidence-based and separate from availability.
+
+## Company research
+
+Company search uses the `COMPANIES` result type on the same search-clusters query used for people. The company overview reads the `WebFullCompanyMain-12` organization decoration, resolves the returned entity, and checks its numeric ID against the selected hit. The decoration and normalized root shape are documented in a [Voyager capture](https://github.com/SharmaNityam/linkedin-profile-api#company-pages).
+
+On the Stripe company overview, LinkedIn's “Search more employees” link opened People search with `currentCompany` and `COMPANY_PAGE_CANNED_SEARCH`, without a keyword. The same company filter was visible on the second page. The MCP adapter uses that scope with the existing search-clusters cursor mechanism.

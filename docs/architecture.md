@@ -32,7 +32,7 @@ No cloud runtime dependencies. Git installation supplies the local native host; 
 
 `native/platform.ts` owns macOS/Windows paths and launcher syntax. macOS uses a private Unix socket. Windows uses a user-specific named pipe, with a random local token in a user-ACL-protected directory. The token is checked before dispatch and never forwarded to Chrome. Windows native-host registration is scoped to HKCU; neither installation requires administrator rights.
 
-Builds expose the same 33 primitives with complete descriptions and common MCP server instructions. The runtime fingerprint binds acceptance to executable sources, dependencies, assets and build configuration rather than documentation commits. Store and development channels retain distinct native-host names.
+Builds expose the same 36 primitives with complete descriptions and common MCP server instructions. The runtime fingerprint binds acceptance to executable sources, dependencies, assets and build configuration rather than documentation commits. Store and development channels retain distinct native-host names.
 
 ## 0.3 adapter boundaries
 
@@ -44,7 +44,7 @@ A connection-generation change invalidates queued operations and guards journal 
 
 ## 0.4 direct writes
 
-All 33 operations are exposed in every build. The approval module, review UI, inbox permission and test-write build flag have been removed. Writes retain account/target checks, serialization, durable receipts and postconditions. Acceptance metadata informs release readiness only. Migration clears session drafts and the old inbox preference without replaying actions or deleting the mutation journal; it preserves the bound connection and its explicit pause state. Local data clearing is available in the popup.
+All 36 operations are exposed in every build. The approval module, review UI, inbox permission and test-write build flag have been removed. Writes retain account/target checks, serialization, durable receipts and postconditions. Acceptance metadata informs release readiness only. Migration clears session drafts and the old inbox preference without replaying actions or deleting the mutation journal; it preserves the bound connection and its explicit pause state. Local data clearing is available in the popup.
 
 ## 0.5 native post planning
 
