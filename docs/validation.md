@@ -235,3 +235,9 @@ A fresh, isolated checkout of `v0.8.2` completed npm ci, the Store/pilot build, 
 On canonical source, all 264 tests, typecheck, formatting and local release consistency pass. The existing built-installer regression now verifies published version 0.8.2, the exact Store URL and absence of the stale notice in newly built main. Publication metadata and the canonical Store URL change the main-source fingerprint; this does not replace the Store binary or relabel historical live-write evidence.
 
 The onboarding concurrency regression intermittently reached its simulated tab transition before the operation entered its adapter. Its fixed 10 ms startup delay now waits for the observed adapter call instead; assertions about queued recovery and retained tab identity are unchanged. No product recovery behavior was modified.
+
+## Company research — 2026-11-25
+
+Read-only acceptance on development commit `2bfd4ba` passed after matching the Native Host to the loaded extension. The connected MCP client searched for Stripe, selected the page by URL, read the company overview and retrieved two pages with ten distinct profiles. Buttondown reached source exhaustion with eight profiles on one page. The original people search with a keyword and company filter returned three profiles.
+
+The live search response placed industry and location together and showed follower count on a separate line. The company-search mapping now uses the first line for the industry and location fields, with a regression fixture covering that observed shape.

@@ -30,12 +30,16 @@ export function companySearchHit(row: Record<string, any>) {
   if (id && urlId && id !== urlId) throw new Fault("company_identity_mismatch");
   const resolvedId = id ?? urlId;
   if (!resolvedId) throw new Fault("company_identity_unresolved");
+  // LinkedIn puts industry and location in the first line, followers in the second.
+  const [industry, location] = (text(row.primarySubtitle?.text) ?? "").split(
+    /\s+[•·]\s+/,
+  );
   return {
     company_id: resolvedId,
     company_url: url.canonical,
     name,
-    industry: text(row.primarySubtitle?.text),
-    location: text(row.secondarySubtitle?.text),
+    industry: text(industry),
+    location: text(location),
   };
 }
 

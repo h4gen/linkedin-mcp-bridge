@@ -125,6 +125,10 @@ describe("LinkedIn company research", () => {
                       : "https://www.linkedin.com/company/other-acme/",
                   entityUrn: `urn:li:fsd_entityResultViewModel:(urn:li:fsd_company:${id},SEARCH_SRP,DEFAULT)`,
                   title: { text: "Acme" },
+                  primarySubtitle: {
+                    text: "Software Development • Seattle, Washington",
+                  },
+                  secondarySubtitle: { text: "868 followers" },
                 },
               })),
             },
@@ -156,6 +160,10 @@ describe("LinkedIn company research", () => {
       "123",
       "456",
     ]);
+    expect(found.items[0]).toMatchObject({
+      industry: "Software Development",
+      location: "Seattle, Washington",
+    });
     const profile = await f.engine.run("company_get", {
       ...company,
       company_url: found.items[0].company_url,
