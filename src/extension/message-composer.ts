@@ -42,6 +42,47 @@ const shown = <T extends Element>(root: ParentNode, selector: string) =>
   [...root.querySelectorAll<T>(selector)].filter(visible);
 const label = (e: Element) =>
   (e.getAttribute("aria-label") || e.textContent || "").trim();
+
+function directRecipient(pane: HTMLElement) {
+  const cards = shown(pane, ".msg-s-profile-card-one-to-one");
+  const chips = shown(
+    pane,
+    ".msg-connections-typeahead__added-recipients button.artdeco-pill--selected",
+  );
+  const fields = shown<HTMLInputElement>(
+    pane,
+    'input.msg-connections-typeahead__search-field[role="combobox"]',
+  );
+  if (
+    cards.length !== 1 ||
+    chips.length !== 1 ||
+    fields.length !== 1 ||
+    fields[0].value.trim() ||
+    fields[0].getAttribute("aria-expanded") !== "false"
+  )
+    throw Error("composer_recipient_unverified");
+
+  const card = cards[0];
+  const links = shown<HTMLAnchorElement>(
+    card,
+    "a.profile-card-one-to-one__profile-link[href]",
+  );
+  const name = (e: Element) => e.textContent?.trim().replace(/\s+/g, " ");
+  if (
+    links.length !== 1 ||
+    !name(chips[0]) ||
+    name(chips[0]) !== name(links[0])
+  )
+    throw Error("composer_recipient_unverified");
+  const badges = shown(card, ".artdeco-entity-lockup__badge .a11y-text");
+  return {
+    link: links[0],
+    firstDegree:
+      badges.length === 1 &&
+      /^(?:1st degree connection|Kontakt 1\. Grades)$/i.test(label(badges[0])),
+  };
+}
+
 function inspect(a: Args) {
   if (!composeRoute(location.href, a.profile_urn))
     throw Error("composer_route_mismatch");
@@ -87,15 +128,25 @@ function inspect(a: Args) {
   );
   if (editors.length !== 1) throw Error("composer_body_not_unique");
   const editor = editors[0];
+  const form = editor.closest<HTMLFormElement>("form");
   const pane =
     editor.closest<HTMLElement>(
       ".msg-inmail-compose-form-v2,.msg-compose,.msg-inmail-compose-form,.msg-convo-wrapper",
-    ) ?? editor.closest<HTMLElement>("form");
+    ) ?? form;
   if (!pane) throw Error("composer_unavailable");
+  const direct =
+    pane.matches(".msg-convo-wrapper.msg-compose-container") &&
+    form?.matches("form.msg-form")
+      ? directRecipient(pane)
+      : null;
   // Recipient chips and the recipient header are identity evidence, never links inside history/body.
-  const recipientRoots = shown<HTMLElement>(
-    pane,
-    '.msg-compose__inmail-compose-entity-lockup,.msg-compose__recipient,.msg-compose__recipient-pill,.msg-compose__recipient-list,.msg-compose__profile-card,.msg-form__recipient,.artdeco-pill--blue,[data-view-name="message-recipient"]',
+  const recipientRoots = (
+    direct
+      ? [direct.link]
+      : shown<HTMLElement>(
+          pane,
+          '.msg-compose__inmail-compose-entity-lockup,.msg-compose__recipient,.msg-compose__recipient-pill,.msg-compose__recipient-list,.msg-compose__profile-card,.msg-form__recipient,.artdeco-pill--blue,[data-view-name="message-recipient"]',
+        )
   ).filter(
     (e) =>
       !e.closest(
@@ -140,6 +191,12 @@ function inspect(a: Args) {
     /^(?:Send|Send message|Senden|Nachricht senden)$/i.test(label(b)),
   );
   if (controls.length !== 1) throw Error("composer_send_control_not_unique");
+  const button = controls[0];
+  if (
+    direct &&
+    (!button.matches("button.msg-form__send-button") || button.form !== form)
+  )
+    throw Error("composer_send_control_not_unique");
   // The native rate line is outside the editable form and recipient profile.
   // Its text node contains "Free message |" followed by the separate Why? link.
   const priceRows = shown<HTMLElement>(pane, "p").filter(
@@ -170,13 +227,23 @@ function inspect(a: Args) {
       s,
     ),
   );
+  // The native one-to-one composer for a first-degree connection has no rate line.
+  const directFree =
+    direct?.firstDegree &&
+    !pane.querySelector(
+      ".msg-inmail-compose-form-v2,.msg-inmail-compose-form,[name=subject]",
+    );
   return {
     pane,
     editor,
     reason: "verified_recipient_composer",
-    button: controls[0],
+    button,
     cost:
-      free && !paid ? "free" : paid && !free ? "credits_required" : "unknown",
+      paid && !free
+        ? "credits_required"
+        : !paid && (direct ? directFree : free)
+          ? "free"
+          : "unknown",
   };
 }
 export async function messageComposer(a: Args) {

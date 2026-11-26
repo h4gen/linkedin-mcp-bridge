@@ -801,7 +801,20 @@ it.each([true, false])(
   },
 );
 
-it.each(["free", "paid", "unknown", "wrong", "mixed", "delayed"])(
+it.each([
+  "free",
+  "paid",
+  "unknown",
+  "wrong",
+  "mixed",
+  "delayed",
+  "direct",
+  "direct_wrong",
+  "direct_no_card",
+  "direct_multiple_recipients",
+  "direct_no_degree",
+  "direct_paid",
+])(
   "routes a %s first message through the built, recipient-bound composer",
   async (mode) => {
     const src = identitySource(),
@@ -813,11 +826,31 @@ it.each(["free", "paid", "unknown", "wrong", "mixed", "delayed"])(
       delivered = 0,
       show = mode !== "delayed",
       apiWrites = 0;
+    const direct = mode.startsWith("direct");
+    const composer = direct
+      ? `<div class="msg-convo-wrapper msg-compose-container">
+          <div class="msg-connections-typeahead__added-recipients">
+            <button class="artdeco-pill--selected">Alex Example</button>
+            ${mode === "direct_multiple_recipients" ? '<button class="artdeco-pill--selected">Another recipient</button>' : ""}
+            <input class="msg-connections-typeahead__search-field" role="combobox" aria-expanded="false">
+          </div>
+          ${
+            mode === "direct_no_card"
+              ? ""
+              : `<div class="msg-s-profile-card-one-to-one">
+            <a class="profile-card-one-to-one__profile-link" href="${mode === "direct_wrong" ? "/in/other/" : url}">Alex Example</a>
+            <div class="artdeco-entity-lockup__badge"><span class="a11y-text">${mode === "direct_no_degree" ? "2nd degree connection" : "1st degree connection"}</span></div>
+          </div>`
+          }
+          ${mode === "direct_paid" ? "<p>Use 1 InMail credit</p>" : ""}
+          <form class="msg-form"><div contenteditable="true" role="textbox"></div><button class="msg-form__send-button" type="button">Send</button></form>
+        </div>`
+      : `<form class="msg-compose"><span class="msg-compose__inmail-compose-entity-lockup"><a href="${mode === "wrong" ? "/in/other/" : url}">Recipient</a></span><p>${mode === "paid" ? "Use 1 InMail credit" : mode === "unknown" ? "Send a message" : 'Free message | <strong><a href="/help/linkedin">Why?</a></strong>'}</p>${mode === "mixed" ? "<p>Use 1 credit</p>" : ""}<textarea></textarea><button type="button">Send</button></form><aside>Free message</aside>`;
     const options = {
       navigationDelay: 1,
       page: (href: string) =>
         href.includes("/messaging/compose/")
-          ? `<main><form class="msg-compose"><span class="msg-compose__inmail-compose-entity-lockup"><a href="${mode === "wrong" ? "/in/other/" : url}">Recipient</a></span><p>${mode === "paid" ? "Use 1 InMail credit" : mode === "unknown" ? "Send a message" : 'Free message | <strong><a href="/help/linkedin">Why?</a></strong>'}</p>${mode === "mixed" ? "<p>Use 1 credit</p>" : ""}<textarea></textarea><button type="button">Send</button></form><aside>Free message</aside></main>`
+          ? `<main>${composer}</main>`
           : src
               .page(href)
               .replace(
@@ -825,19 +858,31 @@ it.each(["free", "paid", "unknown", "wrong", "mixed", "delayed"])(
                 "Contact info</a>" +
                   `<a href="/messaging/compose/?profileUrn=${encodeURIComponent(identityUrn)}&recipient=${identityMember}&screenContext=NON_SELF_PROFILE_VIEW&interop=msgOverlay">Message</a>`,
               ),
-      onMount: (w: any) =>
+      onMount: (w: any) => {
+        const editor = w.document.querySelector("[contenteditable],textarea");
+        w.document.execCommand = (
+          _command: string,
+          _ui: boolean,
+          text: string,
+        ) => {
+          editor.textContent = text;
+          return true;
+        };
         w.document
           .querySelector("form button")
           ?.addEventListener("click", () => {
-            expect(w.document.querySelector("textarea").value).toBe(body);
+            expect(editor.value ?? editor.textContent).toBe(body);
             clicks++;
             delivered = Date.now() + 1;
-          }),
+          });
+      },
       fetch: (r: any) => {
         if (r.method) {
           apiWrites++;
           throw Error("unexpected generic send");
         }
+        if (direct && !clicks && r.path.includes("messengerConversations"))
+          return { data: { elements: [] } };
         if (r.path.includes("messengerMessages."))
           return {
             data: {
@@ -870,12 +915,10 @@ it.each(["free", "paid", "unknown", "wrong", "mixed", "delayed"])(
       inspect_composer: true,
     });
     expect(relationship.error).toBeUndefined();
+    const free = ["free", "delayed", "direct"].includes(mode);
+    const paid = ["paid", "direct_paid"].includes(mode);
     expect(relationship.result.messaging_cost).toBe(
-      mode === "paid"
-        ? "credits_required"
-        : ["wrong", "unknown", "mixed"].includes(mode)
-          ? "unknown"
-          : "free",
+      free ? "free" : paid ? "credits_required" : "unknown",
     );
     expect(clicks).toBe(0);
     const args = {
@@ -885,19 +928,23 @@ it.each(["free", "paid", "unknown", "wrong", "mixed", "delayed"])(
       idempotency_key: key,
     };
     const sent = await h.request("message_send", args);
-    if (!["free", "delayed"].includes(mode)) {
+    if (!free) {
       expect(sent.error?.code).toBe(
-        mode === "wrong"
+        ["wrong", "direct_wrong"].includes(mode)
           ? "recipient_mismatch"
-          : mode === "paid"
+          : paid
             ? "message_credits_required"
             : "message_cost_unknown",
       );
       expect(clicks).toBe(0);
+      expect(
+        (await h.request("operation_get", { idempotency_key: key })).result
+          .status,
+      ).toBe("not_found");
     } else {
       expect(sent.error).toBeUndefined();
       expect(sent.result.status).toBe(
-        mode === "free" ? "confirmed" : "unknown_outcome",
+        mode === "delayed" ? "unknown_outcome" : "confirmed",
       );
       expect(JSON.stringify(h.local.journal)).not.toContain(body);
       // Browser/worker restart: durable receipt survives, including any partial scan.
