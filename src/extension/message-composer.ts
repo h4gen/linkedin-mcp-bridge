@@ -74,13 +74,21 @@ function directRecipient(pane: HTMLElement) {
     name(chips[0]) !== name(links[0])
   )
     throw Error("composer_recipient_unverified");
-  const badges = shown(card, ".artdeco-entity-lockup__badge .a11y-text");
+  // The screen-reader label can have no layout box in a background tab.
+  const badges = [...card.querySelectorAll(".artdeco-entity-lockup__badge")];
+  const degree = badges[0]?.querySelector(".a11y-text")?.textContent?.trim();
+  const displayed = badges[0]
+    ?.querySelector(".artdeco-entity-lockup__degree")
+    ?.textContent?.trim();
   return {
     link: links[0],
-    firstDegree: badges.length
-      ? badges.length === 1 &&
-        /^(?:1st degree connection|Kontakt 1\. Grades)$/i.test(label(badges[0]))
-      : null,
+    firstDegree:
+      degree || displayed
+        ? badges.length === 1 &&
+          (!degree ||
+            /^(?:1st degree connection|Kontakt 1\. Grades)$/i.test(degree)) &&
+          (!displayed || /^[·•]?\s*1(?:st|\.)$/i.test(displayed))
+        : null,
   };
 }
 
@@ -229,11 +237,12 @@ function inspect(a: Args) {
     ),
   );
   // An incomplete recipient card must let the existing composer probe retry.
-  if (direct?.firstDegree === null && !paid)
+  const firstDegree = direct?.firstDegree ?? a.verified_first_degree === true;
+  if (direct?.firstDegree === null && !firstDegree && !paid)
     throw Error("composer_connection_degree_unavailable");
   // The native one-to-one composer for a first-degree connection has no rate line.
   const directFree =
-    direct?.firstDegree &&
+    firstDegree &&
     !pane.querySelector(
       ".msg-inmail-compose-form-v2,.msg-inmail-compose-form,[name=subject]",
     );

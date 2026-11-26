@@ -347,6 +347,7 @@ const engine = new Engine({
             dispatch: true,
             profile_url: proof.profile_url,
             profile_urn: proof.peer,
+            verified_first_degree: proof.verified_first_degree,
             text: a.text,
             execution_deadline: a.execution_deadline,
             execution_session: session,
@@ -472,6 +473,17 @@ const engine = new Engine({
       );
       const inspectComposer = async () => {
         const peer = basic.entityUrn;
+        const linkedProfile = extra?.relationship;
+        const verified_first_degree =
+          linkedProfile?.connection_degree === "1" &&
+          linkedProfile.profile_urn === peer &&
+          !linkedProfile.evidence.some(({ value }: { value: string }) =>
+            [
+              "connect_available",
+              "outgoing_pending",
+              "incoming_pending",
+            ].includes(value),
+          );
         let reason = "profile_compose_link_unavailable";
         if (extra?.compose_url) {
           await navigate(extra.compose_url);
@@ -483,6 +495,7 @@ const engine = new Engine({
               await pageOperation("message_composer", {
                 profile_url: basic.profile_url,
                 profile_urn: peer,
+                verified_first_degree,
               })
             )[0]?.result;
             reason = result?.reason ?? "composer_unavailable";
@@ -495,6 +508,7 @@ const engine = new Engine({
                   tab: id,
                   peer,
                   profile_url: basic.profile_url,
+                  verified_first_degree,
                 },
               };
             if (

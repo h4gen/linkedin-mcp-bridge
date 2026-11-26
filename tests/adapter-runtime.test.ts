@@ -810,6 +810,8 @@ it.each([
   "delayed",
   "direct",
   "direct_loading",
+  "direct_no_badge",
+  "direct_unproven",
   "direct_wrong",
   "direct_no_card",
   "direct_multiple_recipients",
@@ -840,7 +842,7 @@ it.each([
               ? ""
               : `<div class="msg-s-profile-card-one-to-one">
             <a class="profile-card-one-to-one__profile-link" href="${mode === "direct_wrong" ? "/in/other/" : url}">Alex Example</a>
-            <div class="artdeco-entity-lockup__badge"><span class="a11y-text">${mode === "direct_no_degree" ? "2nd degree connection" : "1st degree connection"}</span></div>
+            ${["direct_no_badge", "direct_unproven"].includes(mode) ? "" : `<div class="artdeco-entity-lockup__badge"><span class="a11y-text">${mode === "direct_no_degree" ? "2nd degree connection" : "1st degree connection"}</span></div>`}
           </div>`
           }
           ${mode === "direct_paid" ? "<p>Use 1 InMail credit</p>" : ""}
@@ -855,6 +857,12 @@ it.each([
           : src
               .page(href)
               .replace(
+                "• 1st",
+                ["direct_loading", "direct_unproven"].includes(mode)
+                  ? ""
+                  : "• 1st",
+              )
+              .replace(
                 "Contact info</a>",
                 "Contact info</a>" +
                   `<a href="/messaging/compose/?profileUrn=${encodeURIComponent(identityUrn)}&recipient=${identityMember}&screenContext=NON_SELF_PROFILE_VIEW&interop=msgOverlay">Message</a>`,
@@ -862,9 +870,15 @@ it.each([
       onMount: (w: any) => {
         const editor = w.document.querySelector("[contenteditable],textarea");
         const badge = w.document.querySelector(".a11y-text");
+        if (badge) badge.getClientRects = () => [];
         if (badge && mode === "direct_loading") {
           let reads = 0;
-          badge.getClientRects = () => (++reads < 3 ? [] : [{}]);
+          const card = badge.closest(".msg-s-profile-card-one-to-one");
+          const query = card.querySelectorAll.bind(card);
+          card.querySelectorAll = (selector: string) =>
+            selector === ".artdeco-entity-lockup__badge" && ++reads < 3
+              ? []
+              : query(selector);
         }
         w.document.execCommand = (
           _command: string,
@@ -921,7 +935,13 @@ it.each([
       inspect_composer: true,
     });
     expect(relationship.error).toBeUndefined();
-    const free = ["free", "delayed", "direct", "direct_loading"].includes(mode);
+    const free = [
+      "free",
+      "delayed",
+      "direct",
+      "direct_loading",
+      "direct_no_badge",
+    ].includes(mode);
     const paid = ["paid", "direct_paid"].includes(mode);
     expect(relationship.result.messaging_cost).toBe(
       free ? "free" : paid ? "credits_required" : "unknown",
