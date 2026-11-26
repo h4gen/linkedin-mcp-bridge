@@ -809,6 +809,7 @@ it.each([
   "mixed",
   "delayed",
   "direct",
+  "direct_loading",
   "direct_wrong",
   "direct_no_card",
   "direct_multiple_recipients",
@@ -860,6 +861,11 @@ it.each([
               ),
       onMount: (w: any) => {
         const editor = w.document.querySelector("[contenteditable],textarea");
+        const badge = w.document.querySelector(".a11y-text");
+        if (badge && mode === "direct_loading") {
+          let reads = 0;
+          badge.getClientRects = () => (++reads < 3 ? [] : [{}]);
+        }
         w.document.execCommand = (
           _command: string,
           _ui: boolean,
@@ -915,7 +921,7 @@ it.each([
       inspect_composer: true,
     });
     expect(relationship.error).toBeUndefined();
-    const free = ["free", "delayed", "direct"].includes(mode);
+    const free = ["free", "delayed", "direct", "direct_loading"].includes(mode);
     const paid = ["paid", "direct_paid"].includes(mode);
     expect(relationship.result.messaging_cost).toBe(
       free ? "free" : paid ? "credits_required" : "unknown",

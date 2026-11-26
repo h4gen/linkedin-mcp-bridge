@@ -77,9 +77,10 @@ function directRecipient(pane: HTMLElement) {
   const badges = shown(card, ".artdeco-entity-lockup__badge .a11y-text");
   return {
     link: links[0],
-    firstDegree:
-      badges.length === 1 &&
-      /^(?:1st degree connection|Kontakt 1\. Grades)$/i.test(label(badges[0])),
+    firstDegree: badges.length
+      ? badges.length === 1 &&
+        /^(?:1st degree connection|Kontakt 1\. Grades)$/i.test(label(badges[0]))
+      : null,
   };
 }
 
@@ -227,6 +228,9 @@ function inspect(a: Args) {
       s,
     ),
   );
+  // An incomplete recipient card must let the existing composer probe retry.
+  if (direct?.firstDegree === null && !paid)
+    throw Error("composer_connection_degree_unavailable");
   // The native one-to-one composer for a first-degree connection has no rate line.
   const directFree =
     direct?.firstDegree &&
@@ -362,6 +366,7 @@ export async function messageComposer(a: Args) {
       "composer_unavailable",
       "composer_body_not_unique",
       "composer_recipient_unverified",
+      "composer_connection_degree_unavailable",
       "recipient_mismatch",
       "composer_send_control_not_unique",
       "composer_session_changed",

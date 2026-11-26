@@ -34,6 +34,7 @@ export function adapterDiagnostics(details: Record<string, unknown> = {}) {
     "composer_unavailable",
     "composer_body_not_unique",
     "composer_recipient_unverified",
+    "composer_connection_degree_unavailable",
     "recipient_mismatch",
     "composer_send_control_not_unique",
     "profile_compose_link_unavailable",
